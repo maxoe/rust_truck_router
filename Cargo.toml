@@ -1,0 +1,7 @@
+[package]
+name = "stud-rust-base"
+version = "0.1.0"
+authors = ["Tim Zeitz <tim.zeitz@kit.edu>"]
+
+[dependencies]
+time = "0.1.40"
