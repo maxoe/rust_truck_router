@@ -1,13 +1,10 @@
-extern crate time as time_crate;
+extern crate stud_rust_base;
 
-mod index_heap;
-mod io;
-mod time;
-mod types;
-
-use types::*;
-use io::*;
-use time::*;
+use stud_rust_base::{
+    types::*,
+    io::*,
+    time::report_time,
+};
 
 use std::{env, path::Path};
 
@@ -18,9 +15,9 @@ fn main() {
     let arg = &args.next().expect("No directory arg given");
     let path = Path::new(arg);
 
-    let first_out: Vec<EdgeId> = Vec::load_from(path.join("first_out").to_str().unwrap()).expect("could not read first_out");
-    let head: Vec<NodeId> = Vec::load_from(path.join("head").to_str().unwrap()).expect("could not read head");
-    let travel_time: Vec<Weight> = Vec::load_from(path.join("travel_time").to_str().unwrap()).expect("could not read travel_time");
+    let first_out = Vec::<EdgeId>::load_from(path.join("first_out").to_str().unwrap()).expect("could not read first_out");
+    let head = Vec::<NodeId>::load_from(path.join("head").to_str().unwrap()).expect("could not read head");
+    let travel_time = Vec::<Weight>::load_from(path.join("travel_time").to_str().unwrap()).expect("could not read travel_time");
 
     report_time("iterating over arcs of some node", || {
         let node_id = 42;

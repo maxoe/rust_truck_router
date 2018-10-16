@@ -19,7 +19,6 @@ const TREE_ARITY: usize = 4;
 const INVALID_POSITION: usize = std::usize::MAX;
 
 impl<T: Ord + Indexing> IndexdMinHeap<T> {
-    #[allow(dead_code)]
     pub fn new(max_id: usize) -> IndexdMinHeap<T> {
         IndexdMinHeap {
             positions: vec![INVALID_POSITION; max_id],
@@ -35,12 +34,10 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
         self.len() == 0
     }
 
-    #[allow(dead_code)]
     pub fn contains_index(&self, id: usize) -> bool {
         self.positions[id] != INVALID_POSITION
     }
 
-    #[allow(dead_code)]
     pub fn clear(&mut self) {
         for element in &self.data {
             self.positions[element.as_index()] = INVALID_POSITION;
@@ -48,12 +45,10 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
         self.data.clear();
     }
 
-    #[allow(dead_code)]
     pub fn peek(&self) -> Option<&T> {
         self.data.first()
     }
 
-    #[allow(dead_code)]
     pub fn pop(&mut self) -> Option<T> {
         self.data.pop().map(|mut item| {
             self.positions[item.as_index()] = INVALID_POSITION;
@@ -67,7 +62,6 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
         })
     }
 
-    #[allow(dead_code)]
     pub fn push(&mut self, element: T) {
         assert!(!self.contains_index(element.as_index()));
         let insert_position = self.len();
@@ -79,7 +73,6 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
     // Updates the key of an element if the new key is smaller than the old key.
     // Does nothing if the new key is larger.
     // Undefined if the element is not part of the queue.
-    #[allow(dead_code)]
     pub fn decrease_key(&mut self, element: T) {
         let position = self.positions[element.as_index()];
         self.data[position] = element;
@@ -89,7 +82,6 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
     // Updates the key of an element if the new key is larger than the old key.
     // Does nothing if the new key is smaller.
     // Undefined if the element is not part of the queue.
-    #[allow(dead_code)]
     pub fn increase_key(&mut self, element: T) {
         let position = self.positions[element.as_index()];
         self.data[position] = element;
