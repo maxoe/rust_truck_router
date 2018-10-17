@@ -1,3 +1,5 @@
+//! A small base framework for route planning student projects.
+
 extern crate time as time_crate;
 
 pub mod index_heap;

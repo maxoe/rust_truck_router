@@ -66,6 +66,10 @@ Die Dateien in `src/bin/` sind einmal ein Beispielprogramm sowieso Hilfsprogramm
 Das Programm `compare_vector` vergleicht ob zwei Vektoren identisch sind und wenn sie es nicht sind gibt es eine Übersicht über die Unterschiede.
 Fügen sie Ihre Programme in `src/bin/` hinzu, diese werden dann von `cargo` automatisch gefunden.
 
+## Docs
+
+`cargo doc --open` öffnet die Dokumentation zu dem bereitgestelltem Code.
+
 ## Graphen
 
 Knoten und Kanten werden durch numerische IDs identifiziert, die von `0` bis `n-1` bzw. `m-1` gehen, wobei `n` die Anzahl an Knoten und `m` die Anzahl an gerichteten Kanten ist.
