@@ -1,43 +1,43 @@
 extern crate stud_rust_base;
-use stud_rust_base::io::*;
-use std::env;
+use stud_rust_base::{io::*, cli::CliErr};
+use std::{env, fmt::Display, error::Error};
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args();
     args.next();
 
     match &args.collect::<Vec<String>>()[..] {
         [data_type, input1, input2] => {
             match data_type.as_ref() {
-                "i8" => compare_values(&Vec::<i8>::load_from(input1).expect("Failed to read from input1"), &Vec::<i8>::load_from(input2).expect("Failed to read from input2")),
-                "u8" => compare_values(&Vec::<u8>::load_from(input1).expect("Failed to read from input1"), &Vec::<u8>::load_from(input2).expect("Failed to read from input2")),
-                "i16" => compare_values(&Vec::<i16>::load_from(input1).expect("Failed to read from input1"), &Vec::<i16>::load_from(input2).expect("Failed to read from input2")),
-                "u16" => compare_values(&Vec::<u16>::load_from(input1).expect("Failed to read from input1"), &Vec::<u16>::load_from(input2).expect("Failed to read from input2")),
-                "i32" => compare_values(&Vec::<i32>::load_from(input1).expect("Failed to read from input1"), &Vec::<i32>::load_from(input2).expect("Failed to read from input2")),
-                "u32" => compare_values(&Vec::<u32>::load_from(input1).expect("Failed to read from input1"), &Vec::<u32>::load_from(input2).expect("Failed to read from input2")),
-                "i64" => compare_values(&Vec::<i64>::load_from(input1).expect("Failed to read from input1"), &Vec::<i64>::load_from(input2).expect("Failed to read from input2")),
-                "u64" => compare_values(&Vec::<u64>::load_from(input1).expect("Failed to read from input1"), &Vec::<u64>::load_from(input2).expect("Failed to read from input2")),
-                "f32" => compare_values(&Vec::<f32>::load_from(input1).expect("Failed to read from input1"), &Vec::<f32>::load_from(input2).expect("Failed to read from input2")),
-                "f64" => compare_values(&Vec::<f64>::load_from(input1).expect("Failed to read from input1"), &Vec::<f64>::load_from(input2).expect("Failed to read from input2")),
-                "int8" => compare_values(&Vec::<i8>::load_from(input1).expect("Failed to read from input1"), &Vec::<i8>::load_from(input2).expect("Failed to read from input2")),
-                "uint8" => compare_values(&Vec::<u8>::load_from(input1).expect("Failed to read from input1"), &Vec::<u8>::load_from(input2).expect("Failed to read from input2")),
-                "int16" => compare_values(&Vec::<i16>::load_from(input1).expect("Failed to read from input1"), &Vec::<i16>::load_from(input2).expect("Failed to read from input2")),
-                "uint16" => compare_values(&Vec::<u16>::load_from(input1).expect("Failed to read from input1"), &Vec::<u16>::load_from(input2).expect("Failed to read from input2")),
-                "int32" => compare_values(&Vec::<i32>::load_from(input1).expect("Failed to read from input1"), &Vec::<i32>::load_from(input2).expect("Failed to read from input2")),
-                "uint32" => compare_values(&Vec::<u32>::load_from(input1).expect("Failed to read from input1"), &Vec::<u32>::load_from(input2).expect("Failed to read from input2")),
-                "int64" => compare_values(&Vec::<i64>::load_from(input1).expect("Failed to read from input1"), &Vec::<i64>::load_from(input2).expect("Failed to read from input2")),
-                "uint64" => compare_values(&Vec::<u64>::load_from(input1).expect("Failed to read from input1"), &Vec::<u64>::load_from(input2).expect("Failed to read from input2")),
-                "float32" => compare_values(&Vec::<f32>::load_from(input1).expect("Failed to read from input1"), &Vec::<f32>::load_from(input2).expect("Failed to read from input2")),
-                "float64" => compare_values(&Vec::<f64>::load_from(input1).expect("Failed to read from input1"), &Vec::<f64>::load_from(input2).expect("Failed to read from input2")),
+                "i8" => { compare_values(&Vec::<i8>::load_from(input1)?, &Vec::<i8>::load_from(input2)?); Ok(()) },
+                "u8" => { compare_values(&Vec::<u8>::load_from(input1)?, &Vec::<u8>::load_from(input2)?); Ok(()) },
+                "i16" => { compare_values(&Vec::<i16>::load_from(input1)?, &Vec::<i16>::load_from(input2)?); Ok(()) },
+                "u16" => { compare_values(&Vec::<u16>::load_from(input1)?, &Vec::<u16>::load_from(input2)?); Ok(()) },
+                "i32" => { compare_values(&Vec::<i32>::load_from(input1)?, &Vec::<i32>::load_from(input2)?); Ok(()) },
+                "u32" => { compare_values(&Vec::<u32>::load_from(input1)?, &Vec::<u32>::load_from(input2)?); Ok(()) },
+                "i64" => { compare_values(&Vec::<i64>::load_from(input1)?, &Vec::<i64>::load_from(input2)?); Ok(()) },
+                "u64" => { compare_values(&Vec::<u64>::load_from(input1)?, &Vec::<u64>::load_from(input2)?); Ok(()) },
+                "f32" => { compare_values(&Vec::<f32>::load_from(input1)?, &Vec::<f32>::load_from(input2)?); Ok(()) },
+                "f64" => { compare_values(&Vec::<f64>::load_from(input1)?, &Vec::<f64>::load_from(input2)?); Ok(()) },
+                "int8" => { compare_values(&Vec::<i8>::load_from(input1)?, &Vec::<i8>::load_from(input2)?); Ok(()) },
+                "uint8" => { compare_values(&Vec::<u8>::load_from(input1)?, &Vec::<u8>::load_from(input2)?); Ok(()) },
+                "int16" => { compare_values(&Vec::<i16>::load_from(input1)?, &Vec::<i16>::load_from(input2)?); Ok(()) },
+                "uint16" => { compare_values(&Vec::<u16>::load_from(input1)?, &Vec::<u16>::load_from(input2)?); Ok(()) },
+                "int32" => { compare_values(&Vec::<i32>::load_from(input1)?, &Vec::<i32>::load_from(input2)?); Ok(()) },
+                "uint32" => { compare_values(&Vec::<u32>::load_from(input1)?, &Vec::<u32>::load_from(input2)?); Ok(()) },
+                "int64" => { compare_values(&Vec::<i64>::load_from(input1)?, &Vec::<i64>::load_from(input2)?); Ok(()) },
+                "uint64" => { compare_values(&Vec::<u64>::load_from(input1)?, &Vec::<u64>::load_from(input2)?); Ok(()) },
+                "float32" => { compare_values(&Vec::<f32>::load_from(input1)?, &Vec::<f32>::load_from(input2)?); Ok(()) },
+                "float64" => { compare_values(&Vec::<f64>::load_from(input1)?, &Vec::<f64>::load_from(input2)?); Ok(()) },
                 _ => {
                     print_usage();
-                    panic!("Unknown data_type {}", data_type);
+                    Err(Box::new(CliErr("Invalid data type")))
                 }
-            };
+            }
         },
         _ => {
             print_usage();
-            panic!("Invalid input")
+            Err(Box::new(CliErr("Invalid arguments")))
         },
     }
 }
@@ -59,8 +59,6 @@ Compares two vectors of elements in binary format. data_type can be one of
 
 ");
 }
-
-use std::fmt::Display;
 
 fn compare_values<T>(values1: &[T], values2: &[T]) where
     T: Display,

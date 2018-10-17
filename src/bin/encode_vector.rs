@@ -1,43 +1,43 @@
 extern crate stud_rust_base;
-use stud_rust_base::io::*;
-use std::env;
+use stud_rust_base::{io::*, cli::CliErr};
+use std::{env, error::Error};
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args();
     args.next();
 
     match &args.collect::<Vec<String>>()[..] {
         [data_type, output] => {
             match data_type.as_ref() {
-                "i8" => parse_input::<i8>().write_to(output).expect("Failed to write to output"),
-                "u8" => parse_input::<u8>().write_to(output).expect("Failed to write to output"),
-                "i16" => parse_input::<i16>().write_to(output).expect("Failed to write to output"),
-                "u16" => parse_input::<u16>().write_to(output).expect("Failed to write to output"),
-                "i32" => parse_input::<i32>().write_to(output).expect("Failed to write to output"),
-                "u32" => parse_input::<u32>().write_to(output).expect("Failed to write to output"),
-                "i64" => parse_input::<i64>().write_to(output).expect("Failed to write to output"),
-                "u64" => parse_input::<u64>().write_to(output).expect("Failed to write to output"),
-                "f32" => parse_input::<f32>().write_to(output).expect("Failed to write to output"),
-                "f64" => parse_input::<f64>().write_to(output).expect("Failed to write to output"),
-                "int8" => parse_input::<i8>().write_to(output).expect("Failed to write to output"),
-                "uint8" => parse_input::<u8>().write_to(output).expect("Failed to write to output"),
-                "int16" => parse_input::<i16>().write_to(output).expect("Failed to write to output"),
-                "uint16" => parse_input::<u16>().write_to(output).expect("Failed to write to output"),
-                "int32" => parse_input::<i32>().write_to(output).expect("Failed to write to output"),
-                "uint32" => parse_input::<u32>().write_to(output).expect("Failed to write to output"),
-                "int64" => parse_input::<i64>().write_to(output).expect("Failed to write to output"),
-                "uint64" => parse_input::<u64>().write_to(output).expect("Failed to write to output"),
-                "float32" => parse_input::<f32>().write_to(output).expect("Failed to write to output"),
-                "float64" => parse_input::<f64>().write_to(output).expect("Failed to write to output"),
+                "i8" => { parse_input::<i8>()?.write_to(output)?; Ok(()) },
+                "u8" => { parse_input::<u8>()?.write_to(output)?; Ok(()) },
+                "i16" => { parse_input::<i16>()?.write_to(output)?; Ok(()) },
+                "u16" => { parse_input::<u16>()?.write_to(output)?; Ok(()) },
+                "i32" => { parse_input::<i32>()?.write_to(output)?; Ok(()) },
+                "u32" => { parse_input::<u32>()?.write_to(output)?; Ok(()) },
+                "i64" => { parse_input::<i64>()?.write_to(output)?; Ok(()) },
+                "u64" => { parse_input::<u64>()?.write_to(output)?; Ok(()) },
+                "f32" => { parse_input::<f32>()?.write_to(output)?; Ok(()) },
+                "f64" => { parse_input::<f64>()?.write_to(output)?; Ok(()) },
+                "int8" => { parse_input::<i8>()?.write_to(output)?; Ok(()) },
+                "uint8" => { parse_input::<u8>()?.write_to(output)?; Ok(()) },
+                "int16" => { parse_input::<i16>()?.write_to(output)?; Ok(()) },
+                "uint16" => { parse_input::<u16>()?.write_to(output)?; Ok(()) },
+                "int32" => { parse_input::<i32>()?.write_to(output)?; Ok(()) },
+                "uint32" => { parse_input::<u32>()?.write_to(output)?; Ok(()) },
+                "int64" => { parse_input::<i64>()?.write_to(output)?; Ok(()) },
+                "uint64" => { parse_input::<u64>()?.write_to(output)?; Ok(()) },
+                "float32" => { parse_input::<f32>()?.write_to(output)?; Ok(()) },
+                "float64" => { parse_input::<f64>()?.write_to(output)?; Ok(()) },
                 _ => {
                     print_usage();
-                    panic!("Unknown data_type {}", data_type);
+                    Err(Box::new(CliErr("Invalid data type")))
                 }
-            };
+            }
         },
         _ => {
             print_usage();
-            panic!("Invalid input")
+            Err(Box::new(CliErr("Invalid arguments")))
         },
     }
 }
@@ -60,14 +60,11 @@ Reads textual data from the standard input and writes it in a binary format to o
 ");
 }
 
-use std::{
-    str::FromStr,
-    fmt::Debug,
-};
+use std::str::FromStr;
 
-fn parse_input<T>() -> Vec<T> where
+fn parse_input<T>() -> Result<Vec<T>, Box<dyn Error>> where
     T: FromStr,
-    <T as FromStr>::Err: Debug
+    <T as FromStr>::Err: Error + 'static
 {
     use std::io::{BufRead, stdin};
 
@@ -75,8 +72,8 @@ fn parse_input<T>() -> Vec<T> where
 
     let stdin = stdin();
     for line in stdin.lock().lines() {
-        values.push(line.unwrap().parse::<T>().unwrap())
+        values.push(line.unwrap().parse::<T>()?)
     }
 
-    values
+    Ok(values)
 }
