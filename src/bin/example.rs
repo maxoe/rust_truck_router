@@ -21,7 +21,7 @@ fn main() {
 
     report_time("iterating over arcs of some node", || {
         let node_id = 42;
-        for &edge_id in &head[first_out[node_id] as usize .. first_out[node_id + 1] as usize] {
+        for edge_id in first_out[node_id] .. first_out[node_id + 1] {
             println!("There is an arc from {} to {} with weight {}", node_id, head[edge_id as usize], travel_time[edge_id as usize]);
         }
     });
