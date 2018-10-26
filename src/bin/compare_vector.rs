@@ -65,7 +65,8 @@ fn compare_values<T>(values1: &[T], values2: &[T]) where
     T: PartialOrd
 {
     if values1.len() != values2.len() {
-        println!("Can only compare vectors of equal size. The first vector has {} elements. The second vector has {} elements.", values1.len(), values2.len());
+        println!("0");
+        eprintln!("Can only compare vectors of equal size. The first vector has {} elements. The second vector has {} elements.", values1.len(), values2.len());
         return
     }
 
@@ -84,16 +85,18 @@ fn compare_values<T>(values1: &[T], values2: &[T]) where
 
     match first_diff {
         Some(index) => {
-            println!("The vectors differ.");
-            println!("{} elements are smaller in the first vector.", v1_smaller_count);
-            println!("{} elements are smaller in the second vector.", v2_smaller_count);
-            println!("{} elements are the same.", values1.len() - v1_smaller_count - v2_smaller_count);
-            println!("{} elements are different.", v1_smaller_count + v2_smaller_count);
-            println!("The vectors have  {} elements.", values1.len());
-            println!("The first element that differs is at index {}.", index);
+            eprintln!("The vectors differ.");
+            eprintln!("{} elements are smaller in the first vector.", v1_smaller_count);
+            eprintln!("{} elements are smaller in the second vector.", v2_smaller_count);
+            eprintln!("{} elements are the same.", values1.len() - v1_smaller_count - v2_smaller_count);
+            println!("{}", values1.len() - v1_smaller_count - v2_smaller_count);
+            eprintln!("{} elements are different.", v1_smaller_count + v2_smaller_count);
+            eprintln!("The vectors have {} elements.", values1.len());
+            eprintln!("The first element that differs is at index {}.", index);
         },
         None => {
-            println!("The vectors are the same and have  {} elements.", values1.len());
+            println!("{}", values1.len());
+            eprintln!("The vectors are the same and have {} elements.", values1.len());
         },
     }
 }
