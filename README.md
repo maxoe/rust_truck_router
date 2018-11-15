@@ -23,7 +23,7 @@ Insbesondere mit ["Dem Buch"](https://doc.rust-lang.org/book/second-edition/inde
 Rust hat ein Build- und Dependency Managementsystem. Yay.
 Heißt `cargo`.
 Mit `cargo build` kann man Programme bauen.
-Im Falle dieses Repos baut das nur die Basislib und noch keine Executable, dazu dann z.B. `cargo build --bin example`.
+Im Falle dieses Repos baut das nur die Basislib und noch keine Executable, dazu dann z.B. `cargo build --bin example` oder statt example ein anderes Programm wie `decode_vector`.
 Mit `cargo run` kann man bauen und direkt ausführen.
 Argumente an das Programm kommen nach einem `--`.
 Sobald die Performance interessant ist unbedingt `cargo run --release` nutzen - das ist ungefähr was `-O3` bei C++ ist.
