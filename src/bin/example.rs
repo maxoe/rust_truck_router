@@ -1,5 +1,3 @@
-extern crate stud_rust_base;
-
 use stud_rust_base::{
     types::*,
     io::*,

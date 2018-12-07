@@ -1,15 +1,13 @@
 //! This module contains a few utilities to measure how long executing algorithms takes.
 //! It utilizes the `time` crate.
 
-use time_crate as time;
-
 /// This function will measure how long it takes to execute the given lambda,
 /// print the time and return the result of the lambda.
 pub fn report_time<Out, F: FnOnce() -> Out>(name: &str, f: F) -> Out {
     let start = time::now();
-    println!("starting {}", name);
+    eprintln!("starting {}", name);
     let res = f();
-    println!("done {} - took: {}", name, (time::now() - start));
+    eprintln!("done {} - took: {}", name, (time::now() - start));
     res
 }
 
@@ -46,7 +44,7 @@ impl Timer {
 
     /// Print the passed time in ms since the timer was started
     pub fn report_passed_ms(&self) {
-        println!("{}ms", (time::now() - self.start).num_milliseconds());
+        eprintln!("{}ms", (time::now() - self.start).num_milliseconds());
     }
 
     /// Return the number of ms passed since the timer was started as a `i64`

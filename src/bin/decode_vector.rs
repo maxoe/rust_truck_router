@@ -1,4 +1,3 @@
-extern crate stud_rust_base;
 use stud_rust_base::{io::*, cli::CliErr};
 use std::{env, error::Error};
 

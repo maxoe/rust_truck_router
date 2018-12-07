@@ -2,6 +2,7 @@
 name = "stud-rust-base"
 version = "0.1.0"
 authors = ["Tim Zeitz <tim.zeitz@kit.edu>"]
+edition = '2018'
 
 [dependencies]
-time = "0.1.40"
+time = "^0.1.40"
