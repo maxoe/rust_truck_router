@@ -35,7 +35,7 @@ Mit `cargo check` kann man das Programm checken ohne zu bauen, das kann einem ei
 
 Rust hat einen exzellenten Linter, der einem sehr hilft idiomatischen und performanten Code zu schreiben.
 Das ist insbesondere wenn man noch nicht viel Erfahrung mit der Sprache hat extrem sinnvoll!
-Installieren kann man Clippy mit `rustup component add clippy-preview`.
+Installieren kann man Clippy mit `rustup component add clippy`.
 Anstatt `cargo check` ruft man dann `cargo clippy` auf und kann sich auf viel hilfreiches Feedback freuen.
 
 # Rust Routenplanungs-Basis-Framework
@@ -108,9 +108,9 @@ Die Aufgabengraphen haben die Größe des Deutschlandgraphen.
 
 ## Hinweise zur Nutzung im Routenplanungspraktikum
 
-Der Quellcode soll durch das Ausführen von `cargo build --all` mit dem aktuellen stabilen Compiler (1.29.2) übersetzt werden können.
+Der Quellcode soll durch das Ausführen von `cargo build --all` mit dem aktuellen stabilen Compiler (1.38.0) übersetzt werden können.
 Auf den Poolraumrechner ist kein Rust Compiler vorinstalliert.
 Sie können aber für ihren Nutzer lokal `rustup` und damit dann einen aktuellen Compiler installieren.
 Die Nutzung von nicht stabilen nightly Features ist nicht erlaubt.
 Das verwenden externer crates ist nicht erlaubt.
-Die Rust-Standardbibliothek ist nicht extern.
+Die Rust-Standardbibliothek gilt nicht als extern.
