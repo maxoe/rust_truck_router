@@ -53,12 +53,11 @@ Die entsprechenden Funktionen sind über Traits definiert und können so direkt 
 Das kann z.B. so aussehen:
 
 ```Rust
-extern crate stud_rust_base;
 use stud_rust_base::io::*;
 
-let head = Vec::<u32>::load_from("head_file_name").expect("could not read head");
-let lat = Vec::<f32>::load_from("node_latitude_file_name").expect("could not read lat");
-head.write_to("output_file").expect("could not write head");
+let head = Vec::<u32>::load_from("head_file_name")?;
+let lat = Vec::<f32>::load_from("node_latitude_file_name")?;
+head.write_to(&"output_file")?;
 ```
 
 Die Dateien in `src/bin/` sind einmal ein Beispielprogramm sowieso Hilfsprogramme.
@@ -79,12 +78,11 @@ Diese heißen `first_out`, `head` und `weight`.
 Um über die ausgehenden Kanten eines Knoten zu iterieren können Sie den folgenden Code verwenden:
 
 ```Rust
-extern crate stud_rust_base;
 use stud_rust_base::{types::*, io::*};
 
-let first_out = Vec::<EdgeId>::load_from("first_out_file_name").expect("could not read first_out");
-let head = Vec::<NodeId>::load_from("head_file_name").expect("could not read head");
-let travel_time = Vec::<Weight>::load_from("weight_file_name").expect("could not read travel_time");
+let first_out = Vec::<EdgeId>::load_from("first_out_file_name")?;
+let head = Vec::<NodeId>::load_from("head_file_name")?;
+let travel_time = Vec::<Weight>::load_from("weight_file_name")?;
 
 let node_id = 42;
 for edge_id in first_out[node_id] .. first_out[node_id + 1] {

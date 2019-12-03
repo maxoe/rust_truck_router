@@ -1,26 +1,26 @@
 //! This module contains a few traits and blanket implementations
-//! for (de)serializing and writing/reading numeric data to/from the disc.
+//! for (de)serializing and writing/reading data to/from the disc.
 //! To use it you should import the `Load` and `Store` traits and use the
 //! `load_from` and `write_to` methods.
 //!
 //! # Example
 //!
-//! ```
-//! use stud_rust_base::io::*;
+//! ```no_run
+//! # use stud_rust_base::io::*;
 //!
-//! fn test() {
-//!     let head = Vec::<u32>::load_from("head_file_name").expect("could not read head");
-//!     let lat = Vec::<f32>::load_from("node_latitude_file_name").expect("could not read lat");
-//!     head.write_to("output_file").expect("could not write head");
-//! }
+//! let head = Vec::<u32>::load_from("head_file_name")?;
+//! let lat = Vec::<f32>::load_from("node_latitude_file_name")?;
+//! head.write_to(&"output_file")?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use std::fs;
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::Result;
-use std::mem;
-use std::slice;
+use std::{
+    fs::{metadata, File},
+    io::{prelude::*, Result},
+    mem,
+    path::Path,
+    slice,
+};
 
 /// A trait which allows accessing the data of an object as a slice of bytes.
 /// The bytes should represent a serialization of the object and allow
@@ -49,6 +49,12 @@ impl<T: Copy> DataBytes for [T] {
     }
 }
 
+impl<T: Copy> DataBytes for Vec<T> {
+    fn data_bytes(&self) -> &[u8] {
+        &self[..].data_bytes()
+    }
+}
+
 impl<T: Copy> DataBytesMut for [T] {
     fn data_bytes_mut(&mut self) -> &mut [u8] {
         let num_bytes = self.len() * mem::size_of::<T>();
@@ -64,10 +70,10 @@ impl<T: Copy> DataBytesMut for Vec<T> {
 }
 
 /// A trait which extends the `DataBytes` trait and exposes a method to write objects to disk.
-pub trait Store : DataBytes {
-    /// Writes the serialized object to the file with the given filename
-    fn write_to(&self, filename: &str) -> Result<()> {
-        File::create(filename)?.write_all(self.data_bytes())
+pub trait Store: DataBytes {
+    /// Writes the serialized object to the file with the given path
+    fn write_to(&self, path: &dyn AsRef<Path>) -> Result<()> {
+        File::create(path)?.write_all(self.data_bytes())
     }
 }
 
@@ -75,16 +81,16 @@ impl<T: DataBytes> Store for T {}
 impl<T> Store for [T] where [T]: DataBytes {}
 
 /// A trait to load serialized data back into objects.
-pub trait Load : DataBytesMut + Sized {
+pub trait Load: DataBytesMut + Sized {
     /// This method must create an object of the correct size for serialized data with the given number of bytes.
     /// It should not be necessary to call this method directly.
     fn new_with_bytes(num_bytes: usize) -> Self;
 
     /// This method will load serialized data from the disk, create an object of the appropriate size,
     /// deserialize the bytes into the object and return the object.
-    fn load_from(filename: &str) -> Result<Self> {
-        let metadata = fs::metadata(filename)?;
-        let mut file = File::open(filename)?;
+    fn load_from<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let metadata = metadata(path.as_ref())?;
+        let mut file = File::open(path)?;
 
         let mut object = Self::new_with_bytes(metadata.len() as usize);
         assert_eq!(metadata.len() as usize, object.data_bytes_mut().len());

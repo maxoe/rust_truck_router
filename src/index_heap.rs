@@ -23,15 +23,13 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     let mut heap = IndexdMinHeap::new(3);
-//!     heap.push(State { node: 0, distance: 42 });
-//!     heap.push(State { node: 1, distance: 23 });
-//!     heap.push(State { node: 2, distance: 50000 });
-//!     assert_eq!(heap.peek().cloned(), Some(State { node: 1, distance: 23 }));
-//!     heap.decrease_key(State { node: 0, distance: 1 });
-//!     assert_eq!(heap.pop(), Some(State { node: 0, distance: 1 }));
-//! }
+//! let mut heap = IndexdMinHeap::new(3);
+//! heap.push(State { node: 0, distance: 42 });
+//! heap.push(State { node: 1, distance: 23 });
+//! heap.push(State { node: 2, distance: 50000 });
+//! assert_eq!(heap.peek().cloned(), Some(State { node: 1, distance: 23 }));
+//! heap.decrease_key(State { node: 0, distance: 1 });
+//! assert_eq!(heap.pop(), Some(State { node: 0, distance: 1 }));
 //!
 //! ```
 
@@ -55,7 +53,7 @@ pub trait Indexing {
 #[derive(Debug)]
 pub struct IndexdMinHeap<T: Ord + Indexing> {
     positions: Vec<usize>,
-    data: Vec<T>
+    data: Vec<T>,
 }
 
 const TREE_ARITY: usize = 4;
@@ -68,7 +66,7 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
     pub fn new(max_index: usize) -> IndexdMinHeap<T> {
         IndexdMinHeap {
             positions: vec![INVALID_POSITION; max_index],
-            data: Vec::new()
+            data: Vec::new(),
         }
     }
 
@@ -170,7 +168,10 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
             let mut hole = Hole::new(&mut self.data, position);
 
             loop {
-                if let Some(smallest_child) = IndexdMinHeap::<T>::children_index_range(position, heap_size).min_by_key(|&child_index| hole.get(child_index)) {
+                if let Some(smallest_child) =
+                    IndexdMinHeap::<T>::children_index_range(position, heap_size)
+                        .min_by_key(|&child_index| hole.get(child_index))
+                {
                     if hole.get(smallest_child) >= hole.element() {
                         self.positions[hole.element().as_index()] = position;
                         return; // no child is smaller
@@ -194,11 +195,9 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
     }
 }
 
-
 // This is an optimization copied straight from the rust stdlib binary heap
 // it allows to avoid always swapping elements pairwise and rather
 // move each element only once.
-
 
 /// Hole represents a hole in a slice i.e. an index without valid value
 /// (because it was moved from or duplicated).
