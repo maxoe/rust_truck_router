@@ -2,10 +2,7 @@ use stud_rust_base::{io::*, cli::CliErr};
 use std::{env, error::Error};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut args = env::args();
-    args.next();
-
-    match &args.collect::<Vec<String>>()[..] {
+    match &env::args().skip(1).collect::<Vec<String>>()[..] {
         [data_type, output] => {
             match data_type.as_ref() {
                 "i8" => { parse_input::<i8>()?.write_to(output)?; Ok(()) },

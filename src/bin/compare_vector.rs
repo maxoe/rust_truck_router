@@ -2,10 +2,7 @@ use stud_rust_base::{io::*, cli::CliErr};
 use std::{env, fmt::Display, error::Error};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut args = env::args();
-    args.next();
-
-    match &args.collect::<Vec<String>>()[..] {
+    match &env::args().skip(1).collect::<Vec<String>>()[..] {
         [data_type, input1, input2] => {
             match data_type.as_ref() {
                 "i8" => { compare_values(&Vec::<i8>::load_from(input1)?, &Vec::<i8>::load_from(input2)?); Ok(()) },
