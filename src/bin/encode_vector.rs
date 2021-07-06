@@ -1,40 +1,32 @@
-use stud_rust_base::{io::*, cli::CliErr};
 use std::{env, error::Error};
+use stud_rust_base::{cli::CliErr, io::*};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    match &env::args().skip(1).collect::<Vec<String>>()[..] {
-        [data_type, output] => {
+    let mut args = env::args().skip(1);
+    match (args.next(), args.next()) {
+        (Some(data_type), Some(ref output)) => {
             match data_type.as_ref() {
-                "i8" => { parse_input::<i8>()?.write_to(output)?; Ok(()) },
-                "u8" => { parse_input::<u8>()?.write_to(output)?; Ok(()) },
-                "i16" => { parse_input::<i16>()?.write_to(output)?; Ok(()) },
-                "u16" => { parse_input::<u16>()?.write_to(output)?; Ok(()) },
-                "i32" => { parse_input::<i32>()?.write_to(output)?; Ok(()) },
-                "u32" => { parse_input::<u32>()?.write_to(output)?; Ok(()) },
-                "i64" => { parse_input::<i64>()?.write_to(output)?; Ok(()) },
-                "u64" => { parse_input::<u64>()?.write_to(output)?; Ok(()) },
-                "f32" => { parse_input::<f32>()?.write_to(output)?; Ok(()) },
-                "f64" => { parse_input::<f64>()?.write_to(output)?; Ok(()) },
-                "int8" => { parse_input::<i8>()?.write_to(output)?; Ok(()) },
-                "uint8" => { parse_input::<u8>()?.write_to(output)?; Ok(()) },
-                "int16" => { parse_input::<i16>()?.write_to(output)?; Ok(()) },
-                "uint16" => { parse_input::<u16>()?.write_to(output)?; Ok(()) },
-                "int32" => { parse_input::<i32>()?.write_to(output)?; Ok(()) },
-                "uint32" => { parse_input::<u32>()?.write_to(output)?; Ok(()) },
-                "int64" => { parse_input::<i64>()?.write_to(output)?; Ok(()) },
-                "uint64" => { parse_input::<u64>()?.write_to(output)?; Ok(()) },
-                "float32" => { parse_input::<f32>()?.write_to(output)?; Ok(()) },
-                "float64" => { parse_input::<f64>()?.write_to(output)?; Ok(()) },
+                "i8" | "int8" => parse_input::<i8>()?.write_to(output)?,
+                "u8" | "uint8" => parse_input::<u8>()?.write_to(output)?,
+                "i16" | "int16" => parse_input::<i16>()?.write_to(output)?,
+                "u16" | "uint16" => parse_input::<u16>()?.write_to(output)?,
+                "i32" | "int32" => parse_input::<i32>()?.write_to(output)?,
+                "u32" | "uint32" => parse_input::<u32>()?.write_to(output)?,
+                "i64" | "int64" => parse_input::<i64>()?.write_to(output)?,
+                "u64" | "uint64" => parse_input::<u64>()?.write_to(output)?,
+                "f32" | "float32" => parse_input::<f32>()?.write_to(output)?,
+                "f64" | "float64" => parse_input::<f64>()?.write_to(output)?,
                 _ => {
                     print_usage();
-                    Err(Box::new(CliErr("Invalid data type")))
+                    return Err(Box::new(CliErr("Invalid data type")));
                 }
-            }
-        },
+            };
+            Ok(())
+        }
         _ => {
             print_usage();
             Err(Box::new(CliErr("Invalid arguments")))
-        },
+        }
     }
 }
 
@@ -58,11 +50,12 @@ Reads textual data from the standard input and writes it in a binary format to o
 
 use std::str::FromStr;
 
-fn parse_input<T>() -> Result<Vec<T>, Box<dyn Error>> where
+fn parse_input<T>() -> Result<Vec<T>, Box<dyn Error>>
+where
     T: FromStr,
-    <T as FromStr>::Err: Error + 'static
+    <T as FromStr>::Err: Error + 'static,
 {
-    use std::io::{BufRead, stdin};
+    use std::io::{stdin, BufRead};
 
     let mut values = Vec::new();
 

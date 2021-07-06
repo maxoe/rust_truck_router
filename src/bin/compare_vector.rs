@@ -1,45 +1,38 @@
-use stud_rust_base::{io::*, cli::CliErr};
-use std::{env, fmt::Display, error::Error};
+use std::{env, error::Error, fmt::Display};
+use stud_rust_base::{cli::CliErr, io::*};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    match &env::args().skip(1).collect::<Vec<String>>()[..] {
-        [data_type, input1, input2] => {
+    let mut args = env::args().skip(1);
+    match &(args.next(), args.next(), args.next()) {
+        (Some(data_type), Some(input1), Some(input2)) => {
             match data_type.as_ref() {
-                "i8" => { compare_values(&Vec::<i8>::load_from(input1)?, &Vec::<i8>::load_from(input2)?); Ok(()) },
-                "u8" => { compare_values(&Vec::<u8>::load_from(input1)?, &Vec::<u8>::load_from(input2)?); Ok(()) },
-                "i16" => { compare_values(&Vec::<i16>::load_from(input1)?, &Vec::<i16>::load_from(input2)?); Ok(()) },
-                "u16" => { compare_values(&Vec::<u16>::load_from(input1)?, &Vec::<u16>::load_from(input2)?); Ok(()) },
-                "i32" => { compare_values(&Vec::<i32>::load_from(input1)?, &Vec::<i32>::load_from(input2)?); Ok(()) },
-                "u32" => { compare_values(&Vec::<u32>::load_from(input1)?, &Vec::<u32>::load_from(input2)?); Ok(()) },
-                "i64" => { compare_values(&Vec::<i64>::load_from(input1)?, &Vec::<i64>::load_from(input2)?); Ok(()) },
-                "u64" => { compare_values(&Vec::<u64>::load_from(input1)?, &Vec::<u64>::load_from(input2)?); Ok(()) },
-                "f32" => { compare_values(&Vec::<f32>::load_from(input1)?, &Vec::<f32>::load_from(input2)?); Ok(()) },
-                "f64" => { compare_values(&Vec::<f64>::load_from(input1)?, &Vec::<f64>::load_from(input2)?); Ok(()) },
-                "int8" => { compare_values(&Vec::<i8>::load_from(input1)?, &Vec::<i8>::load_from(input2)?); Ok(()) },
-                "uint8" => { compare_values(&Vec::<u8>::load_from(input1)?, &Vec::<u8>::load_from(input2)?); Ok(()) },
-                "int16" => { compare_values(&Vec::<i16>::load_from(input1)?, &Vec::<i16>::load_from(input2)?); Ok(()) },
-                "uint16" => { compare_values(&Vec::<u16>::load_from(input1)?, &Vec::<u16>::load_from(input2)?); Ok(()) },
-                "int32" => { compare_values(&Vec::<i32>::load_from(input1)?, &Vec::<i32>::load_from(input2)?); Ok(()) },
-                "uint32" => { compare_values(&Vec::<u32>::load_from(input1)?, &Vec::<u32>::load_from(input2)?); Ok(()) },
-                "int64" => { compare_values(&Vec::<i64>::load_from(input1)?, &Vec::<i64>::load_from(input2)?); Ok(()) },
-                "uint64" => { compare_values(&Vec::<u64>::load_from(input1)?, &Vec::<u64>::load_from(input2)?); Ok(()) },
-                "float32" => { compare_values(&Vec::<f32>::load_from(input1)?, &Vec::<f32>::load_from(input2)?); Ok(()) },
-                "float64" => { compare_values(&Vec::<f64>::load_from(input1)?, &Vec::<f64>::load_from(input2)?); Ok(()) },
+                "i8" | "int8" => compare_values::<i8>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "u8" | "uint8" => compare_values::<u8>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "i16" | "int16" => compare_values::<i16>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "u16" | "uint16" => compare_values::<u16>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "i32" | "int32" => compare_values::<i32>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "u32" | "uint32" => compare_values::<u32>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "i64" | "int64" => compare_values::<i64>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "u64" | "uint64" => compare_values::<u64>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "f32" | "float32" => compare_values::<f32>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
+                "f64" | "float64" => compare_values::<f64>(&Vec::load_from(input1)?, &Vec::load_from(input2)?),
                 _ => {
                     print_usage();
-                    Err(Box::new(CliErr("Invalid data type")))
+                    return Err(Box::new(CliErr("Invalid data type")));
                 }
-            }
-        },
+            };
+            Ok(())
+        }
         _ => {
             print_usage();
             Err(Box::new(CliErr("Invalid arguments")))
-        },
+        }
     }
 }
 
 fn print_usage() {
-    eprintln!("Usage: decode_vector data_type vector1_file vector2_file
+    eprintln!(
+        "Usage: decode_vector data_type vector1_file vector2_file
 
 Compares two vectors of elements in binary format. data_type can be one of
 * i8
@@ -53,17 +46,23 @@ Compares two vectors of elements in binary format. data_type can be one of
 * f32
 * f64
 
-");
+"
+    );
 }
 
-fn compare_values<T>(values1: &[T], values2: &[T]) where
+fn compare_values<T>(values1: &[T], values2: &[T])
+where
     T: Display,
-    T: PartialOrd
+    T: PartialOrd,
 {
     if values1.len() != values2.len() {
         println!("0");
-        eprintln!("Can only compare vectors of equal size. The first vector has {} elements. The second vector has {} elements.", values1.len(), values2.len());
-        return
+        eprintln!(
+            "Can only compare vectors of equal size. The first vector has {} elements. The second vector has {} elements.",
+            values1.len(),
+            values2.len()
+        );
+        return;
     }
 
     let mut v1_smaller_count = 0;
@@ -71,8 +70,12 @@ fn compare_values<T>(values1: &[T], values2: &[T]) where
     let mut first_diff = None;
 
     for (i, (v1, v2)) in values1.iter().zip(values2.iter()).enumerate() {
-        if v1 < v2 { v1_smaller_count += 1; }
-        if v2 < v1 { v2_smaller_count += 1; }
+        if v1 < v2 {
+            v1_smaller_count += 1;
+        }
+        if v2 < v1 {
+            v2_smaller_count += 1;
+        }
 
         if first_diff.is_none() && v1 != v2 {
             first_diff = Some(i)
@@ -89,10 +92,10 @@ fn compare_values<T>(values1: &[T], values2: &[T]) where
             eprintln!("{} elements are different.", v1_smaller_count + v2_smaller_count);
             eprintln!("The vectors have {} elements.", values1.len());
             eprintln!("The first element that differs is at index {}.", index);
-        },
+        }
         None => {
             println!("{}", values1.len());
             eprintln!("The vectors are the same and have {} elements.", values1.len());
-        },
+        }
     }
 }
