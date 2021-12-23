@@ -6,3 +6,4 @@ edition = '2018'
 
 [dependencies]
 time = "^0.1.40"
+rand = "0.8.4"
