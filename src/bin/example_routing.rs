@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 	let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
-	let mut instance = Dijkstra::new(graph, s);
+	let mut instance = Dijkstra::new(graph.borrow(), s);
 
 	report_time("random dijkstra one-to-one distance query", || {
 		println!("From {} to {}: {:?}", s, t, instance.dist_query(t));

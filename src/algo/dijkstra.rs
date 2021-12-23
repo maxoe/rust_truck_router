@@ -50,8 +50,8 @@ pub struct Dijkstra<G: Graph> {
 	graph: G,
 }
 
-impl Dijkstra<OwnedGraph> {
-	pub fn new(graph: OwnedGraph, s: NodeId) -> Self {
+impl<'a> Dijkstra<BorrowedGraph<'a>> {
+	pub fn new(graph: BorrowedGraph<'a>, s: NodeId) -> Self {
 		Self {
 			data: DijkstraData::new(graph.num_nodes()),
 			s: s,
