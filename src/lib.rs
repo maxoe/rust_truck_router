@@ -1,5 +1,5 @@
-//! A small base framework for route planning student projects.
-
+#![feature(generic_associated_types)]
+#![feature(type_alias_impl_trait)]
 pub mod algo;
 pub mod cli;
 pub mod index_heap;
