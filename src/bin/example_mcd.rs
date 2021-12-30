@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let first_out = vec![0, 1, 2, 3, 5];
     // let head = vec![1, 2, 3, 0, 1];
     // let travel_time = vec![2, 3, 3, 1, 5];
-    // let mut weights_vector = vec![[0u32, 0u32]; travel_time.len()];
+    // let mut weights_vector = vec![[2, 5], [3, 1], [3, 3], [1, 3], [5, 1]];
 
     for (w, t) in weights_vector.iter_mut().zip(travel_time) {
         w[0] = t;
@@ -32,8 +32,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
-    let s = rand::thread_rng().gen_range(0..graph.num_nodes() as stud_rust_base::types::NodeId);
-    let t = rand::thread_rng().gen_range(0..graph.num_nodes() as stud_rust_base::types::NodeId);
+    let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as stud_rust_base::types::NodeId);
+    let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as stud_rust_base::types::NodeId);
 
     let mut instance = Dijkstra::new(graph.borrow(), s);
     let mut instance_mcd = MultiCriteriaDijkstra::new(graph_mcd.borrow(), s);

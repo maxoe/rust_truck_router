@@ -146,7 +146,7 @@ impl<G> MultiCriteriaDijkstra<G>
 where
     G: Graph + OutgoingEdgeIterable,
 {
-    pub fn dist_query(&mut self, t: NodeId) -> Option<G::WeightType> {
+    pub fn dist_query(&mut self, t: NodeId) -> Vec<G::WeightType> {
         let per_node_labels = &mut self.data.per_node_labels;
         let queue = &mut self.data.queue;
         let n = self.graph.num_nodes();
@@ -165,14 +165,15 @@ where
             node: node_id,
         }) = queue.pop()
         {
-            if node_id == t {
-                return Some(pareto_dist);
-            }
+            // if node_id == t {
+            //     return Some(pareto_dist);
+            // }
 
-            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id) {
+            // with hopping reduction
+            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|s| *s.1 != node_id) {
                 {
+                    // TODO turns out per_node_labels is a bad idea in rust, .clone() until refactoring
                     let old_label_set = per_node_labels[node_id as usize].clone();
-                    let neighbor_label_set = &mut per_node_labels[neighbor_node as usize];
 
                     for State {
                         distance: node_distance,
@@ -180,8 +181,12 @@ where
                     } in old_label_set.iter()
                     {
                         let new_dist = node_distance.link(&edge_weight);
-                        let dominates_any = false;
 
+                        // target pruning
+                        if per_node_labels[t as usize].iter().any(|&s| s.distance.dominates(&new_dist)) {
+                            continue;
+                        }
+                        let neighbor_label_set = &mut per_node_labels[neighbor_node as usize];
                         if !neighbor_label_set.iter().any(|&s| s.distance.dominates(&new_dist)) {
                             neighbor_label_set.retain(|&s| !new_dist.dominates(&s.distance));
 
@@ -207,6 +212,6 @@ where
             }
         }
 
-        None
+        per_node_labels[t as usize].drain().map(|s| s.distance).collect()
     }
 }

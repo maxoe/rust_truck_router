@@ -46,7 +46,7 @@ pub trait WeightOps: Ord + Clone + Copy {
 impl WeightOps for Weight {
     #[inline(always)]
     fn dominates(&self, other: &Self) -> bool {
-        self < other
+        self <= other
     }
 
     #[inline(always)]
