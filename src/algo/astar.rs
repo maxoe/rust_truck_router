@@ -1,15 +1,18 @@
 use crate::types::*;
 
-pub trait Potential {
-    fn init_potentials(&mut self, potentials: &[Weight]);
-    fn potential(&self, node: NodeId) -> Weight;
+pub trait Potential<W: WeightOps> {
+    fn init_potentials(&mut self, potentials: &[W]);
+    fn potential(&self, node: NodeId) -> W;
 }
 
-pub struct NoPotential();
+pub struct NoPotential {}
 
-impl Potential for NoPotential {
-    fn init_potentials(&mut self, _potentials: &[Weight]) {}
-    fn potential(&self, _node: NodeId) -> Weight {
-        return 0;
+impl<W> Potential<W> for NoPotential
+where
+    W: WeightOps,
+{
+    fn init_potentials(&mut self, _potentials: &[W]) {}
+    fn potential(&self, _node: NodeId) -> W {
+        return W::zero();
     }
 }

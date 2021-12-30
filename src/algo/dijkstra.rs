@@ -1,29 +1,17 @@
 use crate::{algo::astar::*, index_heap::*, types::*};
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
-pub struct State {
-    pub distance: Weight,
-    pub node: NodeId,
-}
-
-impl Indexing for State {
-    fn as_index(&self) -> usize {
-        self.node as usize
-    }
-}
-
-pub struct DijkstraData {
-    pub queue: IndexdMinHeap<State>,
+pub struct DijkstraData<W: WeightOps> {
+    pub queue: IndexdMinHeap<State<W>>,
     pub pred: Vec<(NodeId, EdgeId)>,
-    pub dist: Vec<Weight>,
+    pub dist: Vec<W>,
 }
 
-impl DijkstraData {
+impl<W: WeightOps> DijkstraData<W> {
     pub fn new(n: usize) -> Self {
         Self {
             queue: IndexdMinHeap::new(n),
             pred: vec![(n as NodeId, EdgeId::MAX); n],
-            dist: vec![INFINITY; n],
+            dist: vec![W::infinity(); n],
         }
     }
 
@@ -44,14 +32,22 @@ impl DijkstraData {
     }
 }
 
-pub struct Dijkstra<G: Graph, P: Potential = NoPotential> {
-    data: DijkstraData,
+pub struct Dijkstra<G, P = NoPotential>
+where
+    G: Graph + OutgoingEdgeIterable,
+    P: Potential<G::WeightType>,
+{
+    data: DijkstraData<G::WeightType>,
     s: NodeId,
     graph: G,
     potential: P,
 }
 
-impl<G: Graph, P: Potential> Dijkstra<G, P> {
+impl<G, P> Dijkstra<G, P>
+where
+    G: Graph + OutgoingEdgeIterable,
+    P: Potential<G::WeightType>,
+{
     pub fn new_with_potential(graph: G, s: NodeId, potential: P) -> Self {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
@@ -63,33 +59,31 @@ impl<G: Graph, P: Potential> Dijkstra<G, P> {
     pub fn current_node_path_to(&self, t: NodeId) -> Option<Vec<NodeId>> {
         return self.data.path(self.s, t);
     }
-
-    pub fn relax_edge(&mut self) {}
 }
 
-impl<G: Graph> Dijkstra<G, NoPotential> {
+impl<G: Graph + OutgoingEdgeIterable> Dijkstra<G, NoPotential> {
     pub fn new(graph: G, s: NodeId) -> Self {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
             s: s,
             graph: graph,
-            potential: NoPotential(),
+            potential: NoPotential {},
         }
     }
 }
 
 impl<G: OutgoingEdgeIterable> Dijkstra<G> {
-    pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
+    pub fn dist_query(&mut self, t: NodeId) -> Option<G::WeightType> {
         let dist = &mut self.data.dist;
         let pred = &mut self.data.pred;
         let queue = &mut self.data.queue;
         let pot = &self.potential;
 
-        dist[self.s as usize] = 0;
+        dist[self.s as usize] = G::WeightType::zero();
         // pred[self.s as usize] = (s, edge_weight);
         queue.push(State {
             node: self.s,
-            distance: 0 + pot.potential(self.s),
+            distance: G::WeightType::zero().link(&pot.potential(self.s)),
         });
 
         while let Some(State { distance: _, node: node_id }) = queue.pop() {
@@ -98,23 +92,24 @@ impl<G: OutgoingEdgeIterable> Dijkstra<G> {
             }
 
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id) {
-                let new_dist = dist[node_id as usize] + edge_weight;
+                let new_dist = dist[node_id as usize].link(&edge_weight);
 
                 if new_dist < dist[neighbor_node as usize] {
                     if queue.contains_index(neighbor_node as usize) {
                         queue.decrease_key(State {
-                            distance: new_dist + pot.potential(neighbor_node),
+                            distance: new_dist.link(&pot.potential(neighbor_node)),
                             node: neighbor_node,
                         });
                     } else {
                         queue.push(State {
-                            distance: new_dist + pot.potential(neighbor_node),
+                            distance: new_dist.link(&pot.potential(neighbor_node)),
                             node: neighbor_node,
                         });
                     }
 
                     dist[neighbor_node as usize] = new_dist;
-                    pred[neighbor_node as usize] = (node_id, edge_weight);
+                    // TODO actual edge id ,is it even necessary?
+                    pred[neighbor_node as usize] = (node_id, EdgeId::MAX);
                 }
             }
         }
