@@ -81,6 +81,7 @@ where
     data: MultiCriteriaDijkstraData<G::WeightType>,
     s: NodeId,
     graph: G,
+    constraint: Box<dyn Fn(G::WeightType) -> bool>,
 }
 
 // impl<G: Graph> MultiCriteriaDijkstra<G> {
@@ -98,6 +99,16 @@ where
             data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
             s: s,
             graph: graph,
+            constraint: Box::new(|_w| true),
+        }
+    }
+
+    pub fn add_constaint(self, constraint: impl Fn(G::WeightType) -> bool + 'static) -> Self {
+        Self {
+            data: self.data,
+            s: self.s,
+            graph: self.graph,
+            constraint: Box::new(constraint),
         }
     }
 }
@@ -147,24 +158,20 @@ where
     G: Graph + OutgoingEdgeIterable,
 {
     pub fn dist_query(&mut self, t: NodeId) -> Vec<G::WeightType> {
-        let per_node_labels = &mut self.data.per_node_labels;
-        let queue = &mut self.data.queue;
+        // let per_node_labels = &mut self.data.per_node_labels;
+        // let queue = &mut self.data.queue;
         let n = self.graph.num_nodes();
 
-        per_node_labels[self.s as usize].push(State {
+        self.data.per_node_labels[self.s as usize].push(State {
             node: n as NodeId,
             distance: G::WeightType::zero(),
         });
-        queue.push(State {
+        self.data.queue.push(State {
             node: self.s,
             distance: G::WeightType::zero(),
         });
 
-        while let Some(State {
-            distance: pareto_dist,
-            node: node_id,
-        }) = queue.pop()
-        {
+        while let Some(State { distance: _, node: node_id }) = self.data.queue.pop() {
             // if node_id == t {
             //     return Some(pareto_dist);
             // }
@@ -173,7 +180,7 @@ where
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|s| *s.1 != node_id) {
                 {
                     // TODO turns out per_node_labels is a bad idea in rust, .clone() until refactoring
-                    let old_label_set = per_node_labels[node_id as usize].clone();
+                    let old_label_set = self.data.per_node_labels[node_id as usize].clone();
 
                     for State {
                         distance: node_distance,
@@ -183,10 +190,10 @@ where
                         let new_dist = node_distance.link(&edge_weight);
 
                         // target pruning
-                        if per_node_labels[t as usize].iter().any(|&s| s.distance.dominates(&new_dist)) {
+                        if !(self.constraint)(new_dist) || self.data.per_node_labels[t as usize].iter().any(|&s| s.distance.dominates(&new_dist)) {
                             continue;
                         }
-                        let neighbor_label_set = &mut per_node_labels[neighbor_node as usize];
+                        let neighbor_label_set = &mut self.data.per_node_labels[neighbor_node as usize];
                         if !neighbor_label_set.iter().any(|&s| s.distance.dominates(&new_dist)) {
                             neighbor_label_set.retain(|&s| !new_dist.dominates(&s.distance));
 
@@ -195,13 +202,13 @@ where
                                 node: node_id,
                             });
 
-                            if queue.contains_index(neighbor_node as usize) {
-                                queue.decrease_key(State {
+                            if self.data.queue.contains_index(neighbor_node as usize) {
+                                self.data.queue.decrease_key(State {
                                     distance: new_dist,
                                     node: neighbor_node,
                                 });
                             } else {
-                                queue.push(State {
+                                self.data.queue.push(State {
                                     distance: new_dist,
                                     node: neighbor_node,
                                 });
@@ -212,6 +219,6 @@ where
             }
         }
 
-        per_node_labels[t as usize].drain().map(|s| s.distance).collect()
+        self.data.per_node_labels[t as usize].drain().map(|s| s.distance).collect()
     }
 }

@@ -15,18 +15,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_out = Vec::<stud_rust_base::types::EdgeId>::load_from(path.join("first_out"))?;
     let head = Vec::<stud_rust_base::types::NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<stud_rust_base::types::Weight>::load_from(path.join("travel_time"))?;
-    let mut weights_vector = vec![[0u32, 0u32]; travel_time.len()];
+    let geo_distance = Vec::<stud_rust_base::types::Weight>::load_from(path.join("geo_distance"))?;
 
     let graph = stud_rust_base::types::OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
 
+    let weights_vector = travel_time.into_iter().zip(geo_distance).map(|t| [t.0, t.1]).collect();
+
+    // let mut weights_vector = vec![[0u32, 0u32]; travel_time.len()];
+
+    // directed
+    //  0 - 1
+    //	| / |
+    //  3 - 2
+    //
     // let first_out = vec![0, 1, 2, 3, 5];
     // let head = vec![1, 2, 3, 0, 1];
     // let travel_time = vec![2, 3, 3, 1, 5];
     // let mut weights_vector = vec![[2, 5], [3, 1], [3, 3], [1, 3], [5, 1]];
 
-    for (w, t) in weights_vector.iter_mut().zip(travel_time) {
-        w[0] = t;
-    }
+    // for (w, t) in weights_vector.iter_mut().zip(travel_time) {
+    // w[0] = t;
+    // }
 
     let graph_mcd = stud_rust_base::algo::mcd::OwnedMultiCritGraph::new(first_out, head, weights_vector);
 
@@ -36,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as stud_rust_base::types::NodeId);
 
     let mut instance = Dijkstra::new(graph.borrow(), s);
-    let mut instance_mcd = MultiCriteriaDijkstra::new(graph_mcd.borrow(), s);
+    let mut instance_mcd = MultiCriteriaDijkstra::new(graph_mcd.borrow(), s).add_constaint(|w| (w[1] * 3600 / (w[0])) > 40);
 
     report_time("random dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance.dist_query(t));
