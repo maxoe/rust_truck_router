@@ -1,8 +1,6 @@
 //! This module contains a few basic type and constant definitions
 use crate::index_heap::*;
-use num::traits::Zero;
 use std;
-use std::ops::Add;
 
 /// Node ids are unsigned 32 bit integers
 pub type NodeId = u32;
@@ -20,28 +18,13 @@ pub type Weight3 = [Weight; 3];
 //     fn link(&self, other: &Self) -> Self;
 // }
 
-pub trait WeightOps: Ord + Clone + Copy {
+pub trait WeightOps: Ord + Clone + Copy + std::fmt::Debug {
     fn dominates(&self, other: &Self) -> bool;
-    // fn dominates_any<'a>(&self, others: impl Iterator<Item = Self>) -> bool {
-    //     return others.all(|e| self > &e);
-    // }
-    fn link(&self, other: &Self) -> Self;
+    fn link(&self, other: Weight) -> Self;
     fn zero() -> Self;
     fn infinity() -> Self;
+    fn reset(&mut self, i: usize, pause_time: Weight);
 }
-
-// impl<T> WeightOps for T
-// where
-//     T: Add + Ord + std::ops::Add<Output = T> + Zero,
-// {
-//     fn link(self, other: T) -> T {
-//         self + other
-//     }
-
-//     fn zero() -> Self {
-//         self.zero()
-//     }
-// }
 
 impl WeightOps for Weight {
     #[inline(always)]
@@ -50,7 +33,7 @@ impl WeightOps for Weight {
     }
 
     #[inline(always)]
-    fn link(&self, other: &Self) -> Self {
+    fn link(&self, other: Weight) -> Self {
         self + other
     }
 
@@ -63,6 +46,13 @@ impl WeightOps for Weight {
     fn infinity() -> Self {
         INFINITY
     }
+
+    #[inline(always)]
+    fn reset(&mut self, i: usize, _pause_time: Weight) {
+        if i == 0 {
+            *self = 0;
+        }
+    }
 }
 
 impl WeightOps for Weight2 {
@@ -72,8 +62,8 @@ impl WeightOps for Weight2 {
     }
 
     #[inline(always)]
-    fn link(&self, other: &Self) -> Self {
-        [self[0] + other[0], self[1] + other[1]]
+    fn link(&self, other: Weight) -> Self {
+        [self[0] + other, self[1] + other]
     }
 
     #[inline(always)]
@@ -85,62 +75,20 @@ impl WeightOps for Weight2 {
     fn infinity() -> Self {
         [INFINITY, INFINITY]
     }
+
+    #[inline(always)]
+    fn reset(&mut self, i: usize, pause_time: Weight) {
+        if i < 2 {
+            self[0] += pause_time;
+            self[1] = 0;
+        }
+    }
 }
 
-// pub struct Label {
-//     pub weights: [Weight],
-// }
-
-// impl Label {
-//     fn new(label_weights: [&Weight]) -> Self {
-//         Self { weights: label_weights }
-//     }
-
-//     fn new_from_2_tuple(label_weights: (Weight, Weight)) -> Self {
-//         Self {
-//             weights: [label_weights.0, label_weights.1],
-//         }
-//     }
-// }
-
-// impl Ord for Label {
-//     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-//         self.weights.cmp(&other.weights)
-//     }
-// }
-
-// impl WeightOps for Label {
-//     fn dominates(&self, other: &Self) -> bool {
-//         self.gt(other)
-//     }
-
-//     fn link(&self, rhs: Self) -> Self {
-//         self.add(rhs)
-//     }
-// }
-
-// impl Zero for Weight2 {
-//     fn zero() -> Self {
-//         (0, 0)
-//     }
-// }
-
-// impl Label for Label2 {
-//     fn link(&self, other: &Self) -> Self {
-//         todo!()
-//     }
-// }
-
-// pub struct Label<T: WeightOps> {
-//     pub weights: &[T],
-// }
-
-// impl Label {
-//     pub fn link(&self, other: &Self) -> Self {}
-// }
-
-// #[derive(Ord, Clone, Zero, Add)]
-// pub struct Label {}
+pub struct DrivingTimeRestriction {
+    pub pause_time: Weight,
+    pub max_driving_time: Weight,
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
 pub struct State<T> {

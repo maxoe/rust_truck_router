@@ -22,6 +22,8 @@ use std::{
     slice,
 };
 
+use bit_vec::BitVec;
+
 /// A trait which allows accessing the data of an object as a slice of bytes.
 /// The bytes should represent a serialization of the object and allow
 /// recreating it when reading these bytes again from the disk.
@@ -106,4 +108,14 @@ impl<T: Default + Copy> Load for Vec<T> {
         let num_elements = num_bytes / mem::size_of::<T>();
         (0..num_elements).map(|_| T::default()).collect()
     }
+}
+
+pub fn load_routingkit_bitvector<P: AsRef<Path>>(path: P) -> Result<BitVec> {
+    Ok(BitVec::from_bytes(
+        Vec::<u8>::load_from(path)?[8..]
+            .iter()
+            .map(|b| b.reverse_bits())
+            .collect::<Vec<u8>>()
+            .data_bytes(),
+    ))
 }

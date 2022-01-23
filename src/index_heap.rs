@@ -140,6 +140,15 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
         self.move_down_in_tree(position);
     }
 
+    /// Returns a reference to the item in the heap with the given index, or None if it does not exist.
+    pub fn get_key_by_index(&self, id: usize) -> Option<&T> {
+        if !self.contains_index(id) {
+            return None;
+        }
+
+        Some(&self.data[self.positions[id]])
+    }
+
     fn move_up_in_tree(&mut self, position: usize) {
         unsafe {
             let mut position = position;
@@ -168,10 +177,7 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
             let mut hole = Hole::new(&mut self.data, position);
 
             loop {
-                if let Some(smallest_child) =
-                    IndexdMinHeap::<T>::children_index_range(position, heap_size)
-                        .min_by_key(|&child_index| hole.get(child_index))
-                {
+                if let Some(smallest_child) = IndexdMinHeap::<T>::children_index_range(position, heap_size).min_by_key(|&child_index| hole.get(child_index)) {
                     if hole.get(smallest_child) >= hole.element() {
                         self.positions[hole.element().as_index()] = position;
                         return; // no child is smaller
@@ -218,11 +224,7 @@ impl<'a, T> Hole<'a, T> {
     unsafe fn new(data: &'a mut [T], pos: usize) -> Self {
         debug_assert!(pos < data.len());
         let elt = ptr::read(&data[pos]);
-        Hole {
-            data,
-            elt: Some(elt),
-            pos,
-        }
+        Hole { data, elt: Some(elt), pos }
     }
 
     /// Returns a reference to the element removed.

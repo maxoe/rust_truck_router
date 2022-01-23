@@ -8,6 +8,10 @@ edition = '2018'
 time = "^0.1.40"
 rand = "0.8.4"
 num = "0.4.0"
+bit-vec = "0.6.3"
+
+[profile.dev]
+opt-level = 3
 
 #[dependencies.rust_road_router]
 #path = "../rust_road_router/engine"
