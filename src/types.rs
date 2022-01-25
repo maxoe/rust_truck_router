@@ -1,6 +1,7 @@
 //! This module contains a few basic type and constant definitions
-use crate::index_heap::*;
-use std;
+use std::path::Path;
+
+use crate::{index_heap::*, io::Load};
 
 /// Node ids are unsigned 32 bit integers
 pub type NodeId = u32;
@@ -175,6 +176,16 @@ where
     fn degree(&self, node: NodeId) -> usize {
         let node = node as usize;
         (self.first_out()[node + 1] - self.first_out()[node]) as usize
+    }
+}
+
+impl OwnedGraph {
+    pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
+        Ok(Self {
+            first_out: Vec::<EdgeId>::load_from(path.as_ref().join("first_out"))?,
+            head: Vec::<NodeId>::load_from(path.as_ref().join("head"))?,
+            weights: Vec::<Weight>::load_from(path.as_ref().join("travel_time"))?,
+        })
     }
 }
 

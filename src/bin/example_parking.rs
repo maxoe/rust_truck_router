@@ -28,8 +28,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
-    // for (e, _) in is_parking_node.iter().enumerate().filter(|t| t.1) {
-    //     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let mut instance = Dijkstra::new(graph.borrow(), s);
     report_time("random dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance.dist_query(t));
@@ -38,10 +36,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             instance.num_settled, instance.num_labels_propagated, instance.num_queue_pushes
         );
     });
-    // }
 
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(is_parking_node.clone()).set_restriction(1800_000, 3_600_000);
+    instance_mcd.set_reset_flags(is_parking_node.clone()).set_restriction(16_200_000, 3_600_000);
 
     report_time("random one restriction dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance_mcd.dist_query(t).iter().min());
@@ -51,8 +48,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     });
 
+    let latitude = Vec::<f32>::load_from(path.join("latitude"))?;
+    let longitude = Vec::<f32>::load_from(path.join("longitude"))?;
+    let osm_node_id = Vec::<u64>::load_from(path.join("osm_node_id"))?;
+    assert_eq!(latitude.len(), longitude.len());
+    assert_eq!(latitude.len(), graph_mcd.num_nodes());
+
     if let Some(path) = report_time("Extracting path from base dijkstra", || instance.current_node_path_to(t)) {
         println!("Path has length {}", path.len());
+
+        let file = File::create("path_dijkstra.csv")?;
+        let mut file = LineWriter::new(file);
+        writeln!(file, "latitude,longitude")?;
+
+        for &node_id in &path {
+            writeln!(file, "{},{}", latitude[node_id as usize], longitude[node_id as usize])?;
+        }
     } else {
         println!("No path found from {} to {}", s, t);
     }
@@ -61,12 +72,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if let Some((p, d)) = shortest_mcd_path {
         println!("Path has length {}", p.len());
-        let latitude = Vec::<f32>::load_from(path.join("latitude"))?;
-        let longitude = Vec::<f32>::load_from(path.join("longitude"))?;
-        let osm_node_id = Vec::<u64>::load_from(path.join("osm_node_id"))?;
-
-        assert_eq!(latitude.len(), longitude.len());
-        assert_eq!(latitude.len(), graph_mcd.num_nodes());
 
         let file = File::create("path.csv")?;
         let mut file = LineWriter::new(file);

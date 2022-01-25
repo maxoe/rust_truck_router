@@ -1,5 +1,6 @@
 use crate::{algo::astar::*, index_heap::*, types::*};
 
+#[derive(Debug)]
 pub struct DijkstraData<W: WeightOps> {
     pub queue: IndexdMinHeap<State<W>>,
     pub pred: Vec<(NodeId, EdgeId)>,
