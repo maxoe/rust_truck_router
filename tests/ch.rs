@@ -26,16 +26,18 @@ fn some_ch_queries() -> Result<(), Box<dyn Error>> {
     let travel_time = vec![1, 4, 3, 2, 4];
 
     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/"));
-    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
+    let mut dijkstra = Dijkstra::new(graph.borrow());
 
     for s in 0..5 {
+        dijkstra.init_new_s(s);
+        ch.init_new_s(s);
         for t in 0..5 {
             println!("Testing {} to {}", s, t);
-
-            let mut dijkstra = Dijkstra::new(graph.borrow(), s);
-            assert_eq!(dijkstra.dist_query(t), ch.query(s, t));
+            ch.init_new_t(t);
+            assert_eq!(dijkstra.dist_query(t), ch.run_query());
         }
     }
 
@@ -52,19 +54,22 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
-    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
     let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
+    let mut instance = Dijkstra::new(graph.borrow());
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         let t = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         println!("Query #{} from {} to {}", i, s, t);
-        let mut instance = Dijkstra::new(graph.borrow(), s);
-        assert_eq!(instance.dist_query(t), ch.query(s, t));
+        instance.init_new_s(s);
+        ch.init_new_s(s);
+        ch.init_new_t(t);
+        assert_eq!(instance.dist_query(t), ch.run_query());
         // assert_eq!(instance.current_node_path_to(t), instance_mcd.current_best_node_path_to(t))
     }
 

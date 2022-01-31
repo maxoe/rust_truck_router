@@ -15,24 +15,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_out = Vec::<stud_rust_base::types::EdgeId>::load_from(path.join("first_out"))?;
     let head = Vec::<stud_rust_base::types::NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<stud_rust_base::types::Weight>::load_from(path.join("travel_time"))?;
-    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
 
+    let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
     let graph = stud_rust_base::types::OwnedGraph::new(first_out, head, travel_time);
+    let mut instance = Dijkstra::new(graph.borrow());
 
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as stud_rust_base::types::NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as stud_rust_base::types::NodeId);
 
-    let mut instance = Dijkstra::new(graph.borrow(), s);
+    ch.init_new_s(s);
+    ch.init_new_t(t);
+    instance.init_new_s(s);
 
     report_time("random dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance.dist_query(t));
     });
     report_time("random ch one-to-one distance query", || {
-        println!("From {} to {}: {:?}", s, t, ch.query(s, t));
+        println!("From {} to {}: {:?}", s, t, ch.run_query());
     });
 
     let path = instance.current_node_path_to(t);

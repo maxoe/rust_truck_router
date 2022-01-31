@@ -27,7 +27,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as stud_rust_base::types::NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as stud_rust_base::types::NodeId);
 
-    let mut instance = Dijkstra::new(graph.borrow(), s);
+    let mut instance = Dijkstra::new(graph.borrow());
+    instance.init_new_s(s);
     let mut instance_astar = Dijkstra::new_with_potential(graph.borrow(), s, NoPotential {});
 
     report_time("random dijkstra one-to-one distance query", || {

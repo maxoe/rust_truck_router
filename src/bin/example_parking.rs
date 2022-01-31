@@ -1,4 +1,3 @@
-#![feature(binary_heap_retain)]
 use stud_rust_base::{
     algo::{dijkstra::Dijkstra, mcd::*},
     io::*,
@@ -25,10 +24,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
     let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+
     let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
-    let mut instance = Dijkstra::new(graph.borrow(), s);
+    let mut instance = Dijkstra::new(graph.borrow());
+    instance.init_new_s(s);
     report_time("random dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance.dist_query(t));
         println!(

@@ -22,12 +22,13 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
     let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
+    let mut instance = Dijkstra::new(graph.borrow());
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         let t = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         println!("Query #{} from {} to {} without constraints", i, s, t);
-        let mut instance = Dijkstra::new(graph.borrow(), s);
+        instance.init_new_s(s);
         let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
         instance_mcd.set_reset_flags(is_parking_node.clone());
 

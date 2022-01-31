@@ -6,6 +6,5 @@ pub mod algo;
 pub mod cli;
 pub mod index_heap;
 pub mod io;
-// pub mod rrr;
 pub mod time;
 pub mod types;
