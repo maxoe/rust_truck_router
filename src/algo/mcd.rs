@@ -57,7 +57,7 @@ pub struct MultiCriteriaDijkstraData<L: WeightOps> {
 impl<L: WeightOps> MultiCriteriaDijkstraData<L> {
     pub fn new(n: usize) -> Self {
         let mut per_node_labels = Vec::with_capacity(n);
-        per_node_labels.resize_with(n, || BinaryHeap::new());
+        per_node_labels.resize_with(n, BinaryHeap::new);
 
         Self {
             queue: IndexdMinHeap::new(n),
@@ -167,14 +167,14 @@ impl<'a> OneRestrictionDijkstra<'a> {
     }
 
     pub fn current_best_node_path_to(&self, t: NodeId) -> Option<Vec<NodeId>> {
-        self.current_best_path_to(t, false).map_or(None, |p| Some(p.0))
+        self.current_best_path_to(t, false).map(|p| p.0)
     }
 
     pub fn flagged_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight2>)) -> Vec<NodeId> {
         self.flagged_nodes_on_node_path(&path.0)
     }
 
-    pub fn flagged_nodes_on_node_path(&self, path: &Vec<NodeId>) -> Vec<NodeId> {
+    pub fn flagged_nodes_on_node_path(&self, path: &[NodeId]) -> Vec<NodeId> {
         let mut flagged_nodes = Vec::new();
         for &node in path {
             if self.reset_flags.get(node as usize).unwrap() {
@@ -186,11 +186,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
     }
 
     pub fn flagged_nodes_on_best_path_to(&self, t: NodeId) -> Option<Vec<NodeId>> {
-        if let Some(path) = self.current_best_path_to(t, true) {
-            Some(self.flagged_nodes_on_path(&path))
-        } else {
-            None
-        }
+        self.current_best_path_to(t, true).map(|path| self.flagged_nodes_on_path(&path))
     }
 
     pub fn reset_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight2>)) -> Vec<NodeId> {

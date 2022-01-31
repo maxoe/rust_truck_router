@@ -13,6 +13,6 @@ where
 {
     fn init_potentials(&mut self, _potentials: &[W]) {}
     fn potential(&self, _node: NodeId) -> W {
-        return W::zero();
+        W::zero()
     }
 }

@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             results_number_parking[2].len()
         );
         let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-        instance_mcd.set_reset_flags(is_parking_node.clone()).set_restriction(1620_000, 360_000);
+        instance_mcd.set_reset_flags(is_parking_node.clone()).set_restriction(1_620_000, 360_000);
 
         let (_, time) = measure(|| instance_mcd.dist_query(t));
 

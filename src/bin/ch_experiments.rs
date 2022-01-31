@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let head = Vec::<NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
 
-    let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
+    let graph = OwnedGraph::new(first_out, head, travel_time);
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
     let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
@@ -48,12 +48,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     writeln!(file, "dijkstra_time_µs,ch_time_µs,dijkstra_rank")?;
 
-    for i in 0..results_without_constraint.len() {
-        writeln!(
-            file,
-            "{},{},{}",
-            results_without_constraint[i].0, results_without_constraint[i].1, results_without_constraint[i].2
-        )?;
+    for result in results_without_constraint {
+        writeln!(file, "{},{},{}", result.0, result.1, result.2)?;
     }
 
     Ok(())

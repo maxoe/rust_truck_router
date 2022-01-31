@@ -58,9 +58,9 @@ where
     pub fn new_with_potential(graph: BorrowedGraph<'a>, s: NodeId, potential: P) -> Self {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
-            s: s,
-            graph: graph,
-            potential: potential,
+            s,
+            graph,
+            potential,
             num_queue_pushes: 0,
             num_settled: 0,
             num_labels_propagated: 0,
@@ -68,7 +68,7 @@ where
         }
     }
     pub fn current_node_path_to(&self, t: NodeId) -> Option<Vec<NodeId>> {
-        return self.data.path(self.s, t);
+        self.data.path(self.s, t)
     }
 }
 
@@ -77,7 +77,7 @@ impl<'a> Dijkstra<'a, NoPotential> {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
             s: graph.num_nodes() as NodeId,
-            graph: graph,
+            graph,
             potential: NoPotential {},
             num_queue_pushes: 0,
             num_settled: 0,
@@ -117,10 +117,7 @@ impl<'a> Dijkstra<'a> {
 
     #[inline(always)]
     pub fn min_key(&self) -> Option<Weight> {
-        match self.data.queue.peek() {
-            Some(s) => Some(s.distance),
-            None => None,
-        }
+        self.data.queue.peek().map(|s| s.distance)
     }
 
     pub fn settle_next_node(&mut self) -> Option<State<Weight>> {
@@ -158,7 +155,7 @@ impl<'a> Dijkstra<'a> {
                     pred[neighbor_node as usize] = (node_id, EdgeId::MAX);
                 }
             }
-            return Some(next);
+            Some(next)
         } else {
             None
         }
@@ -198,9 +195,9 @@ where
     pub fn new_with_potential(graph: OwnedGraph, s: NodeId, potential: P) -> Self {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
-            s: s,
-            graph: graph,
-            potential: potential,
+            s,
+            graph,
+            potential,
             num_queue_pushes: 0,
             num_settled: 0,
             num_labels_propagated: 0,
@@ -208,7 +205,7 @@ where
         }
     }
     pub fn current_node_path_to(&self, t: NodeId) -> Option<Vec<NodeId>> {
-        return self.data.path(self.s, t);
+        self.data.path(self.s, t)
     }
 }
 
@@ -217,7 +214,7 @@ impl OwnedDijkstra<NoPotential> {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
             s: graph.num_nodes() as NodeId,
-            graph: graph,
+            graph,
             potential: NoPotential {},
             num_queue_pushes: 0,
             num_settled: 0,
@@ -258,10 +255,7 @@ impl OwnedDijkstra {
 
     #[inline(always)]
     pub fn min_key(&self) -> Option<Weight> {
-        match self.data.queue.peek() {
-            Some(s) => Some(s.distance),
-            None => None,
-        }
+        self.data.queue.peek().map(|s| s.distance)
     }
 
     pub fn settle_next_node(&mut self) -> Option<State<Weight>> {
@@ -299,7 +293,7 @@ impl OwnedDijkstra {
                     pred[neighbor_node as usize] = (node_id, EdgeId::MAX);
                 }
             }
-            return Some(next);
+            Some(next)
         } else {
             None
         }
