@@ -35,25 +35,25 @@ fn shortes_path_breaks_constraint() {
     let t = 4;
     let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(4, 0);
+    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(5, 0);
     let result = instance_mcd.dist_query(t).into_iter().min().unwrap();
     assert_eq!(result, 8);
     assert_eq!(vec![0, 1, 3, 4], instance_mcd.current_best_node_path_to(t).unwrap());
 
     instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(5, 0);
+    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(6, 0);
     let result = instance_mcd.dist_query(t).into_iter().min().unwrap();
     assert_eq!(result, 7);
     assert_eq!(vec![0, 1, 2, 4], instance_mcd.current_best_node_path_to(t).unwrap());
 
     instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(4, 2);
+    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(5, 2);
     let result = instance_mcd.dist_query(t).into_iter().min().unwrap();
     assert_eq!(result, 10);
     assert_eq!(vec![0, 1, 3, 4], instance_mcd.current_best_node_path_to(t).unwrap());
 
     instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(5, 2);
+    instance_mcd.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3)).set_restriction(6, 2);
     let result = instance_mcd.dist_query(t).into_iter().min().unwrap();
     assert_eq!(result, 9);
     assert_eq!(vec![0, 1, 2, 4], instance_mcd.current_best_node_path_to(t).unwrap());
@@ -70,7 +70,7 @@ fn needs_loop_to_fulfill_constraint() {
     let t = 3;
     let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2)).set_restriction(4, 0);
+    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2)).set_restriction(5, 0);
     let mut result = instance_mcd.dist_query(t).into_iter().min().unwrap();
     assert_eq!(result, 7);
     assert_eq!(vec![0, 1, 2, 1, 3], instance_mcd.current_best_node_path_to(t).unwrap());
@@ -82,7 +82,7 @@ fn needs_loop_to_fulfill_constraint() {
     assert_eq!(vec![0, 1, 3], instance_mcd.current_best_node_path_to(t).unwrap());
 
     instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2)).set_restriction(4, 2);
+    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2)).set_restriction(5, 2);
     let mut result = instance_mcd.dist_query(t).into_iter().min().unwrap();
     assert_eq!(result, 9);
     assert_eq!(vec![0, 1, 2, 1, 3], instance_mcd.current_best_node_path_to(t).unwrap());

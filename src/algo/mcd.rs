@@ -288,6 +288,14 @@ impl<'a, P> OneRestrictionDijkstra<'a, P>
 where
     P: Potential<Weight>,
 {
+    fn estimated_dist_with_restriction(&self, distance_at_node: [Weight; 2], potential_to_target: Weight) -> [Weight; 2] {
+        let estimated = distance_at_node.link(potential_to_target);
+        [
+            estimated[0].link((estimated[1] / self.restriction.max_driving_time) * self.restriction.pause_time),
+            estimated[1],
+        ]
+    }
+
     pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
         // check if query already finished for t
         if let Some(best_tuple_at_t) = self.data.per_node_labels[t as usize].popped().iter().min() {
@@ -303,9 +311,10 @@ where
         });
 
         self.num_queue_pushes += 1;
+        let pot = self.potential.potential(self.s);
         self.data.queue.push(State {
             node: self.s,
-            distance: [0, 0].link(self.potential.potential(self.s)),
+            distance: self.estimated_dist_with_restriction([0, 0], pot),
         });
 
         while let Some(State {
@@ -313,24 +322,25 @@ where
             node: node_id,
         }) = self.data.queue.pop()
         {
-            self.num_settled += 1;
-
             if node_id == t {
                 // push again for eventual next query
                 self.data.queue.push(State {
-                    distance: tentative_distance_from_queue.link(self.potential.potential(node_id)),
+                    distance: tentative_distance_from_queue,
                     node: node_id,
                 });
                 return Some(tentative_distance_from_queue[0]);
             }
+
+            self.num_settled += 1;
 
             let label = self.data.per_node_labels[node_id as usize].pop().unwrap();
             let tentative_dist_without_pot = label.distance;
 
             // check if next unsettled lable exists for node and push to queue
             if let Some(next_best_label) = self.data.per_node_labels[node_id as usize].peek() {
+                let pot = self.potential.potential(node_id);
                 self.data.queue.push(State {
-                    distance: next_best_label.distance.link(self.potential.potential(node_id)),
+                    distance: self.estimated_dist_with_restriction(next_best_label.distance, pot),
                     node: node_id,
                 });
             }
@@ -343,7 +353,7 @@ where
                     new_dist.push(tentative_dist_without_pot.link(edge_weight));
 
                     // constraint and target pruning
-                    if new_dist[0][1] > self.restriction.max_driving_time
+                    if new_dist[0][1] >= self.restriction.max_driving_time
                         || self.data.per_node_labels[t as usize].iter().any(|&s| s.distance.dominates(&new_dist[0]))
                     {
                         continue;
@@ -371,7 +381,8 @@ where
                                 incoming_edge_weight: edge_weight,
                             });
 
-                            let dist_with_potential = current_new_dist.link(self.potential.potential(neighbor_node));
+                            let pot = self.potential.potential(neighbor_node);
+                            let dist_with_potential = self.estimated_dist_with_restriction(current_new_dist, pot);
                             if self.data.queue.contains_index(neighbor_node as usize) {
                                 // decrease key seems to increase key if given a larger key than existing
                                 if self.data.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {
