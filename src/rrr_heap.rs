@@ -1,5 +1,6 @@
 use core::mem::ManuallyDrop;
 use core::ptr;
+use std::slice;
 // use std::cmp::Ordering;
 
 #[derive(Clone)]
@@ -270,6 +271,10 @@ impl<T: Ord> Heap<T> {
         self.split -= removed_from_heap;
         // data[0..first_removed] is untouched, so we only need to rebuild the tail:
         self.rebuild_tail(first_removed);
+    }
+
+    pub fn iter(&self) -> slice::Iter<'_, T> {
+        self.data[..self.split].iter()
     }
 
     pub fn peek(&self) -> Option<&T> {
