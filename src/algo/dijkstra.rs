@@ -55,10 +55,10 @@ impl<'a, P> Dijkstra<'a, P>
 where
     P: Potential<Weight>,
 {
-    pub fn new_with_potential(graph: BorrowedGraph<'a>, s: NodeId, potential: P) -> Self {
+    pub fn new_with_potential(graph: BorrowedGraph<'a>, potential: P) -> Self {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
-            s,
+            s: graph.num_nodes() as NodeId,
             graph,
             potential,
             num_queue_pushes: 0,
@@ -87,7 +87,10 @@ impl<'a> Dijkstra<'a, NoPotential> {
     }
 }
 
-impl<'a> Dijkstra<'a> {
+impl<'a, P> Dijkstra<'a, P>
+where
+    P: Potential<Weight>,
+{
     pub fn reset(&mut self) {
         self.data.run_count += 1;
         self.num_settled = 0;
@@ -125,7 +128,7 @@ impl<'a> Dijkstra<'a> {
         let pred = &mut self.data.pred;
         let queue = &mut self.data.queue;
         let run = &mut self.data.run;
-        let pot = &self.potential;
+        let pot = &mut self.potential;
 
         if let Some(next) = queue.pop() {
             self.settled_nodes_vec.push((next.node, next.distance));
@@ -172,6 +175,14 @@ impl<'a> Dijkstra<'a> {
 
         None
     }
+
+    pub fn to_all(&mut self) -> &[Weight] {
+        self.reset();
+
+        while self.settle_next_node().is_some() {}
+
+        &self.data.dist
+    }
 }
 
 pub struct OwnedDijkstra<P = NoPotential>
@@ -192,10 +203,10 @@ impl<P> OwnedDijkstra<P>
 where
     P: Potential<Weight>,
 {
-    pub fn new_with_potential(graph: OwnedGraph, s: NodeId, potential: P) -> Self {
+    pub fn new_with_potential(graph: OwnedGraph, potential: P) -> Self {
         Self {
             data: DijkstraData::new(graph.num_nodes()),
-            s,
+            s: graph.num_nodes() as NodeId,
             graph,
             potential,
             num_queue_pushes: 0,
@@ -263,7 +274,7 @@ impl OwnedDijkstra {
         let pred = &mut self.data.pred;
         let queue = &mut self.data.queue;
         let run = &mut self.data.run;
-        let pot = &self.potential;
+        let pot = &mut self.potential;
 
         if let Some(next) = queue.pop() {
             self.settled_nodes_vec.push((next.node, next.distance));

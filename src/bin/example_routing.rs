@@ -29,7 +29,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut instance = Dijkstra::new(graph.borrow());
     instance.init_new_s(s);
-    let mut instance_astar = Dijkstra::new_with_potential(graph.borrow(), s, NoPotential {});
+    let mut instance_astar = Dijkstra::new_with_potential(graph.borrow(), NoPotential {});
+    instance_astar.init_new_s(s);
 
     report_time("random dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance.dist_query(t));

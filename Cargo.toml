@@ -2,7 +2,7 @@
 name = "stud-rust-base"
 version = "0.1.0"
 authors = ["Tim Zeitz <tim.zeitz@kit.edu>"]
-edition = '2018'
+edition = "2021"
 
 [dependencies]
 time = "^0.1.40"
@@ -12,6 +12,3 @@ bit-vec = "0.6.3"
 
 [profile.dev]
 opt-level = 3
-
-#[dependencies.rust_road_router]
-#path = "../rust_road_router/engine"

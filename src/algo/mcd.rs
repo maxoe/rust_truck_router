@@ -1,7 +1,11 @@
-use crate::{index_heap::*, types::*};
+use crate::{
+    algo::astar::{NoPotential, Potential},
+    index_heap::*,
+    types::*,
+};
 use bit_vec::BitVec;
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::{cmp::Reverse, collections::BinaryHeap};
+
 pub type OwnedOneRestrictionGraph = OneRestrictionFirstOutGraph<Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
 pub type BorrowedOneRestrictionGraph<'a> = OneRestrictionFirstOutGraph<&'a [EdgeId], &'a [NodeId], &'a [Weight]>;
 
@@ -67,19 +71,22 @@ impl<L: WeightOps> MultiCriteriaDijkstraData<L> {
     }
 }
 
-pub struct OneRestrictionDijkstra<'a> {
+pub struct OneRestrictionDijkstra<'a, P = NoPotential>
+where
+    P: Potential<Weight>,
+{
     data: MultiCriteriaDijkstraData<Weight2>,
     s: NodeId,
     graph: BorrowedOneRestrictionGraph<'a>,
     restriction: DrivingTimeRestriction,
     reset_flags: BitVec,
+    potential: P,
     pub num_queue_pushes: u32,
     pub num_settled: u32,
     pub num_labels_propagated: u32,
     pub num_labels_reset: u32,
 }
-
-impl<'a> OneRestrictionDijkstra<'a> {
+impl<'a> OneRestrictionDijkstra<'a, NoPotential> {
     pub fn new(graph: BorrowedOneRestrictionGraph<'a>, s: NodeId) -> Self {
         let n = graph.num_nodes();
         Self {
@@ -91,6 +98,32 @@ impl<'a> OneRestrictionDijkstra<'a> {
                 max_driving_time: Weight::infinity(),
             },
             reset_flags: BitVec::from_elem(n, false),
+            potential: NoPotential {},
+            num_queue_pushes: 0,
+            num_settled: 0,
+            num_labels_propagated: 0,
+            num_labels_reset: 0,
+        }
+    }
+}
+
+impl<'a, P> OneRestrictionDijkstra<'a, P>
+where
+    P: Potential<Weight>,
+{
+    pub fn new_with_potential(graph: BorrowedOneRestrictionGraph<'a>, s: NodeId, potential: P) -> Self {
+        let n = graph.num_nodes();
+
+        Self {
+            data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
+            s,
+            graph,
+            restriction: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            reset_flags: BitVec::from_elem(n, false),
+            potential,
             num_queue_pushes: 0,
             num_settled: 0,
             num_labels_propagated: 0,
@@ -252,7 +285,10 @@ where
     }
 }
 
-impl<'a> OneRestrictionDijkstra<'a> {
+impl<'a, P> OneRestrictionDijkstra<'a, P>
+where
+    P: Potential<Weight>,
+{
     pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
         // check if query already finished for t
         if let Some(Reverse(best_tuple_at_t)) = self.data.per_node_labels[t as usize].peek() {
@@ -275,11 +311,11 @@ impl<'a> OneRestrictionDijkstra<'a> {
         self.num_queue_pushes += 1;
         self.data.queue.push(State {
             node: self.s,
-            distance: [0, 0],
+            distance: [0, 0].link(self.potential.potential(self.s)),
         });
 
         while let Some(State {
-            distance: tentative_distance,
+            distance: tentative_distance_from_queue,
             node: node_id,
         }) = self.data.queue.pop()
         {
@@ -288,21 +324,22 @@ impl<'a> OneRestrictionDijkstra<'a> {
             if node_id == t {
                 // push again for eventual next query
                 self.data.queue.push(State {
-                    distance: tentative_distance,
+                    distance: tentative_distance_from_queue.link(self.potential.potential(node_id)),
                     node: node_id,
                 });
-                return Some(tentative_distance[0]);
+                return Some(tentative_distance_from_queue[0]);
             }
 
             // remove and push again as settled
             let label = self.data.per_node_labels[node_id as usize].pop().unwrap().0 .1;
+            let tentative_dist_without_pot = label.distance;
             self.data.per_node_labels[node_id as usize].push(Reverse((true, label)));
 
             // check if next unsettled lable exists for node and push to queue
             if let Some(Reverse((settled, next_best_label))) = self.data.per_node_labels[node_id as usize].peek() {
                 if !settled {
                     self.data.queue.push(State {
-                        distance: next_best_label.distance,
+                        distance: next_best_label.distance.link(self.potential.potential(node_id)),
                         node: node_id,
                     });
                 }
@@ -312,7 +349,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
                 {
                     // [new_dist without, new_dist with parking]
-                    let mut new_dist_arr = [tentative_distance.link(edge_weight); 2];
+                    let mut new_dist_arr = [tentative_dist_without_pot.link(edge_weight); 2];
 
                     // constraint and target pruning
                     if new_dist_arr[0][1] > self.restriction.max_driving_time
@@ -323,12 +360,15 @@ impl<'a> OneRestrictionDijkstra<'a> {
                         continue;
                     }
 
-                    if self.reset_flags.get(neighbor_node as usize).unwrap() {
+                    let new_dist_slc = if self.reset_flags.get(neighbor_node as usize).unwrap() {
                         new_dist_arr[1].reset(1, self.restriction.pause_time);
                         self.num_labels_reset += 1;
-                    }
+                        &new_dist_arr[..]
+                    } else {
+                        &new_dist_arr[..1]
+                    };
 
-                    for new_dist in new_dist_arr {
+                    for &new_dist in new_dist_slc {
                         let neighbor_label_set = &mut self.data.per_node_labels[neighbor_node as usize];
                         if !neighbor_label_set.iter().any(|&s| s.0 .1.distance.dominates(&new_dist)) {
                             neighbor_label_set.retain(|&s| !new_dist.dominates(&s.0 .1.distance));
@@ -343,18 +383,19 @@ impl<'a> OneRestrictionDijkstra<'a> {
                                 },
                             )));
 
+                            let dist_with_potential = new_dist.link(self.potential.potential(neighbor_node));
                             if self.data.queue.contains_index(neighbor_node as usize) {
                                 // decrease key seems to increase key if given a larger key than existing
-                                if self.data.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > new_dist {
+                                if self.data.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {
                                     self.data.queue.decrease_key(State {
-                                        distance: new_dist,
+                                        distance: dist_with_potential,
                                         node: neighbor_node,
                                     });
                                 }
                             } else {
                                 self.num_queue_pushes += 1;
                                 self.data.queue.push(State {
-                                    distance: new_dist,
+                                    distance: dist_with_potential,
                                     node: neighbor_node,
                                 });
                             }
