@@ -11,7 +11,7 @@ use std::{error::Error, io::Write, path::Path, vec};
 use std::{fs::File, io::LineWriter};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let path = std::env::current_dir()?.as_path().join(Path::new("test_data/parking_ka_hgv/"));
+    let path = std::env::current_dir()?.as_path().join(Path::new("test_data/large/parking_ka_hgv/"));
     let first_out = Vec::<EdgeId>::load_from(path.join("first_out"))?;
     let head = Vec::<NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
@@ -84,6 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if results_number_parking[num_parkings].len() < n {
                 instance.init_new_s(s);
+                dijkstra.init_new_s(s);
                 dijkstra.dist_query(t);
                 results_number_parking[num_parkings].push((time.num_microseconds().unwrap(), dijkstra.num_settled));
             }

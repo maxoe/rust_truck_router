@@ -166,10 +166,11 @@ where
 
     pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
         self.reset();
+        self.potential.init_new_t(t);
 
-        while let Some(State { distance, node }) = self.settle_next_node() {
+        while let Some(State { distance: _, node }) = self.settle_next_node() {
             if node == t {
-                return Some(distance);
+                return Some(self.data.dist[node as usize]);
             }
         }
 
@@ -199,6 +200,21 @@ where
     pub settled_nodes_vec: Vec<(NodeId, Weight)>,
 }
 
+impl OwnedDijkstra<NoPotential> {
+    pub fn new(graph: OwnedGraph) -> Self {
+        Self {
+            data: DijkstraData::new(graph.num_nodes()),
+            s: graph.num_nodes() as NodeId,
+            graph,
+            potential: NoPotential {},
+            num_queue_pushes: 0,
+            num_settled: 0,
+            num_labels_propagated: 0,
+            settled_nodes_vec: Vec::new(),
+        }
+    }
+}
+
 impl<P> OwnedDijkstra<P>
 where
     P: Potential<Weight>,
@@ -218,24 +234,7 @@ where
     pub fn current_node_path_to(&self, t: NodeId) -> Option<Vec<NodeId>> {
         self.data.path(self.s, t)
     }
-}
 
-impl OwnedDijkstra<NoPotential> {
-    pub fn new(graph: OwnedGraph) -> Self {
-        Self {
-            data: DijkstraData::new(graph.num_nodes()),
-            s: graph.num_nodes() as NodeId,
-            graph,
-            potential: NoPotential {},
-            num_queue_pushes: 0,
-            num_settled: 0,
-            num_labels_propagated: 0,
-            settled_nodes_vec: Vec::new(),
-        }
-    }
-}
-
-impl OwnedDijkstra {
     pub fn reset(&mut self) {
         self.data.run_count += 1;
         self.num_settled = 0;
@@ -312,10 +311,11 @@ impl OwnedDijkstra {
 
     pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
         self.reset();
+        self.potential.init_new_t(t);
 
-        while let Some(State { distance, node }) = self.settle_next_node() {
+        while let Some(State { distance: _, node }) = self.settle_next_node() {
             if node == t {
-                return Some(distance);
+                return Some(self.data.dist[node as usize]);
             }
         }
 

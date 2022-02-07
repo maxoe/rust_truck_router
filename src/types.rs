@@ -21,6 +21,7 @@ pub type Weight3 = [Weight; 3];
 
 pub trait WeightOps: Ord + Clone + Copy + std::fmt::Debug {
     fn dominates(&self, other: &Self) -> bool;
+    #[must_use]
     fn link(&self, other: Weight) -> Self;
     fn zero() -> Self;
     fn infinity() -> Self;

@@ -1,7 +1,8 @@
 use stud_rust_base::{
     algo::{
+        astar::Potential,
         ch::*,
-        ch_potential::CHPotentials,
+        ch_potential::CHPotential,
         dijkstra::*,
         mcd::{OneRestrictionDijkstra, OwnedOneRestrictionGraph},
     },
@@ -88,13 +89,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
-    let mut ch_pot = CHPotentials::from_ch(ch);
-    ch_pot.init_target(t);
+    let mut ch_pot = CHPotential::from_ch(ch);
+    ch_pot.init_new_t(t);
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), s, ch_pot);
+    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), ch_pot);
+    instance_mcd_acc.init_new_s(s);
     // let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-    instance_mcd.set_reset_flags(is_parking_node.clone()).set_restriction(16_200_000, 3_600_000);
-    instance_mcd_acc.set_reset_flags(is_parking_node).set_restriction(16_200_000, 3_600_000);
+    instance_mcd.set_reset_flags(is_parking_node.clone()).set_restriction(16_200_000, 1_950_000);
+    instance_mcd_acc.set_reset_flags(is_parking_node).set_restriction(16_200_000, 1_950_000);
 
     report_time("random one restriction dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance_mcd.dist_query(t).iter().min());

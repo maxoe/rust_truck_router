@@ -33,7 +33,7 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
         instance_mcd.set_reset_flags(is_parking_node.clone());
 
         assert_eq!(instance.dist_query(t), instance_mcd.dist_query(t));
-        assert_eq!(instance.current_node_path_to(t), instance_mcd.current_best_node_path_to(t))
+        assert_eq!(instance.current_node_path_to(t), instance_mcd.current_best_node_path_to(t));
     }
 
     Ok(())

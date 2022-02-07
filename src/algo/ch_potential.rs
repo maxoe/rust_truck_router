@@ -3,15 +3,17 @@ use crate::{
     types::{Graph, NodeId, OutgoingEdgeIterable, OwnedGraph, Weight, WeightOps},
 };
 
-pub struct CHPotentials {
+#[derive(Clone)]
+pub struct CHPotential {
     potentials: Vec<Option<Weight>>,
     fw_graph: OwnedGraph,
     bw_graph: OwnedGraph,
     rank: Vec<u32>,
     tent_distances: Vec<Weight>,
+    t: NodeId,
 }
 
-impl CHPotentials {
+impl CHPotential {
     pub fn new(fw_graph: OwnedGraph, bw_graph: OwnedGraph, rank: Vec<u32>) -> Self {
         let n = fw_graph.num_nodes();
         Self {
@@ -20,6 +22,7 @@ impl CHPotentials {
             bw_graph,
             rank,
             tent_distances: vec![Weight::infinity(); n],
+            t: n as NodeId,
         }
     }
 
@@ -27,17 +30,23 @@ impl CHPotentials {
         Self::new(ch.fw_search.graph, ch.bw_search.graph, ch.rank)
     }
 
-    pub fn init_target(&mut self, ext_t: NodeId) {
-        let mut d = Dijkstra::new(self.bw_graph.borrow());
-        let t = self.rank[ext_t as usize];
-        d.init_new_s(t);
-        self.tent_distances = d.to_all().to_owned();
+    pub fn reset(&mut self) {
+        self.potentials = vec![None; self.fw_graph.num_nodes()];
     }
 }
 
-impl Potential<Weight> for CHPotentials {
+impl Potential<Weight> for CHPotential {
     fn init_potentials(&mut self, potentials: &[Weight]) {
         self.potentials = potentials.iter().map(|&p| if p == Weight::infinity() { None } else { Some(p) }).collect();
+    }
+
+    fn init_new_t(&mut self, ext_t: NodeId) {
+        self.reset();
+
+        let mut d = Dijkstra::new(self.bw_graph.borrow());
+        self.t = self.rank[ext_t as usize];
+        d.init_new_s(self.t);
+        self.tent_distances = d.to_all().to_owned();
     }
 
     fn potential(&mut self, ext_n: NodeId) -> Weight {
@@ -49,7 +58,7 @@ impl Potential<Weight> for CHPotentials {
             let mut node_stack = vec![n];
 
             while let Some(&current_node) = node_stack.last() {
-                if let Some(_) = self.potentials[current_node as usize] {
+                if self.potentials[current_node as usize].is_some() {
                     node_stack.pop();
                     continue;
                 }
