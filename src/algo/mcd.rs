@@ -267,8 +267,8 @@ where
         self
     }
 
-    pub fn set_reset_flags(&mut self, flags: BitVec) -> &mut Self {
-        self.reset_flags = flags;
+    pub fn set_reset_flags<B: AsRef<[u8]>>(&mut self, flags: B) -> &mut Self {
+        self.reset_flags = BitVec::from_bytes(flags.as_ref());
         self
     }
 }

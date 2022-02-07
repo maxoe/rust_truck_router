@@ -30,7 +30,7 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
         println!("Query #{} from {} to {} without constraints", i, s, t);
         instance.init_new_s(s);
         let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
-        instance_mcd.set_reset_flags(is_parking_node.clone());
+        instance_mcd.set_reset_flags(is_parking_node.to_bytes());
 
         assert_eq!(instance.dist_query(t), instance_mcd.dist_query(t));
         assert_eq!(instance.current_node_path_to(t), instance_mcd.current_best_node_path_to(t));
