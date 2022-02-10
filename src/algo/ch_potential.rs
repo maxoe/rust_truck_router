@@ -1,15 +1,18 @@
 use crate::{
-    algo::{astar::Potential, ch::ContractionHierarchy, dijkstra::Dijkstra},
+    algo::{astar::Potential, ch::ContractionHierarchy},
+    timestamped_vector::TimestampedVector,
     types::{Graph, NodeId, OutgoingEdgeIterable, OwnedGraph, Weight, WeightOps},
 };
 
+use super::dijkstra::OwnedDijkstra;
+
 #[derive(Clone)]
 pub struct CHPotential {
-    potentials: Vec<Option<Weight>>,
+    potentials: TimestampedVector<Option<Weight>>,
     fw_graph: OwnedGraph,
-    bw_graph: OwnedGraph,
+    init_dijkstra: OwnedDijkstra,
     rank: Vec<u32>,
-    tent_distances: Vec<Weight>,
+
     t: NodeId,
 }
 
@@ -17,11 +20,10 @@ impl CHPotential {
     pub fn new(fw_graph: OwnedGraph, bw_graph: OwnedGraph, rank: Vec<u32>) -> Self {
         let n = fw_graph.num_nodes();
         Self {
-            potentials: vec![None; n],
+            potentials: TimestampedVector::with_size(n),
             fw_graph,
-            bw_graph,
             rank,
-            tent_distances: vec![Weight::infinity(); n],
+            init_dijkstra: OwnedDijkstra::new(bw_graph),
             t: n as NodeId,
         }
     }
@@ -31,42 +33,40 @@ impl CHPotential {
     }
 
     pub fn reset(&mut self) {
-        self.potentials = vec![None; self.fw_graph.num_nodes()];
+        self.potentials.reset();
+        self.init_dijkstra.init_new_s(self.t);
+        self.init_dijkstra.to_all();
     }
 }
 
 impl Potential<Weight> for CHPotential {
     fn init_potentials(&mut self, potentials: &[Weight]) {
-        self.potentials = potentials.iter().map(|&p| if p == Weight::infinity() { None } else { Some(p) }).collect();
+        self.potentials = TimestampedVector::from_vec(potentials.iter().map(|&p| if p == Weight::infinity() { None } else { Some(p) }).collect());
     }
 
     fn init_new_t(&mut self, ext_t: NodeId) {
-        self.reset();
-
-        let mut d = Dijkstra::new(self.bw_graph.borrow());
         self.t = self.rank[ext_t as usize];
-        d.init_new_s(self.t);
-        self.tent_distances = d.to_all().to_owned();
+        self.reset();
     }
 
     fn potential(&mut self, ext_n: NodeId) -> Weight {
         let n = self.rank[ext_n as usize];
 
-        if let Some(p) = self.potentials[n as usize] {
-            p
+        if let Some(p) = self.potentials.get(n as usize) {
+            *p
         } else {
             let mut node_stack = vec![n];
 
             while let Some(&current_node) = node_stack.last() {
-                if self.potentials[current_node as usize].is_some() {
+                if self.potentials.get(current_node as usize).is_some() {
                     node_stack.pop();
                     continue;
                 }
 
-                let mut current_to_t_up_dist = self.tent_distances[current_node as usize];
+                let mut current_to_t_up_dist = self.init_dijkstra.distances()[current_node as usize];
                 let mut neighbors_complete = true;
                 for (&edge_weight, &neighbor_node) in self.fw_graph.outgoing_edge_iter(current_node) {
-                    if let Some(p) = self.potentials[neighbor_node as usize] {
+                    if let Some(p) = self.potentials.get(neighbor_node as usize) {
                         current_to_t_up_dist = current_to_t_up_dist.min(p.link(edge_weight));
                     } else {
                         node_stack.push(neighbor_node);
@@ -76,11 +76,11 @@ impl Potential<Weight> for CHPotential {
 
                 if neighbors_complete {
                     node_stack.pop();
-                    self.potentials[current_node as usize] = Some(current_to_t_up_dist);
+                    self.potentials.set(current_node as usize, Some(current_to_t_up_dist));
                 }
             }
 
-            self.potentials[n as usize].unwrap()
+            self.potentials.get(n as usize).unwrap()
         }
     }
 }

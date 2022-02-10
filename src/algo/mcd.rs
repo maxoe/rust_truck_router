@@ -1,12 +1,18 @@
-use std::cmp::Reverse;
+use std::{
+    cmp::Reverse,
+    fmt::Write,
+    time::{Duration, Instant},
+};
 
 use crate::{
     algo::astar::{NoPotential, Potential},
     index_heap::*,
     rrr_heap::Heap,
+    timestamped_vector::TimestampedVector,
     types::*,
 };
 use bit_vec::BitVec;
+use num::Integer;
 
 pub type OwnedOneRestrictionGraph = OneRestrictionFirstOutGraph<Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
 pub type BorrowedOneRestrictionGraph<'a> = OneRestrictionFirstOutGraph<&'a [EdgeId], &'a [NodeId], &'a [Weight]>;
@@ -54,20 +60,22 @@ pub struct Label<T> {
     pub incoming_edge_weight: Weight,
 }
 
+type MCDHeap<L> = Heap<Reverse<Label<L>>>;
+
+impl<L: Clone> DefaultReset for MCDHeap<L> {
+    const DEFAULT: MCDHeap<L> = MCDHeap::<L>::new();
+}
 pub struct MultiCriteriaDijkstraData<L: WeightOps> {
     pub queue: IndexdMinHeap<State<L>>,
-    pub per_node_labels: Vec<Heap<Reverse<Label<L>>>>,
+    pub per_node_labels: TimestampedVector<MCDHeap<L>>,
     invalid_node_id: NodeId,
 }
 
 impl<L: WeightOps> MultiCriteriaDijkstraData<L> {
     pub fn new(n: usize) -> Self {
-        let mut per_node_labels = Vec::with_capacity(n);
-        per_node_labels.resize_with(n, Heap::new);
-
         Self {
             queue: IndexdMinHeap::new(n),
-            per_node_labels,
+            per_node_labels: TimestampedVector::with_size(n),
             invalid_node_id: n as NodeId,
         }
     }
@@ -87,13 +95,16 @@ where
     pub num_settled: u32,
     pub num_labels_propagated: u32,
     pub num_labels_reset: u32,
+    pub time_elapsed: Duration,
+    pub last_t: NodeId,
+    pub last_distance: Option<Weight>,
 }
 impl<'a> OneRestrictionDijkstra<'a, NoPotential> {
-    pub fn new(graph: BorrowedOneRestrictionGraph<'a>, s: NodeId) -> Self {
+    pub fn new(graph: BorrowedOneRestrictionGraph<'a>) -> Self {
         let n = graph.num_nodes();
         Self {
             data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
-            s,
+            s: n as NodeId,
             graph,
             restriction: DrivingTimeRestriction {
                 pause_time: 0,
@@ -105,6 +116,9 @@ impl<'a> OneRestrictionDijkstra<'a, NoPotential> {
             num_settled: 0,
             num_labels_propagated: 0,
             num_labels_reset: 0,
+            time_elapsed: Duration::ZERO,
+            last_t: n as NodeId,
+            last_distance: None,
         }
     }
 }
@@ -119,7 +133,7 @@ where
         self.num_queue_pushes = 0;
         self.num_labels_reset = 0;
 
-        self.data.per_node_labels.fill_with(Heap::new);
+        self.data.per_node_labels.reset();
 
         self.data.queue.clear();
         self.num_queue_pushes += 1;
@@ -128,7 +142,7 @@ where
             node: self.s,
             distance: self.estimated_dist_with_restriction([0, 0], pot),
         });
-        self.data.per_node_labels[self.s as usize].push(Reverse(Label {
+        self.data.per_node_labels.get_mut(self.s as usize).push(Reverse(Label {
             prev_node: self.graph.num_nodes() as NodeId,
             distance: [0, 0],
             incoming_edge_weight: Weight::infinity(),
@@ -152,6 +166,9 @@ where
             num_settled: 0,
             num_labels_propagated: 0,
             num_labels_reset: 0,
+            time_elapsed: Duration::ZERO,
+            last_t: n as NodeId,
+            last_distance: None,
         }
     }
 
@@ -167,8 +184,8 @@ where
 
         //get best settled or unsettled label
         //max because the type is Reverse<Label<..>>
-        let best_settled_at_t = self.data.per_node_labels[t as usize].popped().iter().max();
-        let best_unsettled_at_t = self.data.per_node_labels[t as usize].iter().max();
+        let best_settled_at_t = self.data.per_node_labels.get(t as usize).popped().iter().max();
+        let best_unsettled_at_t = self.data.per_node_labels.get(t as usize).iter().max();
 
         let best_label_at_t = match (best_settled_at_t, best_unsettled_at_t) {
             (None, Some(best)) => Some(best),
@@ -192,11 +209,11 @@ where
 
             while next_node != self.data.invalid_node_id {
                 // search label in current_node's label set which matches distance
-                'outer: for next_label in self.data.per_node_labels[next_node as usize].popped() {
+                'outer: for next_label in self.data.per_node_labels.get(next_node as usize).popped() {
                     let mut dist_candidates = [next_label.0.distance.link(current_label.0.incoming_edge_weight); 2];
 
                     if self.reset_flags.get(current_node as usize).unwrap() {
-                        dist_candidates[1].reset(1, self.restriction.pause_time);
+                        dist_candidates[1].reset_distance(1, self.restriction.pause_time);
                     };
 
                     for candidate in dist_candidates {
@@ -329,6 +346,9 @@ where
     pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
         self.reset();
         self.potential.init_new_t(t);
+        self.last_t = t;
+
+        let start = Instant::now();
 
         while let Some(State {
             distance: tentative_distance_from_queue,
@@ -341,16 +361,18 @@ where
                     distance: tentative_distance_from_queue,
                     node: node_id,
                 });
-                return self.data.per_node_labels[node_id as usize].peek().map(|label| label.0.distance[0]);
+                self.time_elapsed = start.elapsed();
+                self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
+                return self.last_distance;
             }
 
             self.num_settled += 1;
 
-            let label = self.data.per_node_labels[node_id as usize].pop().unwrap();
+            let label = self.data.per_node_labels.get_mut(node_id as usize).pop().unwrap();
             let tentative_dist_without_pot = label.0.distance;
 
             // check if next unsettled lable exists for node and push to queue
-            if let Some(next_best_label) = self.data.per_node_labels[node_id as usize].peek() {
+            if let Some(next_best_label) = self.data.per_node_labels.get(node_id as usize).peek() {
                 let pot = self.potential.potential(node_id);
                 self.data.queue.push(State {
                     distance: self.estimated_dist_with_restriction(next_best_label.0.distance, pot),
@@ -367,19 +389,19 @@ where
 
                     // constraint and target pruning
                     if new_dist[0][1] >= self.restriction.max_driving_time
-                        || self.data.per_node_labels[t as usize].iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
+                        || self.data.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
                     {
                         continue;
                     }
 
                     if self.reset_flags.get(neighbor_node as usize).unwrap() {
                         new_dist.push(new_dist[0]);
-                        new_dist[1].reset(1, self.restriction.pause_time);
+                        new_dist[1].reset_distance(1, self.restriction.pause_time);
                         self.num_labels_reset += 1;
                     }
 
                     for current_new_dist in new_dist {
-                        let neighbor_label_set = &mut self.data.per_node_labels[neighbor_node as usize];
+                        let neighbor_label_set = self.data.per_node_labels.get_mut(neighbor_node as usize);
                         let mut dominated = false;
                         neighbor_label_set.retain(|&neighbor_label| {
                             dominated |= neighbor_label.0.distance.dominates(&current_new_dist);
@@ -417,12 +439,16 @@ where
             }
         }
 
+        self.time_elapsed = start.elapsed();
         None
     }
 
     pub fn dist_query_propagate_all_labels(&mut self, t: NodeId) -> Option<Weight> {
         self.reset();
         self.potential.init_new_t(t);
+        self.last_t = t;
+
+        let start = Instant::now();
 
         while let Some(State {
             distance: tentative_distance_from_queue,
@@ -435,12 +461,14 @@ where
                     distance: tentative_distance_from_queue,
                     node: node_id,
                 });
-                return self.data.per_node_labels[node_id as usize].peek().map(|label| label.0.distance[0]);
+                self.time_elapsed = start.elapsed();
+                self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
+                return self.last_distance;
             }
 
             self.num_settled += 1;
 
-            while let Some(label) = self.data.per_node_labels[node_id as usize].pop() {
+            while let Some(label) = self.data.per_node_labels.get_mut(node_id as usize).pop() {
                 let tentative_dist_without_pot = label.0.distance;
 
                 // check if next unsettled lable exists for node and push to queue
@@ -461,19 +489,19 @@ where
 
                         // constraint and target pruning
                         if new_dist[0][1] >= self.restriction.max_driving_time
-                            || self.data.per_node_labels[t as usize].iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
+                            || self.data.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
                         {
                             continue;
                         }
 
                         if self.reset_flags.get(neighbor_node as usize).unwrap() {
                             new_dist.push(new_dist[0]);
-                            new_dist[1].reset(1, self.restriction.pause_time);
+                            new_dist[1].reset_distance(1, self.restriction.pause_time);
                             self.num_labels_reset += 1;
                         }
 
                         for current_new_dist in new_dist {
-                            let neighbor_label_set = &mut self.data.per_node_labels[neighbor_node as usize];
+                            let neighbor_label_set = self.data.per_node_labels.get_mut(neighbor_node as usize);
                             let mut dominated = false;
                             neighbor_label_set.retain(|&neighbor_label| {
                                 dominated |= neighbor_label.0.distance.dominates(&current_new_dist);
@@ -512,6 +540,112 @@ where
             }
         }
 
+        self.time_elapsed = start.elapsed();
         None
+    }
+
+    pub fn info(&self) -> String {
+        let mut s = "\n\nSummary for CSP\n\n".to_string();
+
+        if self.num_settled == 0 {
+            writeln!(s, "No query").unwrap();
+            return s;
+        }
+
+        writeln!(s, "Graph: ").unwrap();
+        writeln!(s, "\tnumber of nodes: {}", self.graph.num_nodes()).unwrap();
+        writeln!(s, "\tnumber of arcs: {}", self.graph.num_arcs()).unwrap();
+
+        writeln!(s, "").unwrap();
+        writeln!(s, "Restriction: ").unwrap();
+
+        if self.restriction.max_driving_time < Weight::infinity() {
+            let num_reset_nodes = self.reset_flags.iter().filter(|b| *b).count();
+            writeln!(
+                s,
+                "\tmax. driving time: {}\n\tpause time: {}\n\tnumber of flagged reset nodes: {} ({:.2}%)",
+                self.restriction.max_driving_time,
+                self.restriction.pause_time,
+                num_reset_nodes,
+                100.0 * num_reset_nodes as f32 / self.graph.num_nodes() as f32
+            )
+            .unwrap();
+        } else {
+            writeln!(s, "no driving time restriction").unwrap();
+        }
+
+        writeln!(s, "").unwrap();
+        writeln!(s, "Potential:").unwrap();
+        writeln!(s, "\t{}", std::any::type_name::<P>()).unwrap();
+        writeln!(s, "").unwrap();
+        writeln!(s, "Query:").unwrap();
+        writeln!(s, "\ts: {} t: {}", self.s, self.last_t).unwrap();
+        writeln!(s, "\ttime elapsed: {:.3} ms", self.time_elapsed.as_secs_f64() * 1000.0).unwrap();
+        writeln!(s, "\tnumber of queue pushes: {}", self.num_queue_pushes).unwrap();
+        writeln!(s, "\tnumber of settled nodes: {}", self.num_settled).unwrap();
+        writeln!(s, "\tnumber of propagated labels: {}", self.num_labels_propagated).unwrap();
+        writeln!(s, "\tnumber of labels which were reset: {}", self.num_labels_reset).unwrap();
+
+        writeln!(s, "").unwrap();
+        writeln!(s, "Path:").unwrap();
+
+        if self.last_distance.is_some() {
+            writeln!(s, "\tdistance: {}", self.last_distance.unwrap()).unwrap();
+
+            let (node_path, weights) = self.current_best_path_to(self.last_t, true).unwrap();
+            writeln!(s, "\tnumber of nodes: {}", node_path.len()).unwrap();
+            let flagged_p = self.flagged_nodes_on_node_path(&node_path);
+            writeln!(s, "\t  -thereof number of flagged nodes: {}", flagged_p.len()).unwrap();
+
+            let reset_p = self.reset_nodes_on_path(&(node_path, weights));
+            writeln!(s, "\t  -thereof number of flagged nodes actually used: {}", reset_p.len()).unwrap();
+        } else {
+            writeln!(s, "\tno path found").unwrap();
+        }
+
+        let mut label_sizes_settled = Vec::with_capacity(self.data.per_node_labels.len());
+        let mut label_sizes_unsettled = Vec::with_capacity(self.data.per_node_labels.len());
+        let mut label_sizes = Vec::with_capacity(self.data.per_node_labels.len());
+
+        for label in self.data.per_node_labels.iter() {
+            let number_of_unsettled = label.iter().count();
+            let number_of_settled = label.popped().len();
+
+            if number_of_settled != 0 {
+                label_sizes.push(number_of_unsettled + number_of_settled);
+                label_sizes_settled.push(number_of_settled);
+                label_sizes_unsettled.push(number_of_unsettled);
+            }
+        }
+
+        writeln!(s, "").unwrap();
+        writeln!(s, "Label Statistics:").unwrap();
+        writeln!(
+            s,
+            "\tnumber of nodes with settled labels: {} ({:.2}%)",
+            label_sizes.len(),
+            100.0 * label_sizes.len() as f32 / self.graph.num_nodes() as f32
+        )
+        .unwrap();
+        writeln!(s, "\t  -thereof maximum number of labels: {}", label_sizes.iter().max().unwrap()).unwrap();
+        writeln!(
+            s,
+            "\t  -thereof avg number of labels: {:.2}",
+            label_sizes.iter().sum::<usize>() as f32 / label_sizes.len() as f32
+        )
+        .unwrap();
+        label_sizes.sort_unstable();
+        let mean = if label_sizes.len().is_odd() {
+            label_sizes[label_sizes.len() / 2] as f32
+        } else {
+            (label_sizes[(label_sizes.len() / 2) - 1] as f32 + label_sizes[label_sizes.len() / 2] as f32) / 2.0
+        };
+        writeln!(s, "\t  -thereof mean number of labels: {:.2}", mean).unwrap();
+
+        s
+    }
+
+    pub fn get_per_node_number_of_labels(&self) -> Vec<usize> {
+        self.data.per_node_labels.iter().map(|h| h.iter().count() + h.popped().len()).collect()
     }
 }

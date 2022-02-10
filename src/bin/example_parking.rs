@@ -38,7 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     });
 
-    let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
+    let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
+    instance_mcd.init_new_s(s);
     instance_mcd.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 1_950_000);
 
     report_time("random one restriction dijkstra one-to-one distance query", || {

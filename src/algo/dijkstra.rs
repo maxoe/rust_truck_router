@@ -1,30 +1,26 @@
-use crate::{algo::astar::*, index_heap::*, types::*};
+use crate::{algo::astar::*, index_heap::*, timestamped_vector::TimestampedVector, types::*};
 
-#[derive(Debug)]
-pub struct DijkstraData<W: WeightOps> {
+#[derive(Debug, Clone)]
+pub struct DijkstraData<W: WeightOps + DefaultReset> {
     pub queue: IndexdMinHeap<State<W>>,
-    pub pred: Vec<(NodeId, EdgeId)>,
-    pub dist: Vec<W>,
-    pub run: Vec<usize>,
-    pub run_count: usize,
+    pub pred: TimestampedVector<NodeId>,
+    pub dist: TimestampedVector<W>,
 }
 
-impl<W: WeightOps> DijkstraData<W> {
+impl<W: WeightOps + DefaultReset> DijkstraData<W> {
     pub fn new(n: usize) -> Self {
         Self {
             queue: IndexdMinHeap::new(n),
-            pred: vec![(n as NodeId, EdgeId::MAX); n],
-            dist: vec![W::infinity(); n],
-            run: vec![0; n],
-            run_count: 0,
+            pred: TimestampedVector::with_size(n),
+            dist: TimestampedVector::with_size(n),
         }
     }
 
     pub fn path(&self, s: NodeId, t: NodeId) -> Option<Vec<NodeId>> {
         let mut path = vec![t];
         let mut current_id = t;
-        while current_id != s && current_id as usize != self.pred.len() && self.run[current_id as usize] == self.run_count {
-            current_id = self.pred[current_id as usize].0;
+        while self.pred.is_set(current_id as usize) {
+            current_id = *self.pred.get(current_id as usize);
             path.push(current_id);
         }
 
@@ -92,11 +88,12 @@ where
     P: Potential<Weight>,
 {
     pub fn reset(&mut self) {
-        self.data.run_count += 1;
         self.num_settled = 0;
         self.num_labels_propagated = 0;
         self.num_queue_pushes = 0;
-        self.data.dist[self.s as usize] = 0;
+        self.data.dist.reset();
+        self.data.pred.reset();
+        self.data.dist.set(self.s as usize, 0);
         self.data.queue.clear();
         self.data.queue.push(State {
             node: self.s,
@@ -111,11 +108,7 @@ where
 
     #[inline(always)]
     pub fn tentative_distance_at(&self, t: NodeId) -> Weight {
-        if self.data.run[t as usize] == self.data.run_count {
-            self.data.dist[t as usize]
-        } else {
-            Weight::infinity()
-        }
+        *self.data.dist.get(t as usize)
     }
 
     #[inline(always)]
@@ -127,7 +120,6 @@ where
         let dist = &mut self.data.dist;
         let pred = &mut self.data.pred;
         let queue = &mut self.data.queue;
-        let run = &mut self.data.run;
         let pot = &mut self.potential;
 
         if let Some(next) = queue.pop() {
@@ -136,26 +128,33 @@ where
             let node_id = next.node;
 
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id) {
-                let new_dist = dist[node_id as usize].link(edge_weight);
+                let new_dist = dist.get(node_id as usize).link(edge_weight);
 
-                if run[neighbor_node as usize] != self.data.run_count {
+                if !dist.is_set(neighbor_node as usize) {
                     self.num_queue_pushes += 1;
                     queue.push(State {
                         distance: new_dist.link(pot.potential(neighbor_node)),
                         node: neighbor_node,
                     });
                     self.num_labels_propagated += 1;
-                    dist[neighbor_node as usize] = new_dist;
-                    pred[neighbor_node as usize] = (node_id, EdgeId::MAX);
-                    run[neighbor_node as usize] = self.data.run_count;
-                } else if new_dist < dist[neighbor_node as usize] {
-                    queue.decrease_key(State {
-                        distance: new_dist.link(pot.potential(neighbor_node)),
-                        node: neighbor_node,
-                    });
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
+                } else if new_dist < *dist.get(neighbor_node as usize) {
+                    if !queue.contains_index(neighbor_node as usize) {
+                        self.num_queue_pushes += 1;
+                        queue.push(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    } else {
+                        queue.decrease_key(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    }
                     self.num_labels_propagated += 1;
-                    dist[neighbor_node as usize] = new_dist;
-                    pred[neighbor_node as usize] = (node_id, EdgeId::MAX);
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
                 }
             }
             Some(next)
@@ -170,7 +169,7 @@ where
 
         while let Some(State { distance: _, node }) = self.settle_next_node() {
             if node == t {
-                return Some(self.data.dist[node as usize]);
+                return Some(*self.data.dist.get(node as usize));
             }
         }
 
@@ -182,10 +181,15 @@ where
 
         while self.settle_next_node().is_some() {}
 
-        &self.data.dist
+        self.distances()
+    }
+
+    pub fn distances(&self) -> &[Weight] {
+        self.data.dist.data()
     }
 }
 
+#[derive(Clone)]
 pub struct OwnedDijkstra<P = NoPotential>
 where
     P: Potential<Weight>,
@@ -236,17 +240,17 @@ where
     }
 
     pub fn reset(&mut self) {
-        self.data.run_count += 1;
         self.num_settled = 0;
         self.num_labels_propagated = 0;
         self.num_queue_pushes = 0;
-        self.data.dist[self.s as usize] = 0;
+        self.data.dist.reset();
+        self.data.pred.reset();
+        self.data.dist.set(self.s as usize, 0);
         self.data.queue.clear();
         self.data.queue.push(State {
             node: self.s,
             distance: 0.link(self.potential.potential(self.s)),
         });
-        self.data.run[self.s as usize] = self.data.run_count;
     }
 
     pub fn init_new_s(&mut self, s: NodeId) {
@@ -256,11 +260,7 @@ where
 
     // #[inline(always)]
     pub fn tentative_distance_at(&self, t: NodeId) -> Weight {
-        if self.data.run[t as usize] == self.data.run_count {
-            self.data.dist[t as usize]
-        } else {
-            Weight::infinity()
-        }
+        *self.data.dist.get(t as usize)
     }
 
     #[inline(always)]
@@ -272,7 +272,6 @@ where
         let dist = &mut self.data.dist;
         let pred = &mut self.data.pred;
         let queue = &mut self.data.queue;
-        let run = &mut self.data.run;
         let pot = &mut self.potential;
 
         if let Some(next) = queue.pop() {
@@ -281,26 +280,33 @@ where
             let node_id = next.node;
 
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id) {
-                let new_dist = dist[node_id as usize].link(edge_weight);
+                let new_dist = dist.get(node_id as usize).link(edge_weight);
 
-                if run[neighbor_node as usize] != self.data.run_count {
+                if !dist.is_set(neighbor_node as usize) {
                     self.num_queue_pushes += 1;
                     queue.push(State {
                         distance: new_dist.link(pot.potential(neighbor_node)),
                         node: neighbor_node,
                     });
                     self.num_labels_propagated += 1;
-                    dist[neighbor_node as usize] = new_dist;
-                    pred[neighbor_node as usize] = (node_id, EdgeId::MAX);
-                    run[neighbor_node as usize] = self.data.run_count;
-                } else if new_dist < dist[neighbor_node as usize] {
-                    queue.decrease_key(State {
-                        distance: new_dist.link(pot.potential(neighbor_node)),
-                        node: neighbor_node,
-                    });
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
+                } else if new_dist < *dist.get(neighbor_node as usize) {
+                    if !queue.contains_index(neighbor_node as usize) {
+                        self.num_queue_pushes += 1;
+                        queue.push(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    } else {
+                        queue.decrease_key(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    }
                     self.num_labels_propagated += 1;
-                    dist[neighbor_node as usize] = new_dist;
-                    pred[neighbor_node as usize] = (node_id, EdgeId::MAX);
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
                 }
             }
             Some(next)
@@ -315,10 +321,22 @@ where
 
         while let Some(State { distance: _, node }) = self.settle_next_node() {
             if node == t {
-                return Some(self.data.dist[node as usize]);
+                return Some(*self.data.dist.get(node as usize));
             }
         }
 
         None
+    }
+
+    pub fn to_all(&mut self) -> &[Weight] {
+        self.reset();
+
+        while self.settle_next_node().is_some() {}
+
+        self.distances()
+    }
+
+    pub fn distances(&self) -> &[Weight] {
+        self.data.dist.data()
     }
 }

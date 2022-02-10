@@ -32,9 +32,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let t = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         println!("Query #{} from {} to {} without constraints", i, s, t);
         instance.init_new_s(s);
-        let mut instance_mcd_with_reset = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
+        let mut instance_mcd_with_reset = OneRestrictionDijkstra::new(graph_mcd.borrow());
+        instance_mcd_with_reset.init_new_s(s);
         instance_mcd_with_reset.set_reset_flags(is_parking_node.to_bytes());
-        let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
+        let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
+        instance_mcd.init_new_s(s);
 
         results_without_constraint.push((
             measure(|| instance.dist_query(t)).1.num_microseconds().unwrap(),
@@ -74,7 +76,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             results_number_parking[1].len(),
             results_number_parking[2].len()
         );
-        let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow(), s);
+        let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
+        instance_mcd.init_new_s(s);
         instance_mcd.set_reset_flags(is_parking_node.to_bytes()).set_restriction(1_620_000, 360_000);
 
         let (_, time) = measure(|| instance_mcd.dist_query(t));

@@ -50,7 +50,7 @@ pub trait Indexing {
 /// The interface mirros the standard library BinaryHeap (except for the reversed order).
 /// Only the methods necessary for dijkstras algorithm are implemented.
 /// In addition, `increase_key` and `decrease_key` methods are available.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IndexdMinHeap<T: Ord + Indexing> {
     positions: Vec<usize>,
     data: Vec<T>,

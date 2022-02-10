@@ -6,6 +6,7 @@ pub trait Potential<W: WeightOps> {
     fn init_new_t(&mut self, t: NodeId);
 }
 
+#[derive(Clone)]
 pub struct NoPotential {}
 
 impl<W> Potential<W> for NoPotential

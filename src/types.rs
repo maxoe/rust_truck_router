@@ -19,13 +19,32 @@ pub type Weight3 = [Weight; 3];
 //     fn link(&self, other: &Self) -> Self;
 // }
 
+pub trait DefaultReset: Clone {
+    const DEFAULT: Self;
+    fn reset(&mut self) {
+        *self = Self::DEFAULT
+    }
+}
+
+impl DefaultReset for Weight {
+    const DEFAULT: Weight = INFINITY;
+}
+
+impl<T: Clone> DefaultReset for Option<T> {
+    const DEFAULT: Option<T> = None;
+}
+
+impl DefaultReset for Weight2 {
+    const DEFAULT: Weight2 = [INFINITY; 2];
+}
+
 pub trait WeightOps: Ord + Clone + Copy + std::fmt::Debug {
     fn dominates(&self, other: &Self) -> bool;
     #[must_use]
     fn link(&self, other: Weight) -> Self;
     fn zero() -> Self;
     fn infinity() -> Self;
-    fn reset(&mut self, i: usize, pause_time: Weight);
+    fn reset_distance(&mut self, i: usize, pause_time: Weight);
 }
 
 impl WeightOps for Weight {
@@ -50,7 +69,7 @@ impl WeightOps for Weight {
     }
 
     #[inline(always)]
-    fn reset(&mut self, i: usize, _pause_time: Weight) {
+    fn reset_distance(&mut self, i: usize, _pause_time: Weight) {
         if i == 0 {
             *self = 0;
         }
@@ -79,7 +98,7 @@ impl WeightOps for Weight2 {
     }
 
     #[inline(always)]
-    fn reset(&mut self, i: usize, pause_time: Weight) {
+    fn reset_distance(&mut self, i: usize, pause_time: Weight) {
         if i < 2 {
             self[0] += pause_time;
             self[1] = 0;

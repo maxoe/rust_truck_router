@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
     let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
     let mut instance_mcd = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), pot);
+    // let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
     instance_mcd.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 1_950_000);
     // println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
@@ -49,7 +50,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
             instance_mcd.init_new_s(s);
-            instance_mcd.reset();
             instance_mcd.dist_query(t);
         }
     });
@@ -65,7 +65,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
                 instance_mcd.init_new_s(s);
-                instance_mcd.reset();
                 instance_mcd.dist_query_propagate_all_labels(t);
             }
         },
