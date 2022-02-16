@@ -1,5 +1,10 @@
-/target
 **/*.rs.bk
-.vscode
 *.csv
-test_data/large
+*.txt
+**__pycache__**
+
+.vscode
+target
+test_data/large/*
+eval/data/*
+eval/plots/*

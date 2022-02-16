@@ -38,6 +38,10 @@ impl DefaultReset for Weight2 {
     const DEFAULT: Weight2 = [INFINITY; 2];
 }
 
+impl DefaultReset for Weight3 {
+    const DEFAULT: Weight3 = [INFINITY; 3];
+}
+
 pub trait WeightOps: Ord + Clone + Copy + std::fmt::Debug {
     fn dominates(&self, other: &Self) -> bool;
     #[must_use]
@@ -102,6 +106,40 @@ impl WeightOps for Weight2 {
         if i < 2 {
             self[0] += pause_time;
             self[1] = 0;
+        }
+    }
+}
+
+impl WeightOps for Weight3 {
+    #[inline(always)]
+    fn dominates(&self, other: &Self) -> bool {
+        self[0] <= other[0] && self[1] <= other[1] && self[2] <= other[2]
+    }
+
+    #[inline(always)]
+    fn link(&self, other: Weight) -> Self {
+        [self[0] + other, self[1] + other, self[2] + other]
+    }
+
+    #[inline(always)]
+    fn zero() -> Self {
+        [0, 0, 0]
+    }
+
+    #[inline(always)]
+    fn infinity() -> Self {
+        [INFINITY, INFINITY, INFINITY]
+    }
+
+    #[inline(always)]
+    fn reset_distance(&mut self, i: usize, pause_time: Weight) {
+        if i == 1 {
+            self[0] += pause_time;
+            self[1] = 0;
+        } else if i == 2 {
+            self[0] += pause_time;
+            self[1] = 0;
+			self[2] = 0;
         }
     }
 }

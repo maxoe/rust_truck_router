@@ -7,6 +7,7 @@ pub mod algo;
 pub mod cli;
 pub mod index_heap;
 pub mod io;
+pub mod osm_id_mapper;
 pub mod rrr_heap;
 pub mod time;
 pub mod timestamped_vector;
