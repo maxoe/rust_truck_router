@@ -3,3 +3,4 @@ pub mod ch;
 pub mod ch_potential;
 pub mod dijkstra;
 pub mod mcd;
+pub mod mcd_2;

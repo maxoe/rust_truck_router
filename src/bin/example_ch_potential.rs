@@ -3,8 +3,10 @@ use stud_rust_base::{
         ch::*,
         ch_potential::CHPotential,
         mcd::{OneRestrictionDijkstra, OwnedOneRestrictionGraph},
+        mcd_2::{OwnedTwoRestrictionGraph, TwoRestrictionDijkstra},
     },
     io::*,
+    osm_id_mapper::OSMIDMapper,
     types::*,
 };
 
@@ -15,6 +17,7 @@ use std::{
     fs::File,
     io::{LineWriter, Write},
     path::Path,
+    time::Instant,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -24,21 +27,34 @@ fn main() -> Result<(), Box<dyn Error>> {
     let head = Vec::<NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+
+    // let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedTwoRestrictionGraph::new(first_out, head, travel_time);
 
     let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
+    let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
+    // path with distance 20517304
+    // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
+    // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
+
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
+    // let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
+    // instance_mcd_acc
+    //     .set_reset_flags(is_parking_node.to_bytes())
+    //     .set_restriction(16_200_000, 1_950_000);
+    let mut instance_mcd_acc = TwoRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
     instance_mcd_acc
         .set_reset_flags(is_parking_node.to_bytes())
-        .set_restriction(16_200_000, 1_950_000);
+        .set_restriction(32_400_000, 32_400_000, 16_200_000, 270_000);
+
+    let timer = Instant::now();
     instance_mcd_acc.init_new_s(s);
     instance_mcd_acc.dist_query(t);
-
+    println!("Elapsed: {}ms", timer.elapsed().as_secs_f64() * 1000.0);
     print!("{}", instance_mcd_acc.info());
 
     // instance_mcd_acc.reset();
@@ -60,23 +76,37 @@ fn main() -> Result<(), Box<dyn Error>> {
             writeln!(file, "{},{}", latitude[node_id as usize], longitude[node_id as usize])?;
         }
 
-        let flagged_p = instance_mcd_acc.flagged_nodes_on_node_path(&p);
-        let reset_p = instance_mcd_acc.reset_nodes_on_path(&(p, d));
-
         let file = File::create("path_flagged_acc.csv")?;
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude,osm_id,is_parking_used")?;
-
-        for node_id in flagged_p {
+        let flagged_p = instance_mcd_acc.flagged_nodes_on_node_path(&p);
+        for &node_id in flagged_p.iter() {
             writeln!(
                 file,
                 "{},{},{},{}",
                 latitude[node_id as usize],
                 longitude[node_id as usize],
                 osm_node_id[node_id as usize],
-                reset_p.contains(&node_id)
+                flagged_p.contains(&node_id)
             )?;
         }
+
+        // let (reset_p_short, reset_p_long) = instance_mcd_acc.reset_nodes_on_path(&(p, d));
+        // let file = File::create("path_flagged_acc.csv")?;
+        // let mut file = LineWriter::new(file);
+        // writeln!(file, "latitude,longitude,osm_id,is_parking_short_break,is_parking_long_break")?;
+
+        // for node_id in flagged_p {
+        //     writeln!(
+        //         file,
+        //         "{},{},{},{},{}",
+        //         latitude[node_id as usize],
+        //         longitude[node_id as usize],
+        //         osm_node_id[node_id as usize],
+        //         reset_p_short.contains(&node_id),
+        //         reset_p_long.contains(&node_id)
+        //     )?;
+        // }
     }
 
     let file = File::create("labels_acc.csv")?;

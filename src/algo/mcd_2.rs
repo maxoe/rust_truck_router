@@ -14,17 +14,17 @@ use crate::{
 use bit_vec::BitVec;
 use num::Integer;
 
-pub type OwnedOneRestrictionGraph = OneRestrictionFirstOutGraph<Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
-pub type BorrowedOneRestrictionGraph<'a> = OneRestrictionFirstOutGraph<&'a [EdgeId], &'a [NodeId], &'a [Weight]>;
+pub type OwnedTwoRestrictionGraph = TwoRestrictionFirstOutGraph<Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
+pub type BorrowedTwoRestrictionGraph<'a> = TwoRestrictionFirstOutGraph<&'a [EdgeId], &'a [NodeId], &'a [Weight]>;
 
 #[derive(Debug, Clone)]
-pub struct OneRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> {
+pub struct TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> {
     first_out: FirstOutContainer,
     head: HeadContainer,
     weights: WeightsContainer,
 }
 
-impl<FirstOutContainer, HeadContainer, WeightsContainer> OneRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
+impl<FirstOutContainer, HeadContainer, WeightsContainer> TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
 where
     FirstOutContainer: AsRef<[EdgeId]>,
     HeadContainer: AsRef<[NodeId]>,
@@ -44,8 +44,8 @@ where
         self.weights.as_ref()
     }
 
-    pub fn borrow(&self) -> OneRestrictionFirstOutGraph<&[EdgeId], &[NodeId], &[Weight]> {
-        OneRestrictionFirstOutGraph {
+    pub fn borrow(&self) -> TwoRestrictionFirstOutGraph<&[EdgeId], &[NodeId], &[Weight]> {
+        TwoRestrictionFirstOutGraph {
             first_out: self.first_out(),
             head: self.head(),
             weights: self.weights(),
@@ -81,14 +81,15 @@ impl<L: WeightOps> MultiCriteriaDijkstraData<L> {
     }
 }
 
-pub struct OneRestrictionDijkstra<'a, P = NoPotential>
+pub struct TwoRestrictionDijkstra<'a, P = NoPotential>
 where
     P: Potential<Weight>,
 {
-    data: MultiCriteriaDijkstraData<Weight2>,
+    data: MultiCriteriaDijkstraData<Weight3>,
     s: NodeId,
-    graph: BorrowedOneRestrictionGraph<'a>,
-    restriction: DrivingTimeRestriction,
+    graph: BorrowedTwoRestrictionGraph<'a>,
+    restriction_short: DrivingTimeRestriction,
+    restriction_long: DrivingTimeRestriction,
     reset_flags: BitVec,
     potential: P,
     pub num_queue_pushes: u32,
@@ -99,14 +100,18 @@ where
     pub last_t: NodeId,
     pub last_distance: Option<Weight>,
 }
-impl<'a> OneRestrictionDijkstra<'a, NoPotential> {
-    pub fn new(graph: BorrowedOneRestrictionGraph<'a>) -> Self {
+impl<'a> TwoRestrictionDijkstra<'a, NoPotential> {
+    pub fn new(graph: BorrowedTwoRestrictionGraph<'a>) -> Self {
         let n = graph.num_nodes();
         Self {
             data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
             s: n as NodeId,
             graph,
-            restriction: DrivingTimeRestriction {
+            restriction_short: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            restriction_long: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
@@ -123,7 +128,7 @@ impl<'a> OneRestrictionDijkstra<'a, NoPotential> {
     }
 }
 
-impl<'a, P> OneRestrictionDijkstra<'a, P>
+impl<'a, P> TwoRestrictionDijkstra<'a, P>
 where
     P: Potential<Weight>,
 {
@@ -140,23 +145,27 @@ where
         let pot = self.potential.potential(self.s);
         self.data.queue.push(State {
             node: self.s,
-            distance: self.estimated_dist_with_restriction([0, 0], pot),
+            distance: self.estimated_dist_with_restriction([0, 0, 0], pot),
         });
         self.data.per_node_labels.get_mut(self.s as usize).push(Reverse(Label {
             prev_node: self.graph.num_nodes() as NodeId,
-            distance: [0, 0],
+            distance: [0, 0, 0],
             incoming_edge_weight: Weight::infinity(),
         }));
     }
 
-    pub fn new_with_potential(graph: BorrowedOneRestrictionGraph<'a>, potential: P) -> Self {
+    pub fn new_with_potential(graph: BorrowedTwoRestrictionGraph<'a>, potential: P) -> Self {
         let n = graph.num_nodes();
 
         Self {
             data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
             s: graph.num_nodes() as NodeId,
             graph,
-            restriction: DrivingTimeRestriction {
+            restriction_short: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            restriction_long: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
@@ -177,7 +186,7 @@ where
         self.reset();
     }
 
-    pub fn current_best_path_to(&self, t: NodeId, with_distances: bool) -> Option<(Vec<NodeId>, Vec<Weight2>)> {
+    pub fn current_best_path_to(&self, t: NodeId, with_distances: bool) -> Option<(Vec<NodeId>, Vec<Weight3>)> {
         let mut path = vec![];
         let mut distances = vec![];
         let mut current_node = t;
@@ -210,10 +219,13 @@ where
             while next_node != self.data.invalid_node_id {
                 // search label in current_node's label set which matches distance
                 'outer: for next_label in self.data.per_node_labels.get(next_node as usize).popped() {
-                    let mut dist_candidates = [next_label.0.distance.link(current_label.0.incoming_edge_weight); 2];
+                    let mut dist_candidates = [next_label.0.distance.link(current_label.0.incoming_edge_weight); 3];
 
                     if self.reset_flags.get(current_node as usize).unwrap() {
-                        dist_candidates[1].reset_distance(1, self.restriction.pause_time);
+                        dist_candidates[1].reset_distance(1, self.restriction_short.pause_time);
+
+                        dist_candidates[2].reset_distance(1, self.restriction_short.pause_time);
+                        dist_candidates[2].reset_distance(2, self.restriction_long.pause_time);
                     };
 
                     for candidate in dist_candidates {
@@ -249,7 +261,7 @@ where
         self.current_best_path_to(t, false).map(|p| p.0)
     }
 
-    pub fn flagged_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight2>)) -> Vec<NodeId> {
+    pub fn flagged_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight3>)) -> Vec<NodeId> {
         self.flagged_nodes_on_node_path(&path.0)
     }
 
@@ -268,19 +280,38 @@ where
         self.current_best_path_to(t, true).map(|path| self.flagged_nodes_on_path(&path))
     }
 
-    pub fn reset_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight2>)) -> Vec<NodeId> {
-        let mut reset_nodes = Vec::new();
+    pub fn reset_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight3>)) -> (Vec<NodeId>, Vec<NodeId>) {
+        let mut reset_nodes_short = Vec::new();
+        let mut reset_nodes_long = Vec::new();
+
         for (node, dist) in path.0.iter().zip(&path.1) {
             if self.reset_flags.get(*node as usize).unwrap() && dist[1] == 0 {
-                reset_nodes.push(*node)
+                reset_nodes_short.push(*node)
+            }
+
+            if self.reset_flags.get(*node as usize).unwrap() && dist[2] == 0 {
+                reset_nodes_long.push(*node)
             }
         }
 
-        reset_nodes
+        (reset_nodes_short, reset_nodes_long)
     }
 
-    pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) -> &mut Self {
-        self.restriction = DrivingTimeRestriction { pause_time, max_driving_time };
+    pub fn set_restriction(
+        &mut self,
+        max_driving_time_long: Weight,
+        pause_time_long: Weight,
+        max_driving_time_short: Weight,
+        pause_time_short: Weight,
+    ) -> &mut Self {
+        self.restriction_short = DrivingTimeRestriction {
+            pause_time: pause_time_short,
+            max_driving_time: max_driving_time_short,
+        };
+        self.restriction_long = DrivingTimeRestriction {
+            pause_time: pause_time_long,
+            max_driving_time: max_driving_time_long,
+        };
         self
     }
 
@@ -290,7 +321,7 @@ where
     }
 }
 
-impl<FirstOutContainer, HeadContainer, WeightsContainer> Graph for OneRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
+impl<FirstOutContainer, HeadContainer, WeightsContainer> Graph for TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
 where
     FirstOutContainer: AsRef<[EdgeId]>,
     HeadContainer: AsRef<[NodeId]>,
@@ -313,7 +344,7 @@ where
 }
 
 impl<FirstOutContainer, HeadContainer, WeightsContainer> OutgoingEdgeIterable
-    for OneRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
+    for TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
 where
     FirstOutContainer: AsRef<[EdgeId]>,
     HeadContainer: AsRef<[NodeId]>,
@@ -331,15 +362,21 @@ where
     }
 }
 
-impl<'a, P> OneRestrictionDijkstra<'a, P>
+impl<'a, P> TwoRestrictionDijkstra<'a, P>
 where
     P: Potential<Weight>,
 {
-    fn estimated_dist_with_restriction(&self, distance_at_node: [Weight; 2], potential_to_target: Weight) -> [Weight; 2] {
+    fn estimated_dist_with_restriction(&self, distance_at_node: [Weight; 3], potential_to_target: Weight) -> [Weight; 3] {
         let estimated = distance_at_node.link(potential_to_target);
+
+        let amount_long_breaks = estimated[2] / self.restriction_long.max_driving_time;
+        let amount_short_breaks = (estimated[1] / self.restriction_short.max_driving_time) - amount_long_breaks;
         [
-            estimated[0].link((estimated[1] / self.restriction.max_driving_time) * self.restriction.pause_time),
+            estimated[0]
+                .link(amount_short_breaks * self.restriction_short.pause_time)
+                .link(amount_long_breaks * self.restriction_long.pause_time),
             estimated[1],
+            estimated[2],
         ]
     }
 
@@ -384,11 +421,12 @@ where
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
                 {
                     // [new_dist without, new_dist with parking]
-                    let mut new_dist = Vec::with_capacity(2);
+                    let mut new_dist = Vec::with_capacity(3);
                     new_dist.push(tentative_dist_without_pot.link(edge_weight));
 
                     // constraint and target pruning
-                    if new_dist[0][1] >= self.restriction.max_driving_time
+                    if new_dist[0][1] >= self.restriction_short.max_driving_time
+                        || new_dist[0][2] >= self.restriction_long.max_driving_time
                         || self.data.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
                     {
                         continue;
@@ -396,7 +434,11 @@ where
 
                     if self.reset_flags.get(neighbor_node as usize).unwrap() {
                         new_dist.push(new_dist[0]);
-                        new_dist[1].reset_distance(1, self.restriction.pause_time);
+                        new_dist[1].reset_distance(1, self.restriction_short.pause_time);
+
+                        new_dist.push(new_dist[0]);
+                        new_dist[2].reset_distance(1, self.restriction_short.pause_time);
+                        new_dist[2].reset_distance(2, self.restriction_long.pause_time);
                         self.num_labels_reset += 1;
                     }
 
@@ -488,7 +530,8 @@ where
                         new_dist.push(tentative_dist_without_pot.link(edge_weight));
 
                         // constraint and target pruning
-                        if new_dist[0][1] >= self.restriction.max_driving_time
+                        if new_dist[0][1] >= self.restriction_short.max_driving_time
+                            || new_dist[0][2] >= self.restriction_long.max_driving_time
                             || self.data.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
                         {
                             continue;
@@ -496,7 +539,11 @@ where
 
                         if self.reset_flags.get(neighbor_node as usize).unwrap() {
                             new_dist.push(new_dist[0]);
-                            new_dist[1].reset_distance(1, self.restriction.pause_time);
+                            new_dist[1].reset_distance(1, self.restriction_short.pause_time);
+
+                            new_dist.push(new_dist[0]);
+                            new_dist[2].reset_distance(1, self.restriction_short.pause_time);
+                            new_dist[2].reset_distance(2, self.restriction_long.pause_time);
                             self.num_labels_reset += 1;
                         }
 
@@ -559,13 +606,22 @@ where
         writeln!(s, "").unwrap();
         writeln!(s, "Restriction: ").unwrap();
 
-        if self.restriction.max_driving_time < Weight::infinity() {
+        if self.restriction_short.max_driving_time < Weight::infinity() && self.restriction_long.max_driving_time < Weight::infinity() {
             let num_reset_nodes = self.reset_flags.iter().filter(|b| *b).count();
             writeln!(
                 s,
-                "\tmax. driving time: {}\n\tpause time: {}\n\tnumber of flagged reset nodes: {} ({:.2}%)",
-                self.restriction.max_driving_time,
-                self.restriction.pause_time,
+                "\tShort break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
+                self.restriction_short.max_driving_time,
+                self.restriction_short.pause_time,
+                num_reset_nodes,
+                100.0 * num_reset_nodes as f32 / self.graph.num_nodes() as f32
+            )
+            .unwrap();
+            writeln!(
+                s,
+                "\tLong break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
+                self.restriction_long.max_driving_time,
+                self.restriction_long.pause_time,
                 num_reset_nodes,
                 100.0 * num_reset_nodes as f32 / self.graph.num_nodes() as f32
             )
@@ -597,8 +653,9 @@ where
             let flagged_p = self.flagged_nodes_on_node_path(&node_path);
             writeln!(s, "\t  -thereof number of flagged nodes: {}", flagged_p.len()).unwrap();
 
-            let reset_p = self.reset_nodes_on_path(&(node_path, weights));
-            writeln!(s, "\t  -thereof number of flagged nodes actually used: {}", reset_p.len()).unwrap();
+            let (reset_p_short, reset_p_long) = self.reset_nodes_on_path(&(node_path, weights));
+            writeln!(s, "\t  -thereof number of flagged nodes actually used: {}", reset_p_short.len()).unwrap();
+            writeln!(s, "\t  -thereof long breaks: {}", reset_p_long.len()).unwrap();
         } else {
             writeln!(s, "\tno path found").unwrap();
         }
@@ -647,9 +704,5 @@ where
 
     pub fn get_per_node_number_of_labels(&self) -> Vec<usize> {
         self.data.per_node_labels.iter().map(|h| h.iter().count() + h.popped().len()).collect()
-    }
-
-    pub fn get_number_of_visited_nodes(&self) -> usize {
-        self.data.per_node_labels.iter().filter(|h| h.popped().len() != 0).count()
     }
 }
