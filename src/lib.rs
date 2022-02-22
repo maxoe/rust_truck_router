@@ -2,6 +2,7 @@
 #![feature(type_alias_impl_trait)]
 #![feature(binary_heap_retain)]
 #![feature(is_sorted)]
+#![feature(iter_advance_by)]
 
 pub mod algo;
 pub mod cli;

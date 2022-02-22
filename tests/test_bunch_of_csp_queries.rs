@@ -1,5 +1,5 @@
 use bit_vec::BitVec;
-use stud_rust_base::algo::mcd::*;
+use stud_rust_base::{algo::mcd::*, types::OwnedGraph};
 
 #[test]
 fn simple() {
@@ -11,7 +11,7 @@ fn simple() {
     let travel_time = vec![2, 3, 3, 1, 5];
     let s = 2;
     let t = 1;
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
     instance_mcd.init_new_s(s);
@@ -35,7 +35,7 @@ fn shortes_path_breaks_constraint() {
     let travel_time = vec![1, 4, 3, 2, 4];
     let s = 0;
     let t = 4;
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
     instance_mcd.init_new_s(s);
     instance_mcd
@@ -82,7 +82,7 @@ fn needs_loop_to_fulfill_constraint() {
     let travel_time = vec![2, 1, 3, 1];
     let s = 0;
     let t = 3;
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
     instance_mcd.init_new_s(s);
     instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes()).set_restriction(5, 0);
@@ -122,7 +122,7 @@ fn ignore_parking() {
     let s = 0;
     let t = 4;
 
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
     instance_mcd.init_new_s(s);
     instance_mcd
@@ -141,7 +141,7 @@ fn no_path_fulfills_constraint() {
     let travel_time = vec![1, 5];
     let s = 0;
     let t = 2;
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
     let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
     instance_mcd.init_new_s(s);
     instance_mcd.set_reset_flags(BitVec::from_fn(3, |i| i == 1).to_bytes()).set_restriction(4, 0);

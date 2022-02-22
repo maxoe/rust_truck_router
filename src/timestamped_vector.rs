@@ -1,4 +1,39 @@
-use std::slice;
+//! # Example
+//!
+//! ```
+//! use stud_rust_base::timestamped_vector::*;
+//!
+//! let mut v = TimestampedVector::with_size(10);
+//!
+//! for i in 0..10 {
+//! 	*v.get_mut(i) = 5;
+//! }
+//!
+//! for i in 0..10 {
+//! 	assert_eq!(*v.get(i), 5);
+//! }
+//!
+//! for i in 0..10 {
+//! 	v.set(i, 6)
+//! }
+//!
+//! for i in 0..10 {
+//! 	assert_eq!(*v.get(i), 6);
+//! }
+//!
+//! v.reset();
+//!
+//! for i in 0..10 {
+//! 	assert!(!v.is_set(i));
+//! }
+//!
+//! for i in 0..10 {
+//! 	assert_ne!(*v.get(i), 6);
+//! }
+//!
+//! ```
+//!
+//!
 
 use crate::types::DefaultReset;
 
@@ -81,13 +116,6 @@ impl<T: DefaultReset> TimestampedVector<T> {
 
     pub fn len(&self) -> usize {
         self.vector.len()
-    }
-    pub fn data(&self) -> &[T] {
-        &self.vector
-    }
-
-    pub fn iter(&self) -> slice::Iter<T> {
-        self.vector.iter()
     }
 
     pub fn is_set(&self, i: usize) -> bool {

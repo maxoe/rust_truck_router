@@ -14,45 +14,6 @@ use crate::{
 use bit_vec::BitVec;
 use num::Integer;
 
-pub type OwnedTwoRestrictionGraph = TwoRestrictionFirstOutGraph<Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
-pub type BorrowedTwoRestrictionGraph<'a> = TwoRestrictionFirstOutGraph<&'a [EdgeId], &'a [NodeId], &'a [Weight]>;
-
-#[derive(Debug, Clone)]
-pub struct TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> {
-    first_out: FirstOutContainer,
-    head: HeadContainer,
-    weights: WeightsContainer,
-}
-
-impl<FirstOutContainer, HeadContainer, WeightsContainer> TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
-where
-    FirstOutContainer: AsRef<[EdgeId]>,
-    HeadContainer: AsRef<[NodeId]>,
-    WeightsContainer: AsRef<[Weight]>,
-{
-    pub fn new(first_out: FirstOutContainer, head: HeadContainer, weights: WeightsContainer) -> Self {
-        Self { first_out, head, weights }
-    }
-
-    pub fn first_out(&self) -> &[EdgeId] {
-        self.first_out.as_ref()
-    }
-    pub fn head(&self) -> &[NodeId] {
-        self.head.as_ref()
-    }
-    pub fn weights(&self) -> &[Weight] {
-        self.weights.as_ref()
-    }
-
-    pub fn borrow(&self) -> TwoRestrictionFirstOutGraph<&[EdgeId], &[NodeId], &[Weight]> {
-        TwoRestrictionFirstOutGraph {
-            first_out: self.first_out(),
-            head: self.head(),
-            weights: self.weights(),
-        }
-    }
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
 pub struct Label<T> {
     pub distance: T,
@@ -87,7 +48,7 @@ where
 {
     data: MultiCriteriaDijkstraData<Weight3>,
     s: NodeId,
-    graph: BorrowedTwoRestrictionGraph<'a>,
+    graph: BorrowedGraph<'a>,
     restriction_short: DrivingTimeRestriction,
     restriction_long: DrivingTimeRestriction,
     reset_flags: BitVec,
@@ -101,7 +62,7 @@ where
     pub last_distance: Option<Weight>,
 }
 impl<'a> TwoRestrictionDijkstra<'a, NoPotential> {
-    pub fn new(graph: BorrowedTwoRestrictionGraph<'a>) -> Self {
+    pub fn new(graph: BorrowedGraph<'a>) -> Self {
         let n = graph.num_nodes();
         Self {
             data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
@@ -154,7 +115,7 @@ where
         }));
     }
 
-    pub fn new_with_potential(graph: BorrowedTwoRestrictionGraph<'a>, potential: P) -> Self {
+    pub fn new_with_potential(graph: BorrowedGraph<'a>, potential: P) -> Self {
         let n = graph.num_nodes();
 
         Self {
@@ -318,47 +279,6 @@ where
     pub fn set_reset_flags<B: AsRef<[u8]>>(&mut self, flags: B) -> &mut Self {
         self.reset_flags = BitVec::from_bytes(flags.as_ref());
         self
-    }
-}
-
-impl<FirstOutContainer, HeadContainer, WeightsContainer> Graph for TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
-where
-    FirstOutContainer: AsRef<[EdgeId]>,
-    HeadContainer: AsRef<[NodeId]>,
-    WeightsContainer: AsRef<[Weight]>,
-{
-    type WeightType = Weight;
-
-    fn num_nodes(&self) -> usize {
-        self.first_out().len() - 1
-    }
-
-    fn num_arcs(&self) -> usize {
-        self.head().len()
-    }
-
-    fn degree(&self, node: NodeId) -> usize {
-        let node = node as usize;
-        (self.first_out()[node + 1] - self.first_out()[node]) as usize
-    }
-}
-
-impl<FirstOutContainer, HeadContainer, WeightsContainer> OutgoingEdgeIterable
-    for TwoRestrictionFirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
-where
-    FirstOutContainer: AsRef<[EdgeId]>,
-    HeadContainer: AsRef<[NodeId]>,
-    WeightsContainer: AsRef<[Weight]>,
-{
-    type Iter<'a>
-    where
-        Self: 'a,
-    = impl Iterator<Item = (&'a Self::WeightType, &'a NodeId)> + 'a;
-
-    #[inline]
-    fn outgoing_edge_iter(&self, node: NodeId) -> Self::Iter<'_> {
-        let range = self.first_out()[node as usize] as usize..self.first_out()[node as usize + 1] as usize;
-        self.weights()[range.clone()].iter().zip(self.head()[range].iter())
     }
 }
 
@@ -664,7 +584,8 @@ where
         let mut label_sizes_unsettled = Vec::with_capacity(self.data.per_node_labels.len());
         let mut label_sizes = Vec::with_capacity(self.data.per_node_labels.len());
 
-        for label in self.data.per_node_labels.iter() {
+        for i in 0..self.data.per_node_labels.len() {
+            let label = self.data.per_node_labels.get(i);
             let number_of_unsettled = label.iter().count();
             let number_of_settled = label.popped().len();
 
@@ -677,32 +598,48 @@ where
 
         writeln!(s, "").unwrap();
         writeln!(s, "Label Statistics:").unwrap();
-        writeln!(
-            s,
-            "\tnumber of nodes with settled labels: {} ({:.2}%)",
-            label_sizes.len(),
-            100.0 * label_sizes.len() as f32 / self.graph.num_nodes() as f32
-        )
-        .unwrap();
-        writeln!(s, "\t  -thereof maximum number of labels: {}", label_sizes.iter().max().unwrap()).unwrap();
-        writeln!(
-            s,
-            "\t  -thereof avg number of labels: {:.2}",
-            label_sizes.iter().sum::<usize>() as f32 / label_sizes.len() as f32
-        )
-        .unwrap();
-        label_sizes.sort_unstable();
-        let mean = if label_sizes.len().is_odd() {
-            label_sizes[label_sizes.len() / 2] as f32
+
+        if label_sizes.len() == 0 {
+            writeln!(s, "\t  -no labels were propagated").unwrap();
         } else {
-            (label_sizes[(label_sizes.len() / 2) - 1] as f32 + label_sizes[label_sizes.len() / 2] as f32) / 2.0
-        };
-        writeln!(s, "\t  -thereof mean number of labels: {:.2}", mean).unwrap();
+            writeln!(
+                s,
+                "\tnumber of nodes with settled labels: {} ({:.2}%)",
+                label_sizes.len(),
+                100.0 * label_sizes.len() as f32 / self.graph.num_nodes() as f32
+            )
+            .unwrap();
+            writeln!(s, "\t  -thereof maximum number of labels: {}", label_sizes.iter().max().unwrap()).unwrap();
+            writeln!(
+                s,
+                "\t  -thereof avg number of labels: {:.2}",
+                label_sizes.iter().sum::<usize>() as f32 / label_sizes.len() as f32
+            )
+            .unwrap();
+            label_sizes.sort_unstable();
+            let mean = if label_sizes.len().is_odd() {
+                label_sizes[label_sizes.len() / 2] as f32
+            } else {
+                (label_sizes[(label_sizes.len() / 2) - 1] as f32 + label_sizes[label_sizes.len() / 2] as f32) / 2.0
+            };
+            writeln!(s, "\t  -thereof mean number of labels: {:.2}", mean).unwrap();
+        }
 
         s
     }
 
     pub fn get_per_node_number_of_labels(&self) -> Vec<usize> {
-        self.data.per_node_labels.iter().map(|h| h.iter().count() + h.popped().len()).collect()
+        (0..self.data.per_node_labels.len())
+            .map(|i| {
+                let h = self.data.per_node_labels.get(i);
+                h.iter().count() + h.popped().len()
+            })
+            .collect()
+    }
+
+    pub fn get_number_of_visited_nodes(&self) -> usize {
+        (0..self.data.per_node_labels.len())
+            .filter(|i| self.data.per_node_labels.get(*i).popped().len() != 0)
+            .count()
     }
 }

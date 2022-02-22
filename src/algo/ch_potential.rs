@@ -63,7 +63,7 @@ impl Potential<Weight> for CHPotential {
                     continue;
                 }
 
-                let mut current_to_t_up_dist = self.init_dijkstra.distances()[current_node as usize];
+                let mut current_to_t_up_dist = self.init_dijkstra.tentative_distance_at(current_node);
                 let mut neighbors_complete = true;
                 for (&edge_weight, &neighbor_node) in self.fw_graph.outgoing_edge_iter(current_node) {
                     if let Some(p) = self.potentials.get(neighbor_node as usize) {

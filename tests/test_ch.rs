@@ -2,7 +2,7 @@ use std::error::Error;
 use std::path::Path;
 
 use stud_rust_base::{
-    algo::{ch::ContractionHierarchy, dijkstra::Dijkstra, mcd::*},
+    algo::{ch::ContractionHierarchy, dijkstra::Dijkstra},
     io::*,
     types::{OwnedGraph, *},
 };
@@ -57,7 +57,7 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
     let mut instance = Dijkstra::new(graph.borrow());

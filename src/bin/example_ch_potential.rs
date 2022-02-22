@@ -1,12 +1,6 @@
 use stud_rust_base::{
-    algo::{
-        ch::*,
-        ch_potential::CHPotential,
-        mcd::{OneRestrictionDijkstra, OwnedOneRestrictionGraph},
-        mcd_2::{OwnedTwoRestrictionGraph, TwoRestrictionDijkstra},
-    },
+    algo::{ch::*, ch_potential::CHPotential, mcd_2::TwoRestrictionDijkstra},
     io::*,
-    osm_id_mapper::OSMIDMapper,
     types::*,
 };
 
@@ -29,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
     // let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
-    let graph_mcd = OwnedTwoRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
@@ -67,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(latitude.len(), longitude.len());
     assert_eq!(latitude.len(), graph_mcd.num_nodes());
 
-    if let Some((p, d)) = instance_mcd_acc.current_best_path_to(t, true) {
+    if let Some((p, _d)) = instance_mcd_acc.current_best_path_to(t, true) {
         let file = File::create("path_acc.csv")?;
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude")?;

@@ -19,7 +19,7 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
     let mut instance = Dijkstra::new(graph.borrow());

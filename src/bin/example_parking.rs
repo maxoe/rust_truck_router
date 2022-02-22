@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);

@@ -21,7 +21,7 @@ fn some_ch_pot_queries() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
-    let graph_mcd = OneRestrictionFirstOutGraph::new(first_out, head, travel_time);
+    let graph_mcd = FirstOutGraph::new(first_out, head, travel_time);
     let mut dijkstra = Dijkstra::new(graph.borrow());
     let ch_pot = CHPotential::from_ch(ch);
     let mut dijkstra_pot = Dijkstra::new_with_potential(graph.borrow(), ch_pot.clone());
@@ -45,6 +45,19 @@ fn some_ch_pot_queries() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// #[test]
+// fn test_reset() -> Result<(), Box<dyn Error>> {
+//     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/"));
+//     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+//     ch.check();
+
+//     let mut ch_pot = CHPotential::from_ch(ch);
+//     ch_pot.init_new_t(4);
+//     ch_pot.reset();
+
+//     Ok(())
+// }
+
 /// Careful, can produce false positive if random query has an ambiguous shortest path
 #[test]
 #[ignore]
@@ -58,7 +71,7 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
-    let graph_mcd = OneRestrictionFirstOutGraph::new(first_out, head, travel_time);
+    let graph_mcd = FirstOutGraph::new(first_out, head, travel_time);
     let mut dijkstra = Dijkstra::new(graph.borrow());
     let ch_pot = CHPotential::from_ch(ch);
     let mut dijkstra_pot = Dijkstra::new_with_potential(graph.borrow(), ch_pot.clone());

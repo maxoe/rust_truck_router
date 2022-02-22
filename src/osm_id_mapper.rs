@@ -1,4 +1,4 @@
-//! (SLOW) Mapping for conversion of osm ids to local ids and vice versa.
+//! (SLOW! AND EASY) Mapping for conversion of osm ids to local ids and vice versa.
 //!
 //! # Example
 //!

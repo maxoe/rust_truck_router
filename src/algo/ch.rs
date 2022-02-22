@@ -2,6 +2,7 @@ use crate::{algo::dijkstra::OwnedDijkstra, io::Load, types::*};
 use bit_vec::BitVec;
 use std::path::Path;
 
+#[derive(Clone)]
 pub struct ContractionHierarchy {
     order: Vec<u32>,
     pub rank: Vec<u32>,

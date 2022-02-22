@@ -8,9 +8,9 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib import style
+import matplotlib.ticker as ticker
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import math
 
 import subprocess
@@ -108,7 +108,7 @@ def create_file_hash(bin):
         return h
 
 
-def is_up_to_data(bin):
+def is_up_to_date(bin):
     fpath = to_local_os_binary_file_name(os.path.join(BIN_PATH, bin))
     return is_bin(fpath) and create_file_hash(bin) == load_bin_hash(bin)
 
@@ -129,7 +129,7 @@ def exists_measurement(bin, graph):
 
 
 def run_measurement_conditionally(bin, graph):
-    if is_up_to_data(bin) and exists_measurement(bin, graph):
+    if is_up_to_date(bin) and exists_measurement(bin, graph):
         print('Skipping "' + bin + '" with "' + graph + '"')
     else:
         run_measurement(bin, graph)
@@ -140,8 +140,42 @@ def run_measurement(bin, graph):
     update_file_hash(bin)
 
 
-def read_measurement(bin):
-    return pd.read_csv(os.path.join(DATA_PATH, bin + ".txt"))
+def read_measurement(bin, *args, **kwargs):
+    return pd.read_csv(os.path.join(DATA_PATH, bin + ".txt"), *args, **kwargs)
+
+
+def write_plt(filename, graph):
+    path = os.path.join(os.path.join(OUTPUT_PATH, graph))
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    plt.savefig(
+        os.path.join(
+            path,
+            filename,
+        ),
+        dpi=1200,
+    )
+    plt.close()
+
+
+def exp2_ticks(x):
+
+    if x == 0:
+        return "$0$"
+
+    exponent = int(np.log2(x))
+    coeff = x / 2 ** exponent
+
+    if coeff == 1:
+        return r"$2^{{ {:2d} }}$".format(exponent)
+
+    return r"${:2.0f} \times 2^{{ {:2d} }}$".format(coeff, exponent)
+
+
+def make_exp2_tick_labels(ax_axis, df):
+    ax_axis.set_ticklabels([exp2_ticks(int(i)) for i in df.columns.values])
 
 
 def plot_variable_max_driving_time():
@@ -179,6 +213,7 @@ def plot_variable_max_driving_time():
         if n % every_nth != 0:
             label.set_visible(False)
 
+    write_plt()
     plt.savefig(
         os.path.join(OUTPUT_PATH, "variable_number_parkings.png"),
         dpi=1200,
@@ -291,13 +326,10 @@ def plot_variable_pause_time():
     plt.close()
 
 
-def plot_1000_avg_queries(graph):
-    graph_path = os.path.join(GRAPH_PATH, graph)
-    run_measurement_conditionally("measure_csp_thousand_queries_avg", graph_path)
+def plot_1000_csp_queries(graph):
+    run_measurement_conditionally("measure_csp_1000_queries", graph)
 
-    csp_1000_queries = read_measurement(
-        "measure_csp_thousand_queries_avg-" + graph
-    ).fillna(-1)
+    csp_1000_queries = read_measurement("measure_csp_1000_queries-" + graph).fillna(-1)
 
     fig, ax = plt.subplots(figsize=(10, 5))
     csp_1000_queries[["path_number_pauses", "time_ms"]].boxplot(
@@ -307,11 +339,54 @@ def plot_1000_avg_queries(graph):
     ax.set_xlabel("number of pauses on path (-1: no path)")
     ax.set_ylabel("time [ms]")
 
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "1000_queries_csp.png"),
-        dpi=1200,
+    write_plt("1000_queries_csp.png", graph)
+
+
+def plot_rank_times(name, graph):
+    run_measurement_conditionally(name, graph)
+
+    max_elements = 0
+    with open(
+        os.path.join(
+            DATA_PATH,
+            name + "-" + graph + ".txt",
+        )
+    ) as file:
+        Lines = file.readlines()
+        for line in Lines:
+            max_elements = max(max_elements, line.count(",") + 1)
+
+    csp_1000_queries = read_measurement(
+        name + "-" + graph,
     )
-    plt.close()
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    csp_1000_queries.boxplot(ax=ax)
+
+    ax.set_xlabel("dijkstra rank")
+    ax.set_ylabel("time [ms]")
+    ax.set_yscale("log")
+    make_exp2_tick_labels(ax.xaxis, csp_1000_queries)
+
+    write_plt(name + ".png", graph)
+
+
+def plot_1000_csp_2_queries(graph):
+    run_measurement_conditionally("measure_csp_2_1000_queries", graph)
+
+    csp_1000_queries = read_measurement("measure_csp_2_1000_queries-" + graph).fillna(
+        -1
+    )
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    csp_1000_queries[["path_number_pauses", "time_ms"]].boxplot(
+        by="path_number_pauses", ax=ax
+    )
+
+    ax.set_xlabel("number of pauses on path (-1: no path)")
+    ax.set_ylabel("time [ms]")
+
+    write_plt("1000_queries_csp_2.png", graph)
 
 
 if __name__ == "__main__":
@@ -320,6 +395,10 @@ if __name__ == "__main__":
         "-g", "--graph", dest="graph", help="the graph directory in GRAPH_PATH"
     )
     args = parser.parse_args()
+
     # plot_variable_max_driving_time()
     # plot_variable_pause_time()
-    plot_1000_avg_queries(args.graph)
+    # plot_1000_csp_queries(args.graph)
+    # plot_1000_csp_2_queries(args.graph)
+    plot_rank_times("measure_csp_1000_queries_rank_times", args.graph)
+    plot_rank_times("measure_csp_2_1000_queries_rank_times", args.graph)

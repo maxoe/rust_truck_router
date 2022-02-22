@@ -81,6 +81,26 @@ impl<'a> Dijkstra<'a, NoPotential> {
             settled_nodes_vec: Vec::new(),
         }
     }
+
+    pub fn ranks_only_exponentials(&mut self) -> Vec<NodeId> {
+        self.reset();
+
+        let log_num_nodes = (self.graph.num_nodes() as f32).log2() as usize;
+        let mut rank_order = Vec::with_capacity(log_num_nodes);
+
+        let mut exp_counter = 1;
+        let mut counter = 0;
+        while let Some(State { distance: _, node }) = self.settle_next_node() {
+            counter += 1;
+
+            if counter == exp_counter {
+                exp_counter = 2 * exp_counter;
+                rank_order.push(node);
+            }
+        }
+
+        rank_order
+    }
 }
 
 impl<'a, P> Dijkstra<'a, P>
@@ -176,16 +196,10 @@ where
         None
     }
 
-    pub fn to_all(&mut self) -> &[Weight] {
+    pub fn to_all(&mut self) {
         self.reset();
 
         while self.settle_next_node().is_some() {}
-
-        self.distances()
-    }
-
-    pub fn distances(&self) -> &[Weight] {
-        self.data.dist.data()
     }
 }
 
@@ -216,6 +230,30 @@ impl OwnedDijkstra<NoPotential> {
             num_labels_propagated: 0,
             settled_nodes_vec: Vec::new(),
         }
+    }
+
+    pub fn ranks_only_exponentials(&mut self) -> Vec<NodeId> {
+        self.reset();
+
+        let log_num_nodes = (self.graph.num_nodes() as f32).log2() as usize;
+        let mut rank_order = Vec::with_capacity(log_num_nodes);
+
+        let mut exp_counter = 1;
+        let mut counter = 0;
+        while let Some(State { distance: _, node }) = self.settle_next_node() {
+            counter += 1;
+
+            if counter == exp_counter {
+                exp_counter = 2 * exp_counter;
+                rank_order.push(node);
+
+                if rank_order.len() == log_num_nodes {
+                    break;
+                }
+            }
+        }
+
+        rank_order
     }
 }
 
@@ -328,15 +366,9 @@ where
         None
     }
 
-    pub fn to_all(&mut self) -> &[Weight] {
+    pub fn to_all(&mut self) {
         self.reset();
 
         while self.settle_next_node().is_some() {}
-
-        self.distances()
-    }
-
-    pub fn distances(&self) -> &[Weight] {
-        self.data.dist.data()
     }
 }

@@ -12,7 +12,7 @@ use std::{
     fs::File,
     io::{LineWriter, Write},
     path::Path,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
     let mut search = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
     search.set_reset_flags(is_parking_node.to_bytes());
 
