@@ -22,6 +22,7 @@ import itertools
 import pickle
 import hashlib
 import argparse
+import time
 
 from pandas.core.base import DataError
 
@@ -62,6 +63,15 @@ def is_bin(fpath):
     return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
 
+def to_local_os_binary_file_name(file):
+    if os.name != "nt" and file[-4:] == ".exe":
+        return file[:-4]
+    elif os.name == "nt" and file[-4:] != ".exe":
+        return file + ".exe"
+
+    return file
+
+
 def load_bin_hashes():
     if not os.path.isfile(PLOTDATA_PATH):
         hashes = dict()
@@ -91,24 +101,26 @@ def update_file_hash(bin):
 
 
 def create_file_hash(bin):
-    with open(os.path.join(BIN_PATH, bin + ".exe"), "rb") as f:
+    with open(to_local_os_binary_file_name(os.path.join(BIN_PATH, bin), "rb")) as f:
         h = hashlib.md5(f.read()).digest()
         f.close()
         return h
 
 
 def is_up_to_data(bin):
-    fpath = os.path.join(BIN_PATH, bin + ".exe")
+    fpath = to_local_os_binary_file_name(os.path.join(BIN_PATH, bin))
     return is_bin(fpath) and create_file_hash(bin) == load_bin_hash(bin)
 
 
 def run_bin(bin, args=[]):
+    start = time.time()
     popen = subprocess.Popen(
         ["cargo", "run", "--release", "--bin", bin] + args,
         stdout=subprocess.PIPE,
         cwd=DATA_PATH,
     )
-    popen.wait()
+    popen.communicate()
+    print('"' + bin + '" ran in {:.2f}'.format(time.time() - start))
 
 
 def exists_measurement(bin, graph):
