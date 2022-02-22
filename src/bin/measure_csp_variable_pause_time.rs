@@ -1,5 +1,6 @@
 use stud_rust_base::{
     algo::{ch::ContractionHierarchy, ch_potential::CHPotential, mcd::*},
+    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
     io::*,
     osm_id_mapper::OSMIDMapper,
     types::*,
@@ -44,55 +45,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     let pause_duration_step = 30_000;
 
     #[derive(Debug, Clone, Copy)]
-    struct MeasurementResult {
+    struct LocalMeasurementResult {
         pub pause_duration_ms: u32,
-        pub num_queue_pushes: u32,
-        pub num_settled: u32,
-        pub num_labels_propagated: u32,
-        pub num_labels_reset: u32,
-        pub num_nodes_searched: usize,
-        pub time: Duration,
-        pub path_distance: Option<Weight>,
-        pub path_number_nodes: Option<usize>,
-        pub path_number_flagged_nodes: Option<usize>,
-        pub path_number_pauses: Option<usize>,
+        standard: CSPMeasurementResult,
     }
 
-    impl MeasurementResult {
-        const HEADER : &'static str= "pause_duration_ms,num_queue_pushes,num_settled,num_labels_propagated,num_labels_reset,num_nodes_searched,time_ms,path_distance,path_number_nodes,path_number_flagged_nodes,path_number_pauses";
+    impl MeasurementResult for LocalMeasurementResult {
+        const OWN_HEADER: &'static str = "pause_duration_ms";
 
-        pub fn as_csv(&self) -> String {
-            if self.path_distance.is_some() {
-                format!(
-                    "{},{},{},{},{},{},{},{},{},{},{}",
-                    self.pause_duration_ms,
-                    self.num_queue_pushes,
-                    self.num_settled,
-                    self.num_labels_propagated,
-                    self.num_labels_reset,
-                    self.num_nodes_searched,
-                    self.time.as_secs_f64() * 1000.0,
-                    self.path_distance.unwrap(),
-                    self.path_number_nodes.unwrap(),
-                    self.path_number_flagged_nodes.unwrap(),
-                    self.path_number_pauses.unwrap()
-                )
-            } else {
-                format!(
-                    "{},{},{},{},{},{},{},{},{},{},{}",
-                    self.pause_duration_ms,
-                    self.num_queue_pushes,
-                    self.num_settled,
-                    self.num_labels_propagated,
-                    self.num_labels_reset,
-                    self.num_nodes_searched,
-                    self.time.as_secs_f64() * 1000.0,
-                    "NaN",
-                    "NaN",
-                    "NaN",
-                    "NaN",
-                )
-            }
+        fn get_header() -> String {
+            format!("{},{}", Self::OWN_HEADER, CSPMeasurementResult::get_header())
+        }
+        fn as_csv(&self) -> String {
+            format!("{},{}", self.pause_duration_ms, self.standard.as_csv())
         }
     }
 
@@ -117,32 +82,36 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let number_flagged_nodes = search.flagged_nodes_on_path(&path);
                 let number_pauses = search.reset_nodes_on_path(&path);
 
-                results.push(MeasurementResult {
+                results.push(LocalMeasurementResult {
                     pause_duration_ms: current_pause_duration,
-                    num_queue_pushes: search.num_queue_pushes,
-                    num_settled: search.num_settled,
-                    num_labels_propagated: search.num_labels_propagated,
-                    num_labels_reset: search.num_labels_reset,
-                    num_nodes_searched: search.get_number_of_visited_nodes(),
-                    time,
-                    path_distance: Some(dist),
-                    path_number_nodes: Some(path.0.len()),
-                    path_number_flagged_nodes: Some(number_flagged_nodes.len()),
-                    path_number_pauses: Some(number_pauses.len()),
+                    standard: CSPMeasurementResult {
+                        num_queue_pushes: search.num_queue_pushes,
+                        num_settled: search.num_settled,
+                        num_labels_propagated: search.num_labels_propagated,
+                        num_labels_reset: search.num_labels_reset,
+                        num_nodes_searched: search.get_number_of_visited_nodes(),
+                        time,
+                        path_distance: Some(dist),
+                        path_number_nodes: Some(path.0.len()),
+                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                        path_number_pauses: Some(number_pauses.len()),
+                    },
                 });
             } else {
-                results.push(MeasurementResult {
+                results.push(LocalMeasurementResult {
                     pause_duration_ms: current_pause_duration,
-                    num_queue_pushes: search.num_queue_pushes,
-                    num_settled: search.num_settled,
-                    num_labels_propagated: search.num_labels_propagated,
-                    num_labels_reset: search.num_labels_reset,
-                    num_nodes_searched: search.get_number_of_visited_nodes(),
-                    time,
-                    path_distance: None,
-                    path_number_nodes: None,
-                    path_number_flagged_nodes: None,
-                    path_number_pauses: None,
+                    standard: CSPMeasurementResult {
+                        num_queue_pushes: search.num_queue_pushes,
+                        num_settled: search.num_settled,
+                        num_labels_propagated: search.num_labels_propagated,
+                        num_labels_reset: search.num_labels_reset,
+                        num_nodes_searched: search.get_number_of_visited_nodes(),
+                        time,
+                        path_distance: None,
+                        path_number_nodes: None,
+                        path_number_flagged_nodes: None,
+                        path_number_pauses: None,
+                    },
                 });
             }
         }
@@ -150,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let file = File::create("measure_csp_variable_pause_time-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);
-    writeln!(file, "{}", MeasurementResult::HEADER)?;
+    writeln!(file, "{}", LocalMeasurementResult::get_header())?;
     for r in results {
         writeln!(file, "{}", r.as_csv())?;
     }

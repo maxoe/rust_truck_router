@@ -23,6 +23,7 @@ import pickle
 import hashlib
 import argparse
 import time
+import argparse
 
 from pandas.core.base import DataError
 
@@ -290,6 +291,35 @@ def plot_variable_pause_time():
     plt.close()
 
 
+def plot_1000_avg_queries(graph):
+    graph_path = os.path.join(GRAPH_PATH, graph)
+    run_measurement_conditionally("measure_csp_thousand_queries_avg", graph_path)
+
+    csp_1000_queries = read_measurement(
+        "measure_csp_thousand_queries_avg-" + graph
+    ).fillna(-1)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    csp_1000_queries[["path_number_pauses", "time_ms"]].boxplot(
+        by="path_number_pauses", ax=ax
+    )
+
+    ax.set_xlabel("number of pauses on path (-1: no path)")
+    ax.set_ylabel("time [ms]")
+
+    plt.savefig(
+        os.path.join(OUTPUT_PATH, "1000_queries_csp.png"),
+        dpi=1200,
+    )
+    plt.close()
+
+
 if __name__ == "__main__":
-    plot_variable_max_driving_time()
-    plot_variable_pause_time()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-g", "--graph", dest="graph", help="the graph directory in GRAPH_PATH"
+    )
+    args = parser.parse_args()
+    # plot_variable_max_driving_time()
+    # plot_variable_pause_time()
+    plot_1000_avg_queries(args.graph)

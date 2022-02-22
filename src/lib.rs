@@ -5,6 +5,7 @@
 
 pub mod algo;
 pub mod cli;
+pub mod experiments;
 pub mod index_heap;
 pub mod io;
 pub mod osm_id_mapper;
