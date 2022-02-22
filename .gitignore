@@ -1,6 +1,7 @@
 **/*.rs.bk
 *.csv
 *.txt
+
 **__pycache__**
 
 .vscode
