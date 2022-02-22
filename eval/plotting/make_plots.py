@@ -101,7 +101,7 @@ def update_file_hash(bin):
 
 
 def create_file_hash(bin):
-    with open(to_local_os_binary_file_name(os.path.join(BIN_PATH, bin), "rb")) as f:
+    with open(to_local_os_binary_file_name(os.path.join(BIN_PATH, bin)), "rb") as f:
         h = hashlib.md5(f.read()).digest()
         f.close()
         return h
