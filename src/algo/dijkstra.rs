@@ -96,6 +96,10 @@ impl<'a> Dijkstra<'a, NoPotential> {
             if counter == exp_counter {
                 exp_counter = 2 * exp_counter;
                 rank_order.push(node);
+
+                if rank_order.len() == log_num_nodes {
+                    break;
+                }
             }
         }
 
@@ -111,6 +115,7 @@ where
         self.num_settled = 0;
         self.num_labels_propagated = 0;
         self.num_queue_pushes = 0;
+        self.settled_nodes_vec.clear();
         self.data.dist.reset();
         self.data.pred.reset();
         self.data.dist.set(self.s as usize, 0);

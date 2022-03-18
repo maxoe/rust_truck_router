@@ -3,6 +3,7 @@
 #![feature(binary_heap_retain)]
 #![feature(is_sorted)]
 #![feature(iter_advance_by)]
+#![feature(int_log)]
 
 pub mod algo;
 pub mod cli;

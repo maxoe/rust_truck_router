@@ -27,13 +27,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let mut search = TwoRestrictionDijkstra::new_with_potential(graph.borrow(), CHPotential::from_ch(ch));
-    // search.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000);
-    search.set_reset_flags(is_parking_node.to_bytes());
+    search
+        .set_reset_flags(is_parking_node.to_bytes())
+        .set_restriction(32_400_000, 32_400_000, 16_200_000, 270_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
     let mut dijkstra = Dijkstra::new(graph.borrow());
 
-    let n = 1000;
+    let n = 100;
     let mut result = Vec::with_capacity(n);
 
     for _i in 0..n {
