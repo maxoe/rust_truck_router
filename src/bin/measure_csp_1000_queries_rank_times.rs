@@ -9,6 +9,7 @@ use std::{
 };
 use stud_rust_base::{
     algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd::OneRestrictionDijkstra},
+    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
     io::*,
     types::*,
 };
@@ -35,6 +36,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     let n = 100;
     let mut result = Vec::with_capacity(n);
 
+    #[derive(Debug, Clone, Copy)]
+    struct LocalMeasurementResult {
+        pub dijkstra_rank_exponent: usize,
+        standard: CSPMeasurementResult,
+    }
+
+    impl MeasurementResult for LocalMeasurementResult {
+        const OWN_HEADER: &'static str = "dijkstra_rank_exponent";
+
+        fn get_header() -> String {
+            format!("{},{}", Self::OWN_HEADER, CSPMeasurementResult::get_header())
+        }
+        fn as_csv(&self) -> String {
+            format!("{},{}", self.dijkstra_rank_exponent, self.standard.as_csv())
+        }
+    }
+
+    let mut stat_logs = Vec::with_capacity(n * log_num_nodes);
+
     for _i in 0..n {
         print!("Progress {}/{}\r", _i, n);
         stdout().flush()?;
@@ -48,11 +68,50 @@ fn main() -> Result<(), Box<dyn Error>> {
         dijkstra.ranks_only_exponentials();
 
         let mut rank_times = Vec::with_capacity(log_num_nodes);
-        for current_t in rank_order {
+        for (i, current_t) in rank_order.into_iter().enumerate() {
             let start = Instant::now();
             search.init_new_s(s);
-            search.dist_query(current_t);
-            rank_times.push(start.elapsed());
+            let dist = search.dist_query(current_t);
+            let time = start.elapsed();
+            rank_times.push(time);
+
+            if dist.is_some() {
+                let path = search.current_best_path_to(current_t, true).unwrap();
+                let number_flagged_nodes = search.flagged_nodes_on_path(&path);
+                let number_pauses = search.reset_nodes_on_path(&path);
+
+                stat_logs.push(LocalMeasurementResult {
+                    dijkstra_rank_exponent: i,
+                    standard: CSPMeasurementResult {
+                        num_queue_pushes: search.num_queue_pushes,
+                        num_settled: search.num_settled,
+                        num_labels_propagated: search.num_labels_propagated,
+                        num_labels_reset: search.num_labels_reset,
+                        num_nodes_searched: search.get_number_of_visited_nodes(),
+                        time,
+                        path_distance: dist,
+                        path_number_nodes: Some(path.0.len()),
+                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                        path_number_pauses: Some(number_pauses.len()),
+                    },
+                });
+            } else {
+                stat_logs.push(LocalMeasurementResult {
+                    dijkstra_rank_exponent: i,
+                    standard: CSPMeasurementResult {
+                        num_queue_pushes: search.num_queue_pushes,
+                        num_settled: search.num_settled,
+                        num_labels_propagated: search.num_labels_propagated,
+                        num_labels_reset: search.num_labels_reset,
+                        num_nodes_searched: search.get_number_of_visited_nodes(),
+                        time,
+                        path_distance: None,
+                        path_number_nodes: None,
+                        path_number_flagged_nodes: None,
+                        path_number_pauses: None,
+                    },
+                });
+            }
         }
         result.push(rank_times);
     }
@@ -76,6 +135,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .collect::<Vec<_>>()
                 .join(",")
         )?;
+    }
+
+    let file = File::create("measure_csp_1000_queries_rank_times_detailed_log-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
+    let mut file = LineWriter::new(file);
+    writeln!(file, "{}", LocalMeasurementResult::get_header())?;
+    for r in stat_logs {
+        writeln!(file, "{}", r.as_csv())?;
     }
 
     Ok(())
