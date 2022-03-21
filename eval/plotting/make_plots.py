@@ -2,6 +2,7 @@
 
 from cProfile import label
 from math import log2
+from multiprocessing.pool import RUN
 from os.path import join
 import numpy as np
 import pandas as pd
@@ -58,6 +59,8 @@ BIN_PATH = os.path.normpath(os.path.join(REPO_PATH, "target/release"))
 GRAPH_PATH = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../")
 )
+
+RUN_ALL_MEASUREMENTS = False
 
 
 def is_bin(fpath):
@@ -129,7 +132,11 @@ def exists_measurement(bin, graph):
 
 
 def run_measurement_conditionally(bin, graph):
-    if is_up_to_date(bin) and exists_measurement(bin, graph):
+    if (
+        is_up_to_date(bin)
+        and exists_measurement(bin, graph)
+        and not RUN_ALL_MEASUREMENTS
+    ):
         print('Skipping "' + bin + '" with "' + graph + '"')
     else:
         run_measurement(bin, graph)
@@ -392,10 +399,21 @@ def plot_1000_csp_2_queries(graph):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-g", "--graph", dest="graph", help="the graph directory in GRAPH_PATH"
+        "-g",
+        "--graph",
+        required=True,
+        dest="graph",
+        help="the graph directory in GRAPH_PATH",
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="force rerun of all measurements",
     )
     args = parser.parse_args()
 
+    RUN_ALL_MEASUREMENTS = args.force
     # plot_variable_max_driving_time()
     # plot_variable_pause_time()
     # plot_1000_csp_queries(args.graph)

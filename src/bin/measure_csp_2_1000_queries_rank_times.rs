@@ -9,7 +9,7 @@ use std::{
 };
 use stud_rust_base::{
     algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd_2::TwoRestrictionDijkstra},
-    experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    experiments::measurement::{CSP2MeasurementResult, MeasurementResult},
     io::*,
     types::*,
 };
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         const OWN_HEADER: &'static str = "dijkstra_rank_exponent";
 
         fn get_header() -> String {
-            format!("{},{}", Self::OWN_HEADER, CSPMeasurementResult::get_header())
+            format!("{},{}", Self::OWN_HEADER, CSP2MeasurementResult::get_header())
         }
         fn as_csv(&self) -> String {
             format!("{},{}", self.dijkstra_rank_exponent, self.standard.as_csv())
@@ -121,24 +121,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("Progress {}/{}", n, n);
 
+    // let file = File::create("measure_csp_2_1000_queries_rank_times-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
+    // let mut file = LineWriter::new(file);
+
+    // writeln!(
+    //     file,
+    //     "{}",
+    //     (0..log_num_nodes).map(|d| u32::pow(2, d as u32).to_string()).collect::<Vec<_>>().join(",")
+    // )?;
+    // for one_result in result {
+    //     writeln!(
+    //         file,
+    //         "{}",
+    //         one_result
+    //             .into_iter()
+    //             .map(|d| (d.as_secs_f64() * 1000.0).to_string())
+    //             .collect::<Vec<_>>()
+    //             .join(",")
+    //     )?;
+    // }
+
     let file = File::create("measure_csp_2_1000_queries_rank_times-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);
-
-    writeln!(
-        file,
-        "{}",
-        (0..log_num_nodes).map(|d| u32::pow(2, d as u32).to_string()).collect::<Vec<_>>().join(",")
-    )?;
-    for one_result in result {
-        writeln!(
-            file,
-            "{}",
-            one_result
-                .into_iter()
-                .map(|d| (d.as_secs_f64() * 1000.0).to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        )?;
+    writeln!(file, "{}", LocalMeasurementResult::get_header())?;
+    for r in stat_logs {
+        writeln!(file, "{}", r.as_csv())?;
     }
 
     Ok(())
