@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from cProfile import label
+from cProfile import label, run
 from math import log2
 from multiprocessing.pool import RUN
 from os.path import join
@@ -111,7 +111,7 @@ def create_file_hash(bin):
         return h
 
 
-def is_up_to_date(bin):
+def is_hash_up_to_date(bin):
     fpath = to_local_os_binary_file_name(os.path.join(BIN_PATH, bin))
     return is_bin(fpath) and create_file_hash(bin) == load_bin_hash(bin)
 
@@ -127,24 +127,46 @@ def run_bin(bin, args=[]):
     print('"' + bin + '" ran in {:.2f}'.format(time.time() - start))
 
 
+def run_build(bin):
+    popen = subprocess.Popen(
+        ["cargo", "build", "--release", "--bin", bin],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stream_data = popen.communicate()
+
+    if popen.returncode is not 0:
+        print('Build of "' + bin + '" failed with exit code ' + str(popen.returncode))
+        return False
+
+    return True
+
+
 def exists_measurement(bin, graph):
     return os.path.isfile(os.path.join(DATA_PATH, bin + "-" + graph + ".txt"))
 
 
 def run_measurement_conditionally(bin, graph):
-    if (
-        is_up_to_date(bin)
+    build_successful = run_build(bin)
+    should_skip = (
+        is_hash_up_to_date(bin)
         and exists_measurement(bin, graph)
         and not RUN_ALL_MEASUREMENTS
-    ):
-        print('Skipping "' + bin + '" with "' + graph + '"')
-    else:
+    )
+
+    if not build_successful or should_skip:
+        print('Skipping measurement of "' + bin + '" with "' + graph + '"')
+    elif not should_skip:
         run_measurement(bin, graph)
 
 
 def run_measurement(bin, graph):
     run_bin(bin, ["--", os.path.join(GRAPH_PATH, graph)])
     update_file_hash(bin)
+
+
+def build_measurement(bin, graph):
+    run_bin(bin, ["--", os.path.join(GRAPH_PATH, graph)])
 
 
 def read_measurement(bin, *args, **kwargs):
@@ -168,7 +190,6 @@ def write_plt(filename, graph):
 
 
 def exp2_ticks(x):
-
     if x == 0:
         return "$0$"
 
@@ -181,8 +202,12 @@ def exp2_ticks(x):
     return r"${:2.0f} \times 2^{{ {:2d} }}$".format(coeff, exponent)
 
 
-def make_exp2_tick_labels(ax_axis, df):
-    ax_axis.set_ticklabels([exp2_ticks(int(i)) for i in df.columns.values])
+def exp2_ticks_from_exponent(exponent):
+    return r"$2^{{ {:2d} }}$".format(exponent)
+
+
+def make_dijkstra_rank_tick_labels(ax_axis, series):
+    ax_axis.set_ticklabels([exp2_ticks_from_exponent(int(i)) for i in series])
 
 
 def plot_variable_max_driving_time():
@@ -368,12 +393,31 @@ def plot_rank_times(name, graph):
     )
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    csp_1000_queries.boxplot(ax=ax)
+    csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
 
     ax.set_xlabel("dijkstra rank")
-    ax.set_ylabel("time [ms]")
+    ax.set_ylabel("query time [ms]")
     ax.set_yscale("log")
-    make_exp2_tick_labels(ax.xaxis, csp_1000_queries)
+    ax.set_title("")
+
+    make_dijkstra_rank_tick_labels(
+        ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
+    )
+
+    ax2 = ax.twinx()
+    if "path_number_pauses" in csp_1000_queries.columns:
+        csp_1000_queries.groupby("dijkstra_rank_exponent").max()[
+            "path_number_pauses"
+        ].plot(ax=ax2)
+        ax.set_ylabel("avg number of breaks")
+    else:
+        csp_1000_queries.groupby("dijkstra_rank_exponent").max()[
+            "path_number_short_pauses"
+        ].plot(ax=ax2)
+        ax.set_ylabel("avg number of short breaks")
+
+    ax2.set_ylim(bottom=0)
+    ax2.grid(False)
 
     write_plt(name + ".png", graph)
 
@@ -401,6 +445,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-g",
         "--graph",
+        nargs="+",
         required=True,
         dest="graph",
         help="the graph directory in GRAPH_PATH",
@@ -418,5 +463,7 @@ if __name__ == "__main__":
     # plot_variable_pause_time()
     # plot_1000_csp_queries(args.graph)
     # plot_1000_csp_2_queries(args.graph)
-    plot_rank_times("measure_csp_1000_queries_rank_times", args.graph)
-    plot_rank_times("measure_csp_2_1000_queries_rank_times", args.graph)
+
+    for g in args.graph:
+        plot_rank_times("measure_csp_1000_queries_rank_times", g)
+        plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
