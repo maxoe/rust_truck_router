@@ -10,6 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import style
 import matplotlib.ticker as ticker
+import matplotlib.patches as mpatches
 import pandas as pd
 import numpy as np
 import math
@@ -207,7 +208,18 @@ def exp2_ticks_from_exponent(exponent):
 
 
 def make_dijkstra_rank_tick_labels(ax_axis, series):
+    ax_axis.set_ticks(series + 1)
     ax_axis.set_ticklabels([exp2_ticks_from_exponent(int(i)) for i in series])
+
+
+def get_boxplot_outliers(df, by_column_name):
+    q1 = df[by_column_name].quantile(0.25)
+    q3 = df[by_column_name].quantile(0.75)
+    iqr = q3 - q1
+    filter = np.invert(
+        (df[by_column_name] >= q1 - 1.5 * iqr) & (df[by_column_name] <= q3 + 1.5 * iqr)
+    )
+    return df.loc[filter]
 
 
 def plot_variable_max_driving_time():
@@ -377,47 +389,68 @@ def plot_1000_csp_queries(graph):
 def plot_rank_times(name, graph):
     run_measurement_conditionally(name, graph)
 
-    max_elements = 0
-    with open(
-        os.path.join(
-            DATA_PATH,
-            name + "-" + graph + ".txt",
-        )
-    ) as file:
-        Lines = file.readlines()
-        for line in Lines:
-            max_elements = max(max_elements, line.count(",") + 1)
-
     csp_1000_queries = read_measurement(
         name + "-" + graph,
     )
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
+    bp = csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
+
+    bp.get_figure().gca().set_title("")
+    fig.suptitle("")
 
     ax.set_xlabel("dijkstra rank")
     ax.set_ylabel("query time [ms]")
     ax.set_yscale("log")
-    ax.set_title("")
 
     make_dijkstra_rank_tick_labels(
         ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
     )
 
     ax2 = ax.twinx()
+    colors = ggPlotColors(3)
+
+    # DIRTY HACK BUT SOMEWHERE IT IS SHIFTED AGAINST EACH OTHER
+    csp_1000_queries["dijkstra_rank_exponent"] = (
+        csp_1000_queries["dijkstra_rank_exponent"] + 1
+    )
+
     if "path_number_pauses" in csp_1000_queries.columns:
-        csp_1000_queries.groupby("dijkstra_rank_exponent").max()[
+        csp_1000_queries.groupby("dijkstra_rank_exponent")[
             "path_number_pauses"
-        ].plot(ax=ax2)
-        ax.set_ylabel("avg number of breaks")
+        ].mean().plot(
+            ax=ax2,
+            color=colors[1],
+            style=".-",
+            x=csp_1000_queries["dijkstra_rank_exponent"] + 1,
+        )
+
+        patch1 = mpatches.Patch(color=colors[0], label="query time")
+        patch2 = mpatches.Patch(color=colors[1], label="mean number of breaks")
+        ax2.legend(handles=[patch1, patch2], loc=0)
+
     else:
-        csp_1000_queries.groupby("dijkstra_rank_exponent").max()[
-            "path_number_short_pauses"
-        ].plot(ax=ax2)
-        ax.set_ylabel("avg number of short breaks")
+        gb = csp_1000_queries.groupby("dijkstra_rank_exponent").mean()
+
+        gb["path_number_short_pauses"].plot(
+            ax=ax2,
+            color=colors[1],
+            style=".-",
+        )
+        gb["path_number_long_pauses"].plot(ax=ax2, color=colors[2], style=".-")
+
+        ax2.set_ylabel("avg number of short breaks")
+
+        patch1 = mpatches.Patch(color=colors[0], label="query time")
+        patch2 = mpatches.Patch(color=colors[1], label="mean number of short breaks")
+        patch3 = mpatches.Patch(color=colors[2], label="mean number of long breaks")
+        ax2.legend(handles=[patch1, patch2, patch3], loc=0)
 
     ax2.set_ylim(bottom=0)
+    ax2.set_ylabel("#breaks")
     ax2.grid(False)
+    ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    plt.title("1000 queries on " + graph)
 
     write_plt(name + ".png", graph)
 
