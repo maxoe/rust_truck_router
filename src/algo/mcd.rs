@@ -232,7 +232,7 @@ where
     pub fn reset_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight2>)) -> Vec<NodeId> {
         let mut reset_nodes = Vec::new();
         for (node, dist) in path.0.iter().zip(&path.1) {
-            if self.reset_flags.get(*node as usize).unwrap() && dist[1] == 0 {
+            if self.reset_flags.get(*node as usize).unwrap() && dist[1] == 0 && dist[0] != 0 {
                 reset_nodes.push(*node)
             }
         }

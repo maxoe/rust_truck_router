@@ -246,11 +246,11 @@ where
         let mut reset_nodes_long = Vec::new();
 
         for (node, dist) in path.0.iter().zip(&path.1) {
-            if self.reset_flags.get(*node as usize).unwrap() && dist[1] == 0 {
+            if self.reset_flags.get(*node as usize).unwrap() && dist[1] == 0 && dist[0] != 0 {
                 reset_nodes_short.push(*node)
             }
 
-            if self.reset_flags.get(*node as usize).unwrap() && dist[2] == 0 {
+            if self.reset_flags.get(*node as usize).unwrap() && dist[2] == 0 && dist[0] != 0 {
                 reset_nodes_long.push(*node)
             }
         }
