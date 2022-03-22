@@ -73,15 +73,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         let file = File::create("path_flagged_acc.csv")?;
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude,osm_id,is_parking_used")?;
-        let flagged_p = instance_mcd_acc.flagged_nodes_on_node_path(&p);
-        for &node_id in flagged_p.iter() {
+        let used_p = instance_mcd_acc.reset_nodes_on_path(&(p, _d));
+        for &node_id in used_p.0.iter() {
             writeln!(
                 file,
                 "{},{},{},{}",
                 latitude[node_id as usize],
                 longitude[node_id as usize],
                 osm_node_id[node_id as usize],
-                flagged_p.contains(&node_id)
+                used_p.0.contains(&node_id)
             )?;
         }
 

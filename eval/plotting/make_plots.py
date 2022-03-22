@@ -62,6 +62,7 @@ GRAPH_PATH = os.path.normpath(
 )
 
 RUN_ALL_MEASUREMENTS = False
+PROHIBIT_MEASUREMENTS = False
 
 
 def is_bin(fpath):
@@ -153,7 +154,7 @@ def run_measurement_conditionally(bin, graph):
         is_hash_up_to_date(bin)
         and exists_measurement(bin, graph)
         and not RUN_ALL_MEASUREMENTS
-    )
+    ) or PROHIBIT_MEASUREMENTS
 
     if not build_successful or should_skip:
         print('Skipping measurement of "' + bin + '" with "' + graph + '"')
@@ -393,6 +394,9 @@ def plot_rank_times(name, graph):
         name + "-" + graph,
     )
 
+    colors = ggPlotColors(4)
+
+    # 1 plot with number of breaks
     fig, ax = plt.subplots(figsize=(10, 5))
     bp = csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
 
@@ -408,7 +412,6 @@ def plot_rank_times(name, graph):
     )
 
     ax2 = ax.twinx()
-    colors = ggPlotColors(3)
 
     # DIRTY HACK BUT SOMEWHERE IT IS SHIFTED AGAINST EACH OTHER
     csp_1000_queries["dijkstra_rank_exponent"] = (
@@ -426,7 +429,7 @@ def plot_rank_times(name, graph):
         )
 
         patch1 = mpatches.Patch(color=colors[0], label="query time")
-        patch2 = mpatches.Patch(color=colors[1], label="mean number of breaks")
+        patch2 = mpatches.Patch(color=colors[1], label="mean #breaks")
         ax2.legend(handles=[patch1, patch2], loc=0)
 
     else:
@@ -439,20 +442,61 @@ def plot_rank_times(name, graph):
         )
         gb["path_number_long_pauses"].plot(ax=ax2, color=colors[2], style=".-")
 
-        ax2.set_ylabel("avg number of short breaks")
-
         patch1 = mpatches.Patch(color=colors[0], label="query time")
-        patch2 = mpatches.Patch(color=colors[1], label="mean number of short breaks")
-        patch3 = mpatches.Patch(color=colors[2], label="mean number of long breaks")
+        patch2 = mpatches.Patch(color=colors[1], label="mean #short breaks")
+        patch3 = mpatches.Patch(color=colors[2], label="mean #long breaks")
         ax2.legend(handles=[patch1, patch2, patch3], loc=0)
 
     ax2.set_ylim(bottom=0)
-    ax2.set_ylabel("#breaks")
+    ax2.set_ylabel("#")
     ax2.grid(False)
     ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     plt.title("1000 queries on " + graph)
 
-    write_plt(name + ".png", graph)
+    write_plt(name + "_breaks" + ".png", graph)
+
+    # 2 plot with number of reset labels
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # REVERSE DIRTY HACK
+    csp_1000_queries["dijkstra_rank_exponent"] = (
+        csp_1000_queries["dijkstra_rank_exponent"] - 1
+    )
+
+    bp = csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
+
+    bp.get_figure().gca().set_title("")
+    fig.suptitle("")
+
+    ax.set_xlabel("dijkstra rank")
+    ax.set_ylabel("query time [ms]")
+    ax.set_yscale("log")
+
+    make_dijkstra_rank_tick_labels(
+        ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
+    )
+
+    ax2 = ax.twinx()
+
+    # DIRTY HACK AGAIN
+    csp_1000_queries["dijkstra_rank_exponent"] = (
+        csp_1000_queries["dijkstra_rank_exponent"] + 1
+    )
+
+    gb = csp_1000_queries.groupby("dijkstra_rank_exponent").mean()
+    gb["num_labels_reset"].plot(ax=ax2, color=colors[3], style=".-")
+
+    patch1 = mpatches.Patch(color=colors[0], label="query time")
+    patch2 = mpatches.Patch(color=colors[3], label="mean #labels reset during search")
+    ax2.legend(handles=[patch1, patch2], loc=0)
+
+    ax2.set_ylim(bottom=0)
+    ax2.set_ylabel("#")
+    ax2.grid(False)
+    ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    plt.title("1000 queries on " + graph)
+
+    write_plt(name + "_labels_reset" + ".png", graph)
 
 
 def plot_1000_csp_2_queries(graph):
@@ -489,13 +533,24 @@ if __name__ == "__main__":
         action="store_true",
         help="force rerun of all measurements",
     )
+    parser.add_argument(
+        "-p",
+        "--plot",
+        action="store_true",
+        help="prohibit rerun of any measurement",
+    )
     args = parser.parse_args()
 
     RUN_ALL_MEASUREMENTS = args.force
+    PROHIBIT_MEASUREMENTS = args.plot
     # plot_variable_max_driving_time()
     # plot_variable_pause_time()
     # plot_1000_csp_queries(args.graph)
     # plot_1000_csp_2_queries(args.graph)
+
+    if RUN_ALL_MEASUREMENTS and PROHIBIT_MEASUREMENTS:
+        print("Cannot force and prohibit measurements and the same time")
+        exit(0)
 
     for g in args.graph:
         plot_rank_times("measure_csp_1000_queries_rank_times", g)

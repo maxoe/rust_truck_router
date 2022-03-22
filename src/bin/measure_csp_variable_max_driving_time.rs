@@ -1,3 +1,4 @@
+use rand::Rng;
 use stud_rust_base::{
     algo::{ch::ContractionHierarchy, ch_potential::CHPotential, mcd::*},
     experiments::measurement::{CSPMeasurementResult, MeasurementResult},
@@ -31,11 +32,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
-    //let s = 422258;
-    let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
+    // let s = 422258;
+    // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
+    let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     search.init_new_s(s);
     // let t = 4548361;
-    let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
+    // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
+    let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
     let n = 1;
     let max_driving_dist_step = 10000;
