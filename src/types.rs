@@ -59,7 +59,7 @@ impl WeightOps for Weight {
 
     #[inline(always)]
     fn link(&self, other: Weight) -> Self {
-        self + other
+        (self + other).min(INFINITY)
     }
 
     #[inline(always)]
@@ -88,7 +88,7 @@ impl WeightOps for Weight2 {
 
     #[inline(always)]
     fn link(&self, other: Weight) -> Self {
-        [self[0] + other, self[1] + other]
+        [(self[0] + other).min(INFINITY), (self[1] + other).min(INFINITY)]
     }
 
     #[inline(always)]
@@ -118,7 +118,11 @@ impl WeightOps for Weight3 {
 
     #[inline(always)]
     fn link(&self, other: Weight) -> Self {
-        [self[0] + other, self[1] + other, self[2] + other]
+        [
+            (self[0] + other).min(INFINITY),
+            (self[1] + other).min(INFINITY),
+            (self[2] + other).min(INFINITY),
+        ]
     }
 
     #[inline(always)]
@@ -139,7 +143,7 @@ impl WeightOps for Weight3 {
         } else if i == 2 {
             self[0] += pause_time;
             self[1] = 0;
-			self[2] = 0;
+            self[2] = 0;
         }
     }
 }

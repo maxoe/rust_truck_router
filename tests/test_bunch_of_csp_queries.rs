@@ -149,3 +149,26 @@ fn no_path_fulfills_constraint() {
     assert_eq!(instance_mcd.dist_query(t), None);
     assert_eq!(None, instance_mcd.current_best_node_path_to(t));
 }
+
+#[test]
+fn graph_has_zero_loop() {
+    // v---------^
+    // 0 -> 1 -> 2p -> 3
+    let first_out = vec![0, 1, 2, 4, 4];
+    let head = vec![1, 2, 0, 3];
+    let travel_time = vec![1, 0, 0, 2];
+    let s = 0;
+    let t = 3;
+    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
+    let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
+    instance_mcd.init_new_s(s);
+    instance_mcd.set_restriction(10, 0);
+
+    assert_eq!(instance_mcd.dist_query(t).unwrap(), 3);
+    assert_eq!(vec![0, 1, 2, 3], instance_mcd.current_best_node_path_to(t).unwrap());
+
+    instance_mcd.set_reset_flags(BitVec::from_fn(3, |i| i == 2).to_bytes());
+    instance_mcd.reset();
+    assert_eq!(instance_mcd.dist_query(t).unwrap(), 3);
+    assert_eq!(vec![0, 1, 2, 3], instance_mcd.current_best_node_path_to(t).unwrap());
+}

@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     cmp::Reverse,
     fmt::Write,
     time::{Duration, Instant},
@@ -170,26 +171,48 @@ where
             _ => None,
         };
 
-        if let Some(mut current_label) = best_label_at_t {
+        if let Some(cl) = best_label_at_t {
+            let mut current_label = cl.clone();
             let mut next_node = current_label.0.prev_node;
             path.push(current_node);
             if with_distances {
                 distances.push(current_label.0.distance);
             }
 
+            dbg!(t);
+
             while next_node != self.data.invalid_node_id {
                 // search label in current_node's label set which matches distance
-                'outer: for next_label in self.data.per_node_labels.get(next_node as usize).popped() {
+                println!(
+                    "\n\nSearching fitting label for {:?} at {} over edge with weight {}",
+                    current_label.0.distance, next_node, current_label.0.incoming_edge_weight
+                );
+
+                println!("settled at {}: {:?}", next_node, self.data.per_node_labels.get(next_node as usize).popped());
+                let mut label_set = self.data.per_node_labels.get(next_node as usize).popped().to_owned();
+                label_set.sort_unstable();
+
+                'outer: for next_label in label_set {
+                    // check if we're running in some weight 0 loop, short circuiting critical for performance
+                    if current_label.0.incoming_edge_weight == 0 && path.contains(&next_label.0.prev_node) {
+                        //TODO
+                    }
+                    println!("\nAt {}: Testing {:?}", next_node, next_label);
                     let mut dist_candidates = [next_label.0.distance.link(current_label.0.incoming_edge_weight); 3];
 
                     if self.reset_flags.get(current_node as usize).unwrap() {
+                        println!("\t- is parking node");
                         dist_candidates[1].reset_distance(1, self.restriction_short.pause_time);
 
                         dist_candidates[2].reset_distance(1, self.restriction_short.pause_time);
                         dist_candidates[2].reset_distance(2, self.restriction_long.pause_time);
                     };
+                    println!("\t- candidates are {:?}", dist_candidates);
 
                     for candidate in dist_candidates {
+                        println!("\t- current candidate is  {:?}", candidate);
+                        println!("\tcandidate matches? {}", candidate == current_label.0.distance);
+                        dbg!(current_label.0.incoming_edge_weight != 0 || !path.contains(&next_label.0.prev_node));
                         if candidate == current_label.0.distance {
                             current_label = next_label;
                             current_node = next_node;
@@ -197,8 +220,12 @@ where
 
                             path.push(current_node);
                             if with_distances {
+                                if current_node == 53010882 {
+                                    dbg!("sergts");
+                                }
                                 distances.push(current_label.0.distance);
                             }
+                            println!("Finished node");
                             break 'outer;
                         }
                     }
@@ -291,6 +318,7 @@ where
 
         let amount_long_breaks = estimated[2] / self.restriction_long.max_driving_time;
         let amount_short_breaks = (estimated[1] / self.restriction_short.max_driving_time) - amount_long_breaks;
+
         [
             estimated[0]
                 .link(amount_short_breaks * self.restriction_short.pause_time)
@@ -300,32 +328,22 @@ where
         ]
     }
 
-    pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
-        self.reset();
-        self.potential.init_new_t(t);
-        self.last_t = t;
+    pub fn settle_next_label(&mut self, t: NodeId) -> Option<State<Weight3>> {
+        let next = self.data.queue.pop();
 
-        let start = Instant::now();
-
-        while let Some(State {
-            distance: tentative_distance_from_queue,
+        if let Some(State {
+            distance: _tentative_distance_from_queue,
             node: node_id,
-        }) = self.data.queue.pop()
+        }) = next
         {
-            if node_id == t {
-                // push again for eventual next query
-                self.data.queue.push(State {
-                    distance: tentative_distance_from_queue,
-                    node: node_id,
-                });
-                self.time_elapsed = start.elapsed();
-                self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
-                return self.last_distance;
-            }
-
             self.num_settled += 1;
 
+            if node_id == t {
+                self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
+            }
+
             let label = self.data.per_node_labels.get_mut(node_id as usize).pop().unwrap();
+            let prev_node = label.0.prev_node;
             let tentative_dist_without_pot = label.0.distance;
 
             // check if next unsettled lable exists for node and push to queue
@@ -337,8 +355,8 @@ where
                 });
             }
 
-            // with hopping reduction
-            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
+            // without hopping reduction
+            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id) {
                 {
                     // [new_dist without, new_dist with parking]
                     let mut new_dist = Vec::with_capacity(3);
@@ -399,8 +417,29 @@ where
                     }
                 };
             }
+        } else {
+            self.last_distance = None;
         }
 
+        next
+    }
+
+    pub fn dist_query(&mut self, t: NodeId) -> Option<Weight> {
+        self.reset();
+        self.potential.init_new_t(t);
+        self.last_t = t;
+
+        let start = Instant::now();
+
+        while let Some(State { distance: _, node: node_id }) = self.settle_next_label(t) {
+            if node_id == t {
+                self.time_elapsed = start.elapsed();
+                return self.last_distance;
+            }
+            // if node_id == 58596598 {
+            //     dbg!("afsgbdnmjk,lj");
+            // }
+        }
         self.time_elapsed = start.elapsed();
         None
     }
@@ -412,35 +451,32 @@ where
 
         let start = Instant::now();
 
-        while let Some(State {
-            distance: tentative_distance_from_queue,
-            node: node_id,
-        }) = self.data.queue.pop()
-        {
+        while let Some(State { distance: _, node: node_id }) = self.settle_next_label_propagate_all(t) {
             if node_id == t {
-                // push again for eventual next query
-                self.data.queue.push(State {
-                    distance: tentative_distance_from_queue,
-                    node: node_id,
-                });
                 self.time_elapsed = start.elapsed();
-                self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
                 return self.last_distance;
             }
+        }
+        self.time_elapsed = start.elapsed();
+        None
+    }
 
+    pub fn settle_next_label_propagate_all(&mut self, t: NodeId) -> Option<State<Weight3>> {
+        let next = self.data.queue.pop();
+
+        if let Some(State {
+            distance: _tentative_distance_from_queue,
+            node: node_id,
+        }) = next
+        {
             self.num_settled += 1;
+
+            if node_id == t {
+                self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
+            }
 
             while let Some(label) = self.data.per_node_labels.get_mut(node_id as usize).pop() {
                 let tentative_dist_without_pot = label.0.distance;
-
-                // check if next unsettled lable exists for node and push to queue
-                // if let Some(next_best_label) = self.data.per_node_labels[node_id as usize].peek() {
-                //     let pot = self.potential.potential(node_id);
-                //     self.data.queue.push(State {
-                //         distance: self.estimated_dist_with_restriction(next_best_label.distance, pot),
-                //         node: node_id,
-                //     });
-                // }
 
                 // with hopping reduction
                 for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
@@ -505,10 +541,11 @@ where
                     };
                 }
             }
+        } else {
+            self.last_distance = None;
         }
 
-        self.time_elapsed = start.elapsed();
-        None
+        next
     }
 
     pub fn info(&self) -> String {
