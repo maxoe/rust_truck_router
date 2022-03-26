@@ -208,9 +208,8 @@ def exp2_ticks_from_exponent(exponent):
     return r"$2^{{ {:2d} }}$".format(exponent)
 
 
-def make_dijkstra_rank_tick_labels(ax_axis, series):
-    ax_axis.set_ticks(series + 1)
-    ax_axis.set_ticklabels([exp2_ticks_from_exponent(int(i)) for i in series])
+def make_dijkstra_rank_tick_labels(ax_axis, exponents):
+    ax_axis.set_ticklabels([exp2_ticks_from_exponent(int(i)) for i in exponents])
 
 
 def get_boxplot_outliers(df, by_column_name):
@@ -394,109 +393,51 @@ def plot_rank_times(name, graph):
         name + "-" + graph,
     )
 
+    # plot only 2^10 and larger
+    csp_1000_queries = csp_1000_queries.loc[
+        csp_1000_queries["dijkstra_rank_exponent"] >= 10
+    ]
+
     colors = ggPlotColors(4)
 
-    # 1 plot with number of breaks
-    fig, ax = plt.subplots(figsize=(10, 5))
-    bp = csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
+    to_plot = [
+        ("time_ms", "log"),
+        ("path_number_pauses", "linear"),
+        ("path_number_long_pauses", "linear"),
+        ("path_number_short_pauses", "linear"),
+        ("path_number_short_pauses", "linear"),
+        ("num_labels_reset", "log"),
+        ("num_nodes_searched", "log"),
+        ("path_distance", "log"),
+        ("path_number_nodes", "linear"),
+    ]
 
-    bp.get_figure().gca().set_title("")
-    fig.suptitle("")
+    for (column_name, plot_scale) in to_plot:
+        if column_name in csp_1000_queries.columns:
+            fig, ax = plt.subplots(figsize=(10, 5))
+            bp = csp_1000_queries.boxplot(
+                ax=ax, by="dijkstra_rank_exponent", column=column_name
+            )
 
-    ax.set_xlabel("dijkstra rank")
-    ax.set_ylabel("query time [ms]")
-    ax.set_yscale("log")
+            bp.get_figure().gca().set_title("")
+            fig.suptitle("")
 
-    make_dijkstra_rank_tick_labels(
-        ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
-    )
+            ax.set_xlabel("dijkstra rank")
+            ax.set_ylabel(column_name)
+            ax.set_yscale(plot_scale)
 
-    ax2 = ax.twinx()
+            if plot_scale == "linear":
+                ax.set_ylim(bottom=-0.1)
+                ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 
-    # DIRTY HACK BUT SOMEWHERE IT IS SHIFTED AGAINST EACH OTHER
-    csp_1000_queries["dijkstra_rank_exponent"] = (
-        csp_1000_queries["dijkstra_rank_exponent"] + 1
-    )
+            make_dijkstra_rank_tick_labels(
+                ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
+            )
 
-    if "path_number_pauses" in csp_1000_queries.columns:
-        csp_1000_queries.groupby("dijkstra_rank_exponent")[
-            "path_number_pauses"
-        ].mean().plot(
-            ax=ax2,
-            color=colors[1],
-            style=".-",
-            x=csp_1000_queries["dijkstra_rank_exponent"] + 1,
-        )
+            plt.title(name + ": " + graph)
+            fig.tight_layout()
 
-        patch1 = mpatches.Patch(color=colors[0], label="query time")
-        patch2 = mpatches.Patch(color=colors[1], label="mean #breaks")
-        ax2.legend(handles=[patch1, patch2], loc=0)
-
-    else:
-        gb = csp_1000_queries.groupby("dijkstra_rank_exponent").mean()
-
-        gb["path_number_short_pauses"].plot(
-            ax=ax2,
-            color=colors[1],
-            style=".-",
-        )
-        gb["path_number_long_pauses"].plot(ax=ax2, color=colors[2], style=".-")
-
-        patch1 = mpatches.Patch(color=colors[0], label="query time")
-        patch2 = mpatches.Patch(color=colors[1], label="mean #short breaks")
-        patch3 = mpatches.Patch(color=colors[2], label="mean #long breaks")
-        ax2.legend(handles=[patch1, patch2, patch3], loc=0)
-
-    ax2.set_ylim(bottom=0)
-    ax2.set_ylabel("#")
-    ax2.grid(False)
-    ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-    plt.title("1000 queries on " + graph)
-
-    write_plt(name + "_breaks" + ".png", graph)
-
-    # 2 plot with number of reset labels
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    # REVERSE DIRTY HACK
-    csp_1000_queries["dijkstra_rank_exponent"] = (
-        csp_1000_queries["dijkstra_rank_exponent"] - 1
-    )
-
-    bp = csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
-
-    bp.get_figure().gca().set_title("")
-    fig.suptitle("")
-
-    ax.set_xlabel("dijkstra rank")
-    ax.set_ylabel("query time [ms]")
-    ax.set_yscale("log")
-
-    make_dijkstra_rank_tick_labels(
-        ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
-    )
-
-    ax2 = ax.twinx()
-
-    # DIRTY HACK AGAIN
-    csp_1000_queries["dijkstra_rank_exponent"] = (
-        csp_1000_queries["dijkstra_rank_exponent"] + 1
-    )
-
-    gb = csp_1000_queries.groupby("dijkstra_rank_exponent").mean()
-    gb["num_labels_reset"].plot(ax=ax2, color=colors[3], style=".-")
-
-    patch1 = mpatches.Patch(color=colors[0], label="query time")
-    patch2 = mpatches.Patch(color=colors[3], label="mean #labels reset during search")
-    ax2.legend(handles=[patch1, patch2], loc=0)
-
-    ax2.set_ylim(bottom=0)
-    ax2.set_ylabel("#")
-    ax2.grid(False)
-    ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-    plt.title("1000 queries on " + graph)
-
-    write_plt(name + "_labels_reset" + ".png", graph)
+            write_plt(name + "-" + column_name + ".png", graph)
 
 
 def plot_1000_csp_2_queries(graph):

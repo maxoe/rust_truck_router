@@ -49,6 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         time = time.checked_add(Instant::now() - start).unwrap();
 
         results.push(CSPMeasurementResult {
+            graph_num_nodes: graph_mcd.num_nodes(),
+            graph_num_edges: graph_mcd.num_arcs(),
             num_queue_pushes: search.num_queue_pushes,
             num_settled: search.num_settled,
             num_labels_propagated: search.num_labels_propagated,
@@ -58,7 +60,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             path_distance: None,
             path_number_nodes: None,
             path_number_flagged_nodes: None,
-            path_number_pauses: None,
         });
     }
 
