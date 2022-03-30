@@ -141,6 +141,57 @@ where
         self.data.queue.peek().map(|s| s.distance)
     }
 
+    pub fn settle_next_node_not_exceeding(&mut self, distance_limit: Weight) -> Option<State<Weight>> {
+        let dist = &mut self.data.dist;
+        let pred = &mut self.data.pred;
+        let queue = &mut self.data.queue;
+        let pot = &mut self.potential;
+
+        if let Some(next) = queue.pop() {
+            self.settled_nodes_vec.push((next.node, next.distance));
+            self.num_settled += 1;
+            let node_id = next.node;
+
+            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id) {
+                let new_dist = dist.get(node_id as usize).link(edge_weight);
+
+                if new_dist >= distance_limit {
+                    continue;
+                }
+
+                if !dist.is_set(neighbor_node as usize) {
+                    self.num_queue_pushes += 1;
+                    queue.push(State {
+                        distance: new_dist.link(pot.potential(neighbor_node)),
+                        node: neighbor_node,
+                    });
+                    self.num_labels_propagated += 1;
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
+                } else if new_dist < *dist.get(neighbor_node as usize) {
+                    if !queue.contains_index(neighbor_node as usize) {
+                        self.num_queue_pushes += 1;
+                        queue.push(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    } else {
+                        queue.decrease_key(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    }
+                    self.num_labels_propagated += 1;
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
+                }
+            }
+            Some(next)
+        } else {
+            None
+        }
+    }
+
     pub fn settle_next_node(&mut self) -> Option<State<Weight>> {
         let dist = &mut self.data.dist;
         let pred = &mut self.data.pred;
@@ -309,6 +360,57 @@ where
     #[inline(always)]
     pub fn min_key(&self) -> Option<Weight> {
         self.data.queue.peek().map(|s| s.distance)
+    }
+
+    pub fn settle_next_node_not_exceeding(&mut self, distance_limit: Weight) -> Option<State<Weight>> {
+        let dist = &mut self.data.dist;
+        let pred = &mut self.data.pred;
+        let queue = &mut self.data.queue;
+        let pot = &mut self.potential;
+
+        if let Some(next) = queue.pop() {
+            self.settled_nodes_vec.push((next.node, next.distance));
+            self.num_settled += 1;
+            let node_id = next.node;
+
+            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id) {
+                let new_dist = dist.get(node_id as usize).link(edge_weight);
+
+                if new_dist >= distance_limit {
+                    continue;
+                }
+
+                if !dist.is_set(neighbor_node as usize) {
+                    self.num_queue_pushes += 1;
+                    queue.push(State {
+                        distance: new_dist.link(pot.potential(neighbor_node)),
+                        node: neighbor_node,
+                    });
+                    self.num_labels_propagated += 1;
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
+                } else if new_dist < *dist.get(neighbor_node as usize) {
+                    if !queue.contains_index(neighbor_node as usize) {
+                        self.num_queue_pushes += 1;
+                        queue.push(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    } else {
+                        queue.decrease_key(State {
+                            distance: new_dist.link(pot.potential(neighbor_node)),
+                            node: neighbor_node,
+                        });
+                    }
+                    self.num_labels_propagated += 1;
+                    dist.set(neighbor_node as usize, new_dist);
+                    pred.set(neighbor_node as usize, node_id);
+                }
+            }
+            Some(next)
+        } else {
+            None
+        }
     }
 
     pub fn settle_next_node(&mut self) -> Option<State<Weight>> {

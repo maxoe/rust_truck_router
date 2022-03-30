@@ -1,10 +1,8 @@
-use rand::Rng;
-use std::{borrow::Borrow, error::Error, path::Path};
 use rust_truck_router::{
-    algo::{core_ch::CoreContractionHierarchy, dijkstra::OwnedDijkstra, mcd::OneRestrictionDijkstra},
-    io::*,
-    types::{EdgeId, Graph, NodeId, OwnedGraph, Weight},
+    algo::{core_ch::CoreContractionHierarchy, mcd::OneRestrictionDijkstra},
+    types::OwnedGraph,
 };
+use std::{error::Error, path::Path};
 
 #[test]
 fn load_core_ch() -> Result<(), Box<dyn Error>> {

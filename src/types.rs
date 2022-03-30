@@ -139,11 +139,12 @@ impl WeightOps for Weight3 {
         } else if i == 2 {
             self[0] += pause_time;
             self[1] = 0;
-			self[2] = 0;
+            self[2] = 0;
         }
     }
 }
 
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub struct DrivingTimeRestriction {
     pub pause_time: Weight,
     pub max_driving_time: Weight,

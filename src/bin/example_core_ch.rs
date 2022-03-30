@@ -1,21 +1,11 @@
 use rust_truck_router::{
-    algo::{
-        ch::*, ch_potential::CHPotential, core_ch::CoreContractionHierarchy, dijkstra::OwnedDijkstra, mcd::OneRestrictionDijkstra,
-        mcd_2::TwoRestrictionDijkstra,
-    },
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, mcd::OneRestrictionDijkstra, one_break_core_ch::OneBreakCoreContractionHierarchy},
     io::*,
     types::*,
 };
 
 use rand::Rng;
-use std::{
-    env,
-    error::Error,
-    fs::File,
-    io::{LineWriter, Write},
-    path::Path,
-    time::Instant,
-};
+use std::{env, error::Error, path::Path, time::Instant};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arg = &env::args().skip(1).next().expect("No directory arg given");
@@ -28,6 +18,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
+    // those use a break on hgv ger and europe
+    // let s = 5945495;
+    // let t = 11838613;
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
@@ -36,7 +29,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
     // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
 
-    let mut core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut core_ch = OneBreakCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    core_ch.add_restriction(16_200_000, 270_000);
     core_ch.check();
 
     let mut time = Instant::now();
@@ -47,17 +41,51 @@ fn main() -> Result<(), Box<dyn Error>> {
     time = Instant::now();
     let dist = core_ch.run_query();
 
+    println!("Took {} ms", time.elapsed().as_secs_f64() * 1000.0);
+
     if dist.is_some() {
         println!("From {} to {}: {}", s, t, dist.unwrap());
-        println!("Took {} ms", time.elapsed().as_secs_f64() * 1000.0);
+
+        if core_ch.last_break && core_ch.strongest_restriction.is_some() {
+            println!(
+                "Used one break:\n\t- max driving time: {} ms\n\t- pause time: {} ms",
+                core_ch.strongest_restriction.unwrap().max_driving_time,
+                core_ch.strongest_restriction.unwrap().pause_time
+            );
+        } else {
+            println!("No break used");
+        }
+    } else {
+        println!("No path found")
     }
 
-    println!("Validating result using dijkstra");
-    let mut csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+    print!("Validating result using constrained dijkstra");
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    ch.check();
+    let mut csp_pot = OneRestrictionDijkstra::new_with_potential(graph.borrow(), CHPotential::from_ch(ch));
     csp_pot.init_new_s(s);
+    csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 270_000);
     let csp_pot_dist = csp_pot.dist_query(t);
 
-    assert_eq!(dist, csp_pot_dist);
+    let csp_pot_num_breaks = if let Some(path) = csp_pot.current_best_path_to(t, true) {
+        Some(csp_pot.reset_nodes_on_path(&path).len())
+    } else {
+        None
+    };
+
+    assert!(dist == csp_pot_dist || (csp_pot_num_breaks.is_some() && csp_pot_num_breaks.unwrap() > 1));
+    assert!(!dist.is_none() || !core_ch.last_break);
+    assert_eq!(dist, core_ch.last_dist);
+
+    if core_ch.last_dist.is_some() {
+        if core_ch.last_break {
+            assert!(csp_pot_num_breaks.unwrap() == 1);
+        } else {
+            assert!(csp_pot_num_breaks.unwrap() == 0);
+        }
+    }
+
+    println!(" - Done");
 
     Ok(())
 }

@@ -3,23 +3,24 @@ use bit_vec::BitVec;
 use std::{path::Path, time::Instant};
 
 #[derive(Clone)]
-pub struct CoreContractionHierarchy {
+pub struct OneBreakCoreContractionHierarchy {
     _order_without_core: Vec<u32>,
     pub rank: Vec<u32>,
     pub is_core: BitVec,
-    pub core_search: OwnedDijkstra,
     pub fw_search: OwnedDijkstra,
     pub bw_search: OwnedDijkstra,
     fw_finished: bool,
     bw_finished: bool,
-    needs_core: bool,
     s: NodeId,
     t: NodeId,
+    pub strongest_restriction: Option<DrivingTimeRestriction>,
+    pub last_dist: Option<Weight>,
+    pub last_break: bool,
 }
 
-impl CoreContractionHierarchy {
+impl OneBreakCoreContractionHierarchy {
     pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        Ok(CoreContractionHierarchy::build(
+        Ok(OneBreakCoreContractionHierarchy::build(
             Vec::<u32>::load_from(path.as_ref().join("rank"))?,
             Vec::<u32>::load_from(path.as_ref().join("order_without_core"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
@@ -41,67 +42,35 @@ impl CoreContractionHierarchy {
             core_node_count,
             core_node_count as f32 * 100.0 / rank.len() as f32
         );
-        let mut first_out = Vec::with_capacity(core_node_count);
-        first_out.push(0);
-        let mut head = Vec::with_capacity(forward.num_arcs());
-        let mut weights = Vec::with_capacity(forward.num_arcs());
 
-        // let mut first_out_i = 0;
-        // for node_id in 0..node_count {
-        //     if is_core.get(node_id).unwrap() {
-        //         first_out.push(first_out_i as NodeId);
-
-        //         for edge_id in forward.first_out()[node_id]..forward.first_out()[node_id + 1] {
-        //             let current_head = is_core.iter().take((forward.head()[edge_id as usize] + 1) as usize).filter(|b| *b).count() as NodeId;
-
-        //             if is_core.get(current_head as usize).unwrap() {
-        //                 head.push(current_head);
-        //                 weights.push(forward.weights()[edge_id as usize]);
-        //                 first_out_i += 1;
-        //             }
-        //         }
-
-        //         for edge_id in backward.first_out()[node_id]..backward.first_out()[node_id + 1] {
-        //             let current_head = is_core.iter().take((backward.head()[edge_id as usize] + 1) as usize).filter(|b| *b).count() as NodeId;
-
-        //             if is_core.get(current_head as usize).unwrap() {
-        //                 head.push(current_head);
-        //                 weights.push(backward.weights()[edge_id as usize]);
-        //                 first_out_i += 1;
-        //             }
-        //         }
-        //     }
-        // }
-
-        // first_out.push(core_node_count as NodeId);
-
-        first_out.shrink_to_fit();
-        head.shrink_to_fit();
-        weights.shrink_to_fit();
-
-        // assert_eq!(first_out.len(), core_node_count + 1);
-        // assert_eq!(head.len(), weights.len());
-        // assert_eq!(first_out[0], 0);
-        // assert_eq!(*first_out.last().unwrap() as usize, first_out.len() - 1);
-
-        let core = OwnedGraph::new(first_out, head, weights);
-
-        // dbg!(core.num_arcs());
-        // dbg!(core.num_nodes());
-
-        CoreContractionHierarchy {
+        OneBreakCoreContractionHierarchy {
             _order_without_core: order_without_core,
             rank,
             is_core,
-            core_search: OwnedDijkstra::new(core),
             fw_search: OwnedDijkstra::new(forward),
             bw_search: OwnedDijkstra::new(backward),
             fw_finished: false,
             bw_finished: false,
-            needs_core: false,
             s: node_count as NodeId,
             t: node_count as NodeId,
+            strongest_restriction: None,
+            last_dist: None,
+            last_break: false,
         }
+    }
+
+    pub fn add_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) {
+        // tighten restriction if the new restriction has a shorter max_driving_time or it is equal, but with a larger pause time
+        if self.strongest_restriction.is_none()
+            || self.strongest_restriction.unwrap().max_driving_time > max_driving_time
+            || (self.strongest_restriction.unwrap().max_driving_time == max_driving_time && self.strongest_restriction.unwrap().pause_time < pause_time)
+        {
+            self.strongest_restriction = Some(DrivingTimeRestriction { pause_time, max_driving_time });
+        }
+    }
+
+    pub fn clear_restrictions(&mut self) {
+        self.strongest_restriction = None;
     }
 
     /// Equivalent to routingkit's check_contraction_hierarchy_for_errors except the check for only up edges
@@ -164,6 +133,37 @@ impl CoreContractionHierarchy {
     //     }
     // }
 
+    #[inline]
+    fn calculate_distance_with_break_at(&self, node: NodeId) -> (Weight, bool) {
+        let s_to_v = self.fw_search.tentative_distance_at(node);
+        let v_to_t = self.bw_search.tentative_distance_at(node);
+        let total_time = s_to_v + v_to_t;
+
+        if let Some(restriction) = self.strongest_restriction {
+            if total_time < restriction.max_driving_time {
+                return (total_time, false);
+            }
+
+            // needs break
+            // no path if we are not at a core node
+            if !self.is_core.get(node as usize).unwrap() {
+                return (INFINITY, false);
+            }
+
+            let longer_part = s_to_v.max(v_to_t);
+
+            // if path may exist at all
+            if longer_part < restriction.max_driving_time {
+                return (total_time + restriction.pause_time, true);
+            }
+
+            // no path
+            (INFINITY, false)
+        } else {
+            return (total_time, false);
+        }
+    }
+
     pub fn run_query(&mut self) -> Option<Weight> {
         let mut tentative_distance = Weight::infinity();
 
@@ -184,16 +184,22 @@ impl CoreContractionHierarchy {
 
         let mut settled_fw = BitVec::from_elem(self.fw_search.graph.num_nodes(), false);
         let mut settled_bw = BitVec::from_elem(self.bw_search.graph.num_nodes(), false);
-        let mut _middle_node = self.fw_search.graph.num_nodes() as u32;
+        let mut _middle_node = self.fw_search.graph.num_nodes() as NodeId;
         let mut fw_next = true;
+
+        let driving_time_limit = if self.strongest_restriction.is_none() {
+            INFINITY
+        } else {
+            self.strongest_restriction.unwrap().max_driving_time
+        };
+
+        let mut needs_break = false;
+        let mut needs_core = false;
 
         let time = Instant::now();
         while !self.fw_finished || !self.bw_finished {
-            let tent_dist_at_v;
-
             if self.bw_finished || !self.fw_finished && fw_next {
-                if let Some(State { distance: _, node }) = self.fw_search.settle_next_node() {
-                    //dbg!("fw settled {}", node);
+                if let Some(State { distance: _, node }) = self.fw_search.settle_next_node_not_exceeding(driving_time_limit) {
                     settled_fw.set(node as usize, true);
 
                     // fw search found t -> done here
@@ -201,15 +207,17 @@ impl CoreContractionHierarchy {
                         tentative_distance = self.fw_search.tentative_distance_at(self.t);
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        self.needs_core = false;
+                        needs_core = false;
 
                         break;
                     }
                     if settled_bw.get(node as usize).unwrap() {
-                        tent_dist_at_v = self.fw_search.tentative_distance_at(node) + self.bw_search.tentative_distance_at(node);
+                        let (tent_dist_at_v, break_type) = self.calculate_distance_with_break_at(node);
+
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
                             _middle_node = node;
+                            needs_break = break_type;
                         }
                     }
                     fw_min_key = self.fw_search.min_key().unwrap_or_else(|| {
@@ -224,24 +232,17 @@ impl CoreContractionHierarchy {
                     if self.fw_finished {
                         println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
-                    // if !self.is_core.get(node as usize).unwrap() && self.needs_core {
-                    //     println!("non-core after core reached");
-                    // }
-                    if self.is_core.get(node as usize).unwrap() && !self.needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !needs_core {
                         println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
                     if self.is_core.get(node as usize).unwrap() {
-                        // dbg!("forward reached core");
-                        //     self.fw_finished = true;
-                        self.needs_core = true;
-                        //     self.core_s.push(node);
+                        needs_core = true;
                     }
 
                     fw_next = false;
                 }
             } else {
-                if let Some(State { distance: _, node }) = self.bw_search.settle_next_node() {
-                    //dbg!("bw settled {}", node);
+                if let Some(State { distance: _, node }) = self.bw_search.settle_next_node_not_exceeding(driving_time_limit) {
                     settled_bw.set(node as usize, true);
 
                     // bw search found s -> done here
@@ -249,17 +250,18 @@ impl CoreContractionHierarchy {
                         tentative_distance = self.bw_search.tentative_distance_at(self.s);
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        self.needs_core = false;
+                        needs_core = false;
 
                         break;
                     }
 
                     if settled_fw.get(node as usize).unwrap() {
-                        tent_dist_at_v = self.fw_search.tentative_distance_at(node) + self.bw_search.tentative_distance_at(node);
+                        let (tent_dist_at_v, break_type) = self.calculate_distance_with_break_at(node);
 
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
                             _middle_node = node;
+                            needs_break = break_type;
                         }
                     }
                     bw_min_key = self.bw_search.min_key().unwrap_or_else(|| {
@@ -275,15 +277,12 @@ impl CoreContractionHierarchy {
                         println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !self.needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !needs_core {
                         println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
                     if self.is_core.get(node as usize).unwrap() {
-                        // dbg!("backwards reached core");
-                        //     // self.bw_finished = true;
-                        self.needs_core = true;
-                        //     self.core_t.push(node);
+                        needs_core = true;
                     }
 
                     fw_next = true;
@@ -291,34 +290,15 @@ impl CoreContractionHierarchy {
             }
         }
 
-        if
-        /* !self.needs_core &&*/
-        tentative_distance == Weight::infinity() {
+        if tentative_distance == Weight::infinity() {
+            self.last_break = false;
+            self.last_dist = None;
             return None;
         }
 
-        //if !self.needs_core {
-        return Some(tentative_distance);
-        //}
+        self.last_break = needs_break;
+        self.last_dist = Some(tentative_distance);
 
-        // dbg!("Searching in core");
-        // dbg!(self.core_s);
-        // dbg!(self.core_t);
-
-        // for current_core_s in self.core_s
-        // self.core_search.init_new_s(self.to_core_index(self.core_s).unwrap());
-
-        // if let Some(core_dist) = self.core_search.dist_query(self.to_core_index(self.core_t).unwrap()) {
-        //     dbg!(core_dist);
-        //     Some(
-        //         self.fw_search.tentative_distance_at(self.to_core_index(self.core_s).unwrap())
-        //             + self.bw_search.tentative_distance_at(self.to_core_index(self.core_t).unwrap())
-        //             + core_dist,
-        //     )
-        // } else {
-        //     dbg!("core search failed");
-        //     None
-        // }
-        // None
+        return self.last_dist;
     }
 }
