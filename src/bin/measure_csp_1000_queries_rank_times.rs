@@ -7,7 +7,7 @@ use std::{
     path::Path,
     time::Instant,
 };
-use stud_rust_base::{
+use rust_truck_router::{
     algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd::OneRestrictionDijkstra},
     experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,

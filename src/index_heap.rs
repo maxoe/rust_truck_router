@@ -7,7 +7,7 @@
 //! # Examples
 //!
 //! ```
-//! use stud_rust_base::index_heap::{Indexing, IndexdMinHeap};
+//! use rust_truck_router::index_heap::{Indexing, IndexdMinHeap};
 //!
 //! #[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
 //! pub struct State {

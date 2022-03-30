@@ -130,8 +130,8 @@ impl ContractionHierarchy {
                     if bw_min_key >= tentative_distance {
                         bw_finished = true;
                     }
+                    fw_next = true;
                 }
-                fw_next = true;
             }
         }
 

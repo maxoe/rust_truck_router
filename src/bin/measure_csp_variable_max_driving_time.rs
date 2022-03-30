@@ -1,5 +1,5 @@
 use rand::Rng;
-use stud_rust_base::{
+use rust_truck_router::{
     algo::{ch::ContractionHierarchy, ch_potential::CHPotential, mcd::*},
     experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,

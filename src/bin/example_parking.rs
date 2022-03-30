@@ -1,4 +1,4 @@
-use stud_rust_base::{
+use rust_truck_router::{
     algo::{dijkstra::Dijkstra, mcd::*},
     io::*,
     time::report_time,

@@ -1,4 +1,10 @@
 use rand::Rng;
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, mcd::OneRestrictionDijkstra},
+    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
+    io::*,
+    types::*,
+};
 use std::{
     env,
     error::Error,
@@ -6,12 +12,6 @@ use std::{
     io::{LineWriter, Write},
     path::Path,
     time::{Duration, Instant},
-};
-use stud_rust_base::{
-    algo::{ch::*, ch_potential::CHPotential, mcd::OneRestrictionDijkstra},
-    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
-    io::*,
-    types::*,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {

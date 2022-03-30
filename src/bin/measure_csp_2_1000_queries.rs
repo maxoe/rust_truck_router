@@ -7,7 +7,7 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
-use stud_rust_base::{
+use rust_truck_router::{
     algo::{ch::*, ch_potential::CHPotential, mcd_2::TwoRestrictionDijkstra},
     experiments::measurement::{CSPMeasurementResult, MeasurementResult},
     io::*,
@@ -18,9 +18,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
 
-    let first_out = Vec::<stud_rust_base::types::EdgeId>::load_from(path.join("first_out"))?;
-    let head = Vec::<stud_rust_base::types::NodeId>::load_from(path.join("head"))?;
-    let travel_time = Vec::<stud_rust_base::types::Weight>::load_from(path.join("travel_time"))?;
+    let first_out = Vec::<rust_truck_router::types::EdgeId>::load_from(path.join("first_out"))?;
+    let head = Vec::<rust_truck_router::types::NodeId>::load_from(path.join("head"))?;
+    let travel_time = Vec::<rust_truck_router::types::Weight>::load_from(path.join("travel_time"))?;
 
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();

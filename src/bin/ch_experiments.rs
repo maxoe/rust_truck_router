@@ -1,4 +1,4 @@
-use stud_rust_base::{
+use rust_truck_router::{
     algo::{ch::ContractionHierarchy, dijkstra::Dijkstra},
     io::*,
     time::measure,

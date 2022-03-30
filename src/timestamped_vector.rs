@@ -1,7 +1,7 @@
 //! # Example
 //!
 //! ```
-//! use stud_rust_base::timestamped_vector::*;
+//! use rust_truck_router::timestamped_vector::*;
 //!
 //! let mut v = TimestampedVector::with_size(10);
 //!
