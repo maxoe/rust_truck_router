@@ -46,11 +46,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     if dist.is_some() {
         println!("From {} to {}: {}", s, t, dist.unwrap());
 
-        if core_ch.last_break && core_ch.strongest_restriction.is_some() {
+        if core_ch.last_break.is_some() {
             println!(
                 "Used one break:\n\t- max driving time: {} ms\n\t- pause time: {} ms",
-                core_ch.strongest_restriction.unwrap().max_driving_time,
-                core_ch.strongest_restriction.unwrap().pause_time
+                core_ch.last_break.unwrap().max_driving_time,
+                core_ch.last_break.unwrap().pause_time
             );
         } else {
             println!("No break used");
@@ -72,13 +72,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         None
     };
-
+    assert_eq!(dist, csp_pot_dist);
     assert!(dist == csp_pot_dist || (csp_pot_num_breaks.is_some() && csp_pot_num_breaks.unwrap() > 1));
-    assert!(!dist.is_none() || !core_ch.last_break);
+    assert!(!dist.is_none() || core_ch.last_break.is_none());
     assert_eq!(dist, core_ch.last_dist);
 
     if core_ch.last_dist.is_some() {
-        if core_ch.last_break {
+        if core_ch.last_break.is_some() {
             assert!(csp_pot_num_breaks.unwrap() == 1);
         } else {
             assert!(csp_pot_num_breaks.unwrap() == 0);

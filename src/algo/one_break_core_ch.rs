@@ -13,9 +13,9 @@ pub struct OneBreakCoreContractionHierarchy {
     bw_finished: bool,
     s: NodeId,
     t: NodeId,
-    pub strongest_restriction: Option<DrivingTimeRestriction>,
+    pub restrictions: Vec<DrivingTimeRestriction>,
     pub last_dist: Option<Weight>,
-    pub last_break: bool,
+    pub last_break: Option<DrivingTimeRestriction>,
 }
 
 impl OneBreakCoreContractionHierarchy {
@@ -53,24 +53,19 @@ impl OneBreakCoreContractionHierarchy {
             bw_finished: false,
             s: node_count as NodeId,
             t: node_count as NodeId,
-            strongest_restriction: None,
+            restrictions: vec![],
             last_dist: None,
-            last_break: false,
+            last_break: None,
         }
     }
 
     pub fn add_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) {
-        // tighten restriction if the new restriction has a shorter max_driving_time or it is equal, but with a larger pause time
-        if self.strongest_restriction.is_none()
-            || self.strongest_restriction.unwrap().max_driving_time > max_driving_time
-            || (self.strongest_restriction.unwrap().max_driving_time == max_driving_time && self.strongest_restriction.unwrap().pause_time < pause_time)
-        {
-            self.strongest_restriction = Some(DrivingTimeRestriction { pause_time, max_driving_time });
-        }
+        self.restrictions.push(DrivingTimeRestriction { pause_time, max_driving_time });
+        self.restrictions.sort();
     }
 
     pub fn clear_restrictions(&mut self) {
-        self.strongest_restriction = None;
+        self.restrictions.clear();
     }
 
     /// Equivalent to routingkit's check_contraction_hierarchy_for_errors except the check for only up edges
@@ -97,70 +92,61 @@ impl OneBreakCoreContractionHierarchy {
 
     pub fn init_new_s(&mut self, ext_s: NodeId) {
         self.s = self.rank[ext_s as usize] as NodeId;
-
-        if !self.is_core.get(self.s as usize).unwrap() {
-            self.fw_search.init_new_s(self.s);
-            self.fw_finished = false;
-            // self.needs_core |= false;
-            // self.core_s = self.fw_search.graph.num_nodes() as NodeId;
-        } else {
-            self.fw_finished = true;
-            // self.needs_core = true;
-            // self.core_s = ext_s;
-        }
+        self.reset();
     }
 
     pub fn init_new_t(&mut self, ext_t: NodeId) {
         self.t = self.rank[ext_t as usize] as NodeId;
+        self.reset();
+    }
 
-        if !self.is_core.get(self.t as usize).unwrap() {
+    pub fn reset(&mut self) {
+        if self.s != self.rank.len() as NodeId && !self.is_core.get(self.s as usize).unwrap() {
+            self.fw_search.init_new_s(self.s);
+            self.fw_finished = false;
+        } else {
+            self.fw_finished = true;
+        }
+
+        if self.t != self.rank.len() as NodeId && !self.is_core.get(self.t as usize).unwrap() {
             self.bw_search.init_new_s(self.t);
             self.bw_finished = false;
-            // self.needs_core |= false;
-            // self.core_t = self.bw_search.graph.num_nodes() as NodeId;
         } else {
             self.bw_finished = true;
-            // self.needs_core = true;
-            // self.core_t = ext_t;
         }
     }
 
-    // fn to_core_index(&self, n: NodeId) -> Option<NodeId> {
-    //     if self.is_core.get(n as usize).is_none() {
-    //         None
-    //     } else {
-    //         Some(self.is_core.iter().take((n) as usize).filter(|b| *b).count() as NodeId)
-    //     }
-    // }
-
-    #[inline]
-    fn calculate_distance_with_break_at(&self, node: NodeId) -> (Weight, bool) {
+    fn calculate_distance_with_break_at(&self, node: NodeId) -> (Weight, Option<DrivingTimeRestriction>) {
         let s_to_v = self.fw_search.tentative_distance_at(node);
         let v_to_t = self.bw_search.tentative_distance_at(node);
         let total_time = s_to_v + v_to_t;
 
-        if let Some(restriction) = self.strongest_restriction {
+        if let Some(&restriction) = self.restrictions.first() {
             if total_time < restriction.max_driving_time {
-                return (total_time, false);
+                return (total_time, None);
             }
 
             // needs break
-            // no path if we are not at a core node
+            // cannot do break if not at a core node
             if !self.is_core.get(node as usize).unwrap() {
-                return (INFINITY, false);
+                return (INFINITY, None);
             }
 
+            // if path does exist at all
             let longer_part = s_to_v.max(v_to_t);
-
-            // if path may exist at all
             if longer_part < restriction.max_driving_time {
-                return (total_time + restriction.pause_time, true);
+                // choose required pause time
+                for r in self.restrictions.iter().rev() {
+                    if total_time >= r.max_driving_time {
+                        return (total_time + r.pause_time, Some(*r));
+                    }
+                }
             }
 
             // no path
-            (INFINITY, false)
+            (INFINITY, None)
         } else {
-            return (total_time, false);
+            return (total_time, None);
         }
     }
 
@@ -170,14 +156,13 @@ impl OneBreakCoreContractionHierarchy {
         let mut fw_min_key = 0;
         let mut bw_min_key = 0;
 
+        self.reset();
         if !self.fw_finished {
-            self.fw_search.reset();
             // safe after dijkstra init
             fw_min_key = self.fw_search.min_key().unwrap();
         }
 
         if !self.bw_finished {
-            self.bw_search.reset();
             // safe after dijkstra init
             bw_min_key = self.bw_search.min_key().unwrap();
         }
@@ -187,13 +172,13 @@ impl OneBreakCoreContractionHierarchy {
         let mut _middle_node = self.fw_search.graph.num_nodes() as NodeId;
         let mut fw_next = true;
 
-        let driving_time_limit = if self.strongest_restriction.is_none() {
+        let driving_time_limit = if self.restrictions.is_empty() {
             INFINITY
         } else {
-            self.strongest_restriction.unwrap().max_driving_time
+            self.restrictions.first().unwrap().max_driving_time
         };
 
-        let mut needs_break = false;
+        let mut needs_break = None;
         let mut needs_core = false;
 
         let time = Instant::now();
@@ -257,7 +242,6 @@ impl OneBreakCoreContractionHierarchy {
 
                     if settled_fw.get(node as usize).unwrap() {
                         let (tent_dist_at_v, break_type) = self.calculate_distance_with_break_at(node);
-
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
                             _middle_node = node;
@@ -291,7 +275,7 @@ impl OneBreakCoreContractionHierarchy {
         }
 
         if tentative_distance == Weight::infinity() {
-            self.last_break = false;
+            self.last_break = None;
             self.last_dist = None;
             return None;
         }

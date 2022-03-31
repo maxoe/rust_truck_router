@@ -47,11 +47,11 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
         };
 
         assert!(dist == csp_pot_dist || (csp_pot_num_breaks.is_some() && csp_pot_num_breaks.unwrap() > 1));
-        assert!(!dist.is_none() || !core_ch.last_break);
+        assert!(!dist.is_none() || core_ch.last_break.is_none());
         assert_eq!(dist, core_ch.last_dist);
 
         if core_ch.last_dist.is_some() {
-            if core_ch.last_break {
+            if core_ch.last_break.is_some() {
                 assert!(csp_pot_num_breaks.unwrap() == 1);
             } else {
                 assert!(csp_pot_num_breaks.unwrap() == 0);

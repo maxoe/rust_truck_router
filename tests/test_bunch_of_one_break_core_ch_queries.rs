@@ -33,6 +33,7 @@ fn query_succeeds() -> Result<(), Box<dyn Error>> {
         (0, 4, 6, 0, Some(7)),
         (0, 4, 6, 1, Some(8)),
         (0, 4, 6, 10, Some(17)),
+        (0, 4, 8, 10, Some(7)),
     ];
 
     for (s, t, max_driving_time, pause_time, result) in to_test {
@@ -43,6 +44,30 @@ fn query_succeeds() -> Result<(), Box<dyn Error>> {
         let dist = core_ch.run_query();
         assert_eq!(dist, result);
     }
+
+    Ok(())
+}
+
+#[test]
+fn query_multiple_restrictions() -> Result<(), Box<dyn Error>> {
+    let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/core_instance"));
+    let mut core_ch = OneBreakCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    core_ch.check();
+
+    core_ch.init_new_s(0);
+    core_ch.init_new_t(4);
+    core_ch.add_restriction(5, 1);
+    core_ch.add_restriction(6, 3);
+    core_ch.add_restriction(8, 4);
+    let dist = core_ch.run_query();
+    assert_eq!(dist, Some(12));
+
+    core_ch.clear_restrictions();
+    core_ch.add_restriction(5, 1);
+    core_ch.add_restriction(6, 3);
+    core_ch.add_restriction(8, 4);
+    let dist = core_ch.run_query();
+    assert_eq!(dist, Some(12));
 
     Ok(())
 }
