@@ -208,8 +208,12 @@ def exp2_ticks_from_exponent(exponent):
     return r"$2^{{ {:2d} }}$".format(exponent)
 
 
-def make_dijkstra_rank_tick_labels(ax_axis, exponents):
+def make_dijkstra_rank_tick_labels_from_exponent(ax_axis, exponents):
     ax_axis.set_ticklabels([exp2_ticks_from_exponent(int(i)) for i in exponents])
+
+
+def make_dijkstra_rank_tick_labels_from_number(ax_axis, exponents):
+    ax_axis.set_ticklabels([exp2_ticks(int(i)) for i in exponents])
 
 
 def get_boxplot_outliers(df, by_column_name):
@@ -430,7 +434,7 @@ def plot_rank_times(name, graph):
                 ax.set_ylim(bottom=-0.1)
                 ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 
-            make_dijkstra_rank_tick_labels(
+            make_dijkstra_rank_tick_labels_from_exponent(
                 ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
             )
 
@@ -438,6 +442,42 @@ def plot_rank_times(name, graph):
             fig.tight_layout()
 
             write_plt(name + "-" + column_name + ".png", graph)
+
+
+def plot_rank_times_from_simple_meaurement(name, graph):
+    run_measurement_conditionally(name, graph)
+
+    csp_1000_queries = read_measurement(
+        name + "-" + graph,
+    )
+
+    # plot only 2^10 and larger
+    csp_1000_queries = csp_1000_queries.loc[
+        :, csp_1000_queries.columns.astype(int) >= 2 ** 10
+    ]
+
+    colors = ggPlotColors(4)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bp = csp_1000_queries.boxplot(
+        ax=ax,
+    )
+
+    bp.get_figure().gca().set_title("")
+    fig.suptitle("")
+
+    ax.set_xlabel("dijkstra rank")
+    ax.set_ylabel("query time [ms]")
+    ax.set_yscale("log")
+
+    make_dijkstra_rank_tick_labels_from_number(
+        ax.xaxis, csp_1000_queries.columns.astype(int).unique()
+    )
+
+    plt.title(name + ": " + graph)
+    fig.tight_layout()
+
+    write_plt(name + "-time_ms.png", graph)
 
 
 def plot_1000_csp_2_queries(graph):
@@ -496,3 +536,6 @@ if __name__ == "__main__":
     for g in args.graph:
         plot_rank_times("measure_csp_1000_queries_rank_times", g)
         plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
+        plot_rank_times_from_simple_meaurement(
+            "measure_one_break_core_ch_1000_queries_rank_times", g
+        )
