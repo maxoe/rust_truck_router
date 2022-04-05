@@ -1,7 +1,7 @@
 use rand::Rng;
 use rust_truck_router::{
-    algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd::OneRestrictionDijkstra, one_break_core_ch::OneBreakCoreContractionHierarchy},
-    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    algo::{dijkstra::Dijkstra, one_break_core_ch::OneBreakCoreContractionHierarchy},
+    experiments::measurement::{CSP1MeasurementResult, MeasurementResult},
     io::*,
     types::*,
 };
@@ -20,7 +20,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_out = Vec::<EdgeId>::load_from(path.join("first_out"))?;
     let head = Vec::<NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
-    let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
@@ -29,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     search.add_restriction(16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
-    let mut dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra = Dijkstra::new(&graph);
 
     let n = 100;
     let mut result = Vec::with_capacity(n);
@@ -66,11 +65,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         dijkstra.ranks_only_exponentials();
 
         let mut rank_times = Vec::with_capacity(log_num_nodes);
-        for (i, current_t) in rank_order.into_iter().enumerate() {
+        for (_i, current_t) in rank_order.into_iter().enumerate() {
             let start = Instant::now();
             search.init_new_s(s);
             search.init_new_t(current_t);
-            let dist = search.run_query();
+            let _dist = search.run_query();
             let time = start.elapsed();
             rank_times.push(time);
 

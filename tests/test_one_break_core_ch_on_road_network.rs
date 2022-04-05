@@ -26,7 +26,7 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     core_ch.check();
     core_ch.add_restriction(4_000_000, 270_000);
 
-    let mut csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+    let mut csp_pot = OneRestrictionDijkstra::new(&graph);
     csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(4_000_000, 270_000);
 
     for i in 0..100 {

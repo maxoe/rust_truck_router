@@ -22,10 +22,10 @@ fn some_ch_pot_queries() -> Result<(), Box<dyn Error>> {
 
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
     let graph_mcd = FirstOutGraph::new(first_out, head, travel_time);
-    let mut dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra = Dijkstra::new(&graph);
     let ch_pot = CHPotential::from_ch(ch);
-    let mut dijkstra_pot = Dijkstra::new_with_potential(graph.borrow(), ch_pot.clone());
-    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), ch_pot);
+    let mut dijkstra_pot = Dijkstra::new_with_potential(&graph, ch_pot.clone());
+    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(&graph_mcd, ch_pot);
 
     for s in 0..5 {
         dijkstra.init_new_s(s);
@@ -72,10 +72,10 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
 
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
     let graph_mcd = FirstOutGraph::new(first_out, head, travel_time);
-    let mut dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra = Dijkstra::new(&graph);
     let ch_pot = CHPotential::from_ch(ch);
-    let mut dijkstra_pot = Dijkstra::new_with_potential(graph.borrow(), ch_pot.clone());
-    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), ch_pot);
+    let mut dijkstra_pot = Dijkstra::new_with_potential(&graph, ch_pot.clone());
+    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(&graph_mcd, ch_pot);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542290214824);
 

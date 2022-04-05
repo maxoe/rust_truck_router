@@ -12,3 +12,8 @@ bit-vec = "0.6.3"
 
 [profile.dev]
 opt-level = 3
+
+[profile.release]
+lto = true
+debug = true
+codegen-units = 1

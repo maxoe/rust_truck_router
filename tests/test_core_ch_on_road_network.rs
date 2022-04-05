@@ -23,7 +23,7 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
     let mut core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     core_ch.check();
-    let mut csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+    let mut csp_pot = OneRestrictionDijkstra::new(&graph);
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);

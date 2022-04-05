@@ -380,6 +380,9 @@ where
 
                             let pot = self.potential.potential(neighbor_node);
                             let dist_with_potential = self.estimated_dist_with_restriction(current_new_dist, pot);
+                            if dist_with_potential[0] == INFINITY {
+                                continue;
+                            }
                             if self.data.queue.contains_index(neighbor_node as usize) {
                                 // decrease key seems to increase key if given a larger key than existing
                                 if self.data.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {

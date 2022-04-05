@@ -26,7 +26,7 @@ fn query_does_not_reach_core() -> Result<(), Box<dyn Error>> {
         core_ch.init_new_t(t);
         let dist = core_ch.run_query();
 
-        let mut csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let mut csp_pot = OneRestrictionDijkstra::new(&graph);
         csp_pot.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(t);
 
@@ -51,7 +51,7 @@ fn query_to_core_node() -> Result<(), Box<dyn Error>> {
         core_ch.init_new_t(t);
         let dist = core_ch.run_query();
 
-        let mut csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let mut csp_pot = OneRestrictionDijkstra::new(&graph);
         csp_pot.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(t);
 
@@ -76,7 +76,7 @@ fn query_through_core() -> Result<(), Box<dyn Error>> {
         core_ch.init_new_t(t);
         let dist = core_ch.run_query();
 
-        let mut csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let mut csp_pot = OneRestrictionDijkstra::new(&graph);
         csp_pot.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(t);
 
@@ -101,7 +101,7 @@ fn query_from_core_node() -> Result<(), Box<dyn Error>> {
         core_ch.init_new_t(t);
         let dist = core_ch.run_query();
 
-        let mut csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let mut csp_pot = OneRestrictionDijkstra::new(&graph);
         csp_pot.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(t);
 

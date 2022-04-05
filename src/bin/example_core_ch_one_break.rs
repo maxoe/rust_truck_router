@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     print!("Validating result using constrained dijkstra");
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
-    let mut csp_pot = OneRestrictionDijkstra::new_with_potential(graph.borrow(), CHPotential::from_ch(ch));
+    let mut csp_pot = OneRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
     csp_pot.init_new_s(s);
     csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 270_000);
     let csp_pot_dist = csp_pot.dist_query(t);

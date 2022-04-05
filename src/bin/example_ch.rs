@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let graph = rust_truck_router::types::OwnedGraph::new(first_out, head, travel_time);
-    let mut instance = Dijkstra::new(graph.borrow());
+    let mut instance = Dijkstra::new(&graph);
 
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 

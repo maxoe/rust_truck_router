@@ -2,6 +2,7 @@ pub mod astar;
 pub mod ch;
 pub mod ch_potential;
 pub mod core_ch;
+pub mod csp_core_ch;
 pub mod dijkstra;
 pub mod mcd;
 pub mod mcd_2;

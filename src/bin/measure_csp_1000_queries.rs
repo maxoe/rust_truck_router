@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut search = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
+    let mut search = OneRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
     search.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000);
 
     let mut time = Duration::ZERO;

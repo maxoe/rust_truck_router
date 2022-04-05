@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let n = 100;
 
     let mut results_without_constraint = Vec::with_capacity(n);
-    let mut instance = Dijkstra::new(graph.borrow());
+    let mut instance = Dijkstra::new(&graph);
 
     for _i in 0..n {
         let s = gen.gen_range(0..graph.num_nodes() as NodeId);

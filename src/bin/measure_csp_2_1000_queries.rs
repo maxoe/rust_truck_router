@@ -1,4 +1,10 @@
 use rand::Rng;
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, mcd_2::TwoRestrictionDijkstra},
+    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
+    io::*,
+    types::*,
+};
 use std::{
     env,
     error::Error,
@@ -6,12 +12,6 @@ use std::{
     io::{LineWriter, Write},
     path::Path,
     time::{Duration, Instant},
-};
-use rust_truck_router::{
-    algo::{ch::*, ch_potential::CHPotential, mcd_2::TwoRestrictionDijkstra},
-    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
-    io::*,
-    types::*,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let pot = CHPotential::from_ch(ch);
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut search = TwoRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), pot);
+    let mut search = TwoRestrictionDijkstra::new_with_potential(&graph_mcd, pot);
     search
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);

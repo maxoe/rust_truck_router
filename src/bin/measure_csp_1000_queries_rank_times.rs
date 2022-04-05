@@ -1,4 +1,10 @@
 use rand::Rng;
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd::OneRestrictionDijkstra},
+    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    io::*,
+    types::*,
+};
 use std::{
     env,
     error::Error,
@@ -6,12 +12,6 @@ use std::{
     io::{stdout, LineWriter, Write},
     path::Path,
     time::Instant,
-};
-use rust_truck_router::{
-    algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd::OneRestrictionDijkstra},
-    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
-    io::*,
-    types::*,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -27,11 +27,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut search = OneRestrictionDijkstra::new_with_potential(graph.borrow(), CHPotential::from_ch(ch));
+    let mut search = OneRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
     search.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
-    let mut dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra = Dijkstra::new(&graph);
 
     let n = 100;
     let mut result = Vec::with_capacity(n);

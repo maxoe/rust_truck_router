@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut search = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
+    let mut search = OneRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
     search.set_reset_flags(is_parking_node.to_bytes());
 
     let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;

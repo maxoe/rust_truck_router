@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cmp::Reverse,
     fmt::Write,
     time::{Duration, Instant},
@@ -48,7 +49,7 @@ where
 {
     data: MultiCriteriaDijkstraData<Weight2>,
     s: NodeId,
-    graph: BorrowedGraph<'a>,
+    pub graph: Cow<'a, OwnedGraph>,
     restriction: DrivingTimeRestriction,
     reset_flags: BitVec,
     potential: P,
@@ -60,13 +61,39 @@ where
     pub last_t: NodeId,
     pub last_distance: Option<Weight>,
 }
-impl<'a> OneRestrictionDijkstra<'a, NoPotential> {
+
+impl<'a> OneRestrictionDijkstra<'a, NoPotential>
+where
+    Self: 'a,
+{
+    pub fn new_from_owned(graph: OwnedGraph) -> Self {
+        let n = graph.num_nodes();
+        Self {
+            data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
+            s: n as NodeId,
+            graph: Cow::Owned(graph),
+            restriction: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            reset_flags: BitVec::from_elem(n, false),
+            potential: NoPotential {},
+            num_queue_pushes: 0,
+            num_settled: 0,
+            num_labels_propagated: 0,
+            num_labels_reset: 0,
+            time_elapsed: Duration::ZERO,
+            last_t: n as NodeId,
+            last_distance: None,
+        }
+    }
+
     pub fn new(graph: BorrowedGraph<'a>) -> Self {
         let n = graph.num_nodes();
         Self {
             data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
             s: n as NodeId,
-            graph,
+            graph: Cow::Borrowed(graph),
             restriction: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
@@ -89,25 +116,27 @@ where
     P: Potential<Weight>,
 {
     pub fn reset(&mut self) {
-        self.num_settled = 0;
-        self.num_labels_propagated = 0;
-        self.num_queue_pushes = 0;
-        self.num_labels_reset = 0;
+        if self.s != self.graph.num_nodes() as NodeId {
+            self.num_settled = 0;
+            self.num_labels_propagated = 0;
+            self.num_queue_pushes = 0;
+            self.num_labels_reset = 0;
 
-        self.data.per_node_labels.reset();
+            self.data.per_node_labels.reset();
 
-        self.data.queue.clear();
-        self.num_queue_pushes += 1;
-        let pot = self.potential.potential(self.s);
-        self.data.queue.push(State {
-            node: self.s,
-            distance: self.estimated_dist_with_restriction([0, 0], pot),
-        });
-        self.data.per_node_labels.get_mut(self.s as usize).push(Reverse(Label {
-            prev_node: self.graph.num_nodes() as NodeId,
-            distance: [0, 0],
-            incoming_edge_weight: Weight::infinity(),
-        }));
+            self.data.queue.clear();
+            self.num_queue_pushes += 1;
+            let pot = self.potential.potential(self.s);
+            self.data.queue.push(State {
+                node: self.s,
+                distance: self.estimated_dist_with_restriction([0, 0], pot),
+            });
+            self.data.per_node_labels.get_mut(self.s as usize).push(Reverse(Label {
+                prev_node: self.graph.num_nodes() as NodeId,
+                distance: [0, 0],
+                incoming_edge_weight: Weight::infinity(),
+            }));
+        }
     }
 
     pub fn new_with_potential(graph: BorrowedGraph<'a>, potential: P) -> Self {
@@ -116,7 +145,30 @@ where
         Self {
             data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
             s: graph.num_nodes() as NodeId,
-            graph,
+            graph: Cow::Borrowed(graph),
+            restriction: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            reset_flags: BitVec::from_elem(n, false),
+            potential,
+            num_queue_pushes: 0,
+            num_settled: 0,
+            num_labels_propagated: 0,
+            num_labels_reset: 0,
+            time_elapsed: Duration::ZERO,
+            last_t: n as NodeId,
+            last_distance: None,
+        }
+    }
+
+    pub fn new_with_potential_from_owned(graph: OwnedGraph, potential: P) -> Self {
+        let n = graph.num_nodes();
+
+        Self {
+            data: MultiCriteriaDijkstraData::new(graph.num_nodes()),
+            s: graph.num_nodes() as NodeId,
+            graph: Cow::Owned(graph),
             restriction: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
@@ -136,6 +188,10 @@ where
     pub fn init_new_s(&mut self, s: NodeId) {
         self.s = s;
         self.reset();
+    }
+
+    pub fn min_key(&self) -> Option<Weight> {
+        self.data.queue.peek().map(|s| s.distance[0])
     }
 
     pub fn current_best_path_to(&self, t: NodeId, with_distances: bool) -> Option<(Vec<NodeId>, Vec<Weight2>)> {
@@ -241,26 +297,57 @@ where
     }
 
     pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) -> &mut Self {
+        assert!(max_driving_time > 0);
         self.restriction = DrivingTimeRestriction { pause_time, max_driving_time };
+        self.reset();
+        self
+    }
+
+    pub fn clear_restriction(&mut self) -> &mut Self {
+        self.restriction = DrivingTimeRestriction {
+            pause_time: 0,
+            max_driving_time: Weight::infinity(),
+        };
+        self.reset();
         self
     }
 
     pub fn set_reset_flags<B: AsRef<[u8]>>(&mut self, flags: B) -> &mut Self {
         self.reset_flags = BitVec::from_bytes(flags.as_ref());
+        self.reset();
         self
+    }
+
+    pub fn clear_reset_flags(&mut self) {
+        self.reset_flags = BitVec::from_elem(self.graph.num_nodes(), false);
+        self.reset();
+    }
+
+    pub fn get_settled_labels_at(&mut self, node: NodeId) -> &[Reverse<Label<Weight2>>] {
+        self.data.per_node_labels.get_mut(node as usize).popped_sorted()
+    }
+
+    pub fn peek_queue(&self) -> Option<&State<Weight2>> {
+        self.data.queue.peek()
     }
 }
 
 impl<'a, P> OneRestrictionDijkstra<'a, P>
 where
     P: Potential<Weight>,
+    Self: 'a,
 {
     fn estimated_dist_with_restriction(&self, distance_at_node: [Weight; 2], potential_to_target: Weight) -> [Weight; 2] {
         let estimated = distance_at_node.link(potential_to_target);
-        [
-            estimated[0].link((estimated[1] / self.restriction.max_driving_time) * self.restriction.pause_time),
-            estimated[1],
-        ]
+
+        if self.restriction.max_driving_time == Weight::infinity() {
+            estimated
+        } else {
+            [
+                estimated[0].link((estimated[1] / self.restriction.max_driving_time) * self.restriction.pause_time),
+                estimated[1],
+            ]
+        }
     }
 
     pub fn settle_next_label(&mut self, t: NodeId) -> Option<State<Weight2>> {
@@ -470,6 +557,11 @@ where
 
                                     let pot = self.potential.potential(neighbor_node);
                                     let dist_with_potential = self.estimated_dist_with_restriction(current_new_dist, pot);
+
+                                    if dist_with_potential[0] == INFINITY {
+                                        continue;
+                                    }
+
                                     if self.data.queue.contains_index(neighbor_node as usize) {
                                         // decrease key seems to increase key if given a larger key than existing
                                         if self.data.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {

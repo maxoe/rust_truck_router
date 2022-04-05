@@ -179,7 +179,7 @@ impl OneBreakCoreContractionHierarchy {
         };
 
         let mut needs_break = None;
-        let mut needs_core = false;
+        let mut _needs_core = false;
 
         let time = Instant::now();
         while !self.fw_finished || !self.bw_finished {
@@ -192,7 +192,7 @@ impl OneBreakCoreContractionHierarchy {
                         tentative_distance = self.fw_search.tentative_distance_at(self.t);
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        needs_core = false;
+                        _needs_core = false;
 
                         break;
                     }
@@ -217,11 +217,11 @@ impl OneBreakCoreContractionHierarchy {
                     if self.fw_finished {
                         println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
-                    if self.is_core.get(node as usize).unwrap() && !needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
                         println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
                     if self.is_core.get(node as usize).unwrap() {
-                        needs_core = true;
+                        _needs_core = true;
                     }
 
                     fw_next = false;
@@ -235,7 +235,7 @@ impl OneBreakCoreContractionHierarchy {
                         tentative_distance = self.bw_search.tentative_distance_at(self.s);
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        needs_core = false;
+                        _needs_core = false;
 
                         break;
                     }
@@ -261,12 +261,12 @@ impl OneBreakCoreContractionHierarchy {
                         println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
                         println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
                     if self.is_core.get(node as usize).unwrap() {
-                        needs_core = true;
+                        _needs_core = true;
                     }
 
                     fw_next = true;

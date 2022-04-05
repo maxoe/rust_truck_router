@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
-    let mut instance = Dijkstra::new(graph.borrow());
+    let mut instance = Dijkstra::new(&graph);
     instance.init_new_s(s);
     report_time("random dijkstra one-to-one distance query", || {
         println!("From {} to {}: {:?}", s, t, instance.dist_query(t));
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     });
 
-    let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
+    let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
     instance_mcd.init_new_s(s);
     instance_mcd.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 1_950_000);
 
