@@ -1,7 +1,9 @@
 use bit_vec::BitVec;
 use rand::{Rng, SeedableRng};
 use rust_truck_router::{
-    algo::{csp::OneRestrictionDijkstra, csp_core_ch::CSPCoreContractionHierarchy},
+    algo::{
+        astar::Potential, ch::ContractionHierarchy, ch_potential::CHPotential, csp::OneRestrictionDijkstra, csp_core_ch_chpot::CSPAstarCoreContractionHierarchy,
+    },
     io::{load_routingkit_bitvector, Load},
     types::{EdgeId, Graph, NodeId, OwnedGraph, Weight},
 };
@@ -11,7 +13,7 @@ use std::{error::Error, path::Path};
 fn test_instance_queries() -> Result<(), Box<dyn Error>> {
     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/core_instance"));
     let graph = OwnedGraph::load_from_routingkit_dir(path.clone())?;
-    let mut core_ch = CSPCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut core_ch = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     core_ch.check();
 
     let mut csp_pot = OneRestrictionDijkstra::new(&graph);
@@ -20,8 +22,12 @@ fn test_instance_queries() -> Result<(), Box<dyn Error>> {
     let max_restriction = 10;
     let pause_time = 5;
 
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let mut chpot = CHPotential::from_ch(ch.clone());
+
     for s in 0..5 {
         for t in 0..5 {
+            chpot.init_new_t(t);
             for max_driving_time in 1..(max_restriction + 1) {
                 println!("Testing {} -> {}; max_driving_time: {}", s, t, max_driving_time);
                 core_ch.init_new_s(s);
@@ -45,7 +51,7 @@ fn test_instance_queries() -> Result<(), Box<dyn Error>> {
 fn test_needs_two_breaks_instance() -> Result<(), Box<dyn Error>> {
     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/core_instance_2"));
     let graph = OwnedGraph::load_from_routingkit_dir(path.clone())?;
-    let mut core_ch = CSPCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut core_ch = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     core_ch.check();
 
     let mut csp_pot = OneRestrictionDijkstra::new(&graph);
@@ -83,14 +89,14 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
     let max_driving_time = 4_000_000;
-    let pause_time = 270_000;
+    let pause_time = 2_700_000;
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
-    let mut core_ch = CSPCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut core_ch = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     core_ch.check();
     core_ch.set_restriction(max_driving_time, pause_time);
 

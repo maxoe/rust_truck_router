@@ -75,7 +75,7 @@ impl MeasurementResult for CSP1MeasurementResult {
     const OWN_HEADER: &'static str = "path_number_pauses";
 
     fn get_header() -> String {
-        format!("{},{}", Self::OWN_HEADER, CSPMeasurementResult::get_header())
+        format!("{},{}", CSPMeasurementResult::get_header(), Self::OWN_HEADER)
     }
     fn as_csv(&self) -> String {
         if self.standard.path_distance.is_some() {
@@ -97,7 +97,7 @@ impl MeasurementResult for CSP2MeasurementResult {
     const OWN_HEADER: &'static str = "path_number_short_pauses,path_number_long_pauses";
 
     fn get_header() -> String {
-        format!("{},{}", Self::OWN_HEADER, CSPMeasurementResult::get_header())
+        format!("{},{}", CSPMeasurementResult::get_header(), Self::OWN_HEADER)
     }
     fn as_csv(&self) -> String {
         if self.standard.path_distance.is_some() {

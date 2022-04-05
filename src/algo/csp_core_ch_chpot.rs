@@ -1,14 +1,18 @@
-use crate::{io::Load, types::*};
+use crate::{
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential},
+    io::Load,
+    types::*,
+};
 use bit_vec::BitVec;
 use std::{path::Path, time::Instant};
 
-use super::csp::OneRestrictionDijkstra;
+use super::{astar::Potential, csp::OneRestrictionDijkstra};
 
-pub struct CSPCoreContractionHierarchy<'a> {
+pub struct CSPAstarCoreContractionHierarchy<'a> {
     pub rank: Vec<u32>,
     pub is_core: BitVec,
-    pub fw_search: OneRestrictionDijkstra<'a>,
-    pub bw_search: OneRestrictionDijkstra<'a>,
+    pub fw_search: OneRestrictionDijkstra<'a, CHPotential>,
+    pub bw_search: OneRestrictionDijkstra<'a, CHPotential>,
     fw_finished: bool,
     bw_finished: bool,
     s: NodeId,
@@ -17,17 +21,19 @@ pub struct CSPCoreContractionHierarchy<'a> {
     pub last_dist: Option<Weight>,
 }
 
-impl<'a> CSPCoreContractionHierarchy<'a> {
+impl<'a> CSPAstarCoreContractionHierarchy<'a> {
     pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        Ok(CSPCoreContractionHierarchy::build(
+        Ok(CSPAstarCoreContractionHierarchy::build(
             Vec::<u32>::load_from(path.as_ref().join("rank"))?,
+            Vec::<u32>::load_from(path.as_ref().join("order"))?,
             Vec::<u32>::load_from(path.as_ref().join("core"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("backward"))?,
+            ContractionHierarchy::load_from_routingkit_dir(path.as_ref().join("../ch"))?,
         ))
     }
 
-    pub fn build(rank: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph) -> Self {
+    pub fn build(rank: Vec<u32>, order: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph, ch: ContractionHierarchy) -> Self {
         let node_count = forward.num_nodes();
 
         let mut is_core = BitVec::from_elem(node_count, false);
@@ -42,11 +48,13 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
             core_node_count as f32 * 100.0 / rank.len() as f32
         );
 
-        CSPCoreContractionHierarchy {
+        ch.check();
+
+        CSPAstarCoreContractionHierarchy {
             rank,
             is_core,
-            fw_search: OneRestrictionDijkstra::new_from_owned(forward),
-            bw_search: OneRestrictionDijkstra::new_from_owned(backward),
+            fw_search: OneRestrictionDijkstra::new_with_potential_from_owned(forward, CHPotential::from_ch_with_node_mapping(ch.clone(), order.clone())),
+            bw_search: OneRestrictionDijkstra::new_with_potential_from_owned(backward, CHPotential::from_ch_with_node_mapping_backwards(ch, order)),
             fw_finished: false,
             bw_finished: false,
             s: node_count as NodeId,
@@ -115,10 +123,12 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
     pub fn reset(&mut self) {
         if self.s != self.rank.len() as NodeId {
             self.fw_search.init_new_s(self.s);
+            self.bw_search.potential.init_new_t(self.s);
         }
 
         if self.t != self.rank.len() as NodeId {
             self.bw_search.init_new_s(self.t);
+            self.fw_search.potential.init_new_t(self.t);
         }
 
         self.fw_finished = false;
@@ -170,12 +180,14 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
         if self.s == self.rank.len() as NodeId || self.t == self.rank.len() as NodeId {
             return None;
         }
+
+        self.reset();
+
         let mut tentative_distance = Weight::infinity();
 
         let mut fw_min_key = 0;
         let mut bw_min_key = 0;
 
-        self.reset();
         if !self.fw_finished {
             // safe after init
             fw_min_key = self.fw_search.min_key().unwrap();
@@ -205,7 +217,7 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
 
                     // fw search found t -> done here
                     if node == self.t {
-                        tentative_distance = dist_from_queue_at_v[0];
+                        tentative_distance = self.fw_search.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
                         self.bw_finished = true;
                         _needs_core = false;
@@ -222,12 +234,8 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
                         }
                     }
 
-                    fw_min_key = self.fw_search.min_key().unwrap_or_else(|| {
-                        self.fw_finished = true;
-                        fw_min_key
-                    });
-
-                    if fw_min_key >= tentative_distance {
+                    if self.fw_search.min_key().is_none() {
+                        // || self.fw_search.get_settled_labels_at(node).last().unwrap().0.distance[0] >= tentative_distance {
                         self.fw_finished = true;
                     }
 
@@ -255,7 +263,7 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
 
                     // bw search found s -> done here
                     if node == self.s {
-                        tentative_distance = dist_from_queue_at_v[0];
+                        tentative_distance = self.bw_search.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
 
                         self.fw_finished = true;
                         self.bw_finished = true;
@@ -273,12 +281,8 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
                         }
                     }
 
-                    bw_min_key = self.bw_search.min_key().unwrap_or_else(|| {
-                        self.bw_finished = true;
-                        bw_min_key
-                    });
-
-                    if bw_min_key >= tentative_distance {
+                    if self.bw_search.min_key().is_none() || self.bw_search.min_key().unwrap() >= tentative_distance {
+                        // self.bw_search.get_settled_labels_at(node).last().unwrap().0.distance[0] >= tentative_distance {
                         self.bw_finished = true;
                     }
 

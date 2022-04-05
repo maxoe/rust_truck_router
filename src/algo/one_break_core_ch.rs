@@ -4,7 +4,6 @@ use std::{path::Path, time::Instant};
 
 #[derive(Clone)]
 pub struct OneBreakCoreContractionHierarchy {
-    _order_without_core: Vec<u32>,
     pub rank: Vec<u32>,
     pub is_core: BitVec,
     pub fw_search: OwnedDijkstra,
@@ -22,21 +21,21 @@ impl OneBreakCoreContractionHierarchy {
     pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         Ok(OneBreakCoreContractionHierarchy::build(
             Vec::<u32>::load_from(path.as_ref().join("rank"))?,
-            Vec::<u32>::load_from(path.as_ref().join("order_without_core"))?,
+            Vec::<u32>::load_from(path.as_ref().join("core"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("backward"))?,
         ))
     }
 
-    pub fn build(rank: Vec<u32>, order_without_core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph) -> Self {
+    pub fn build(rank: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph) -> Self {
         let node_count = forward.num_nodes();
 
-        let mut is_core = BitVec::from_elem(node_count, true);
-        for &n in order_without_core.iter() {
-            is_core.set(rank[n as usize] as usize, false);
+        let mut is_core = BitVec::from_elem(node_count, false);
+        for &n in core.iter() {
+            is_core.set(rank[n as usize] as usize, true);
         }
 
-        let core_node_count = node_count - order_without_core.len();
+        let core_node_count = core.len();
         println!(
             "Core node count: {} ({:.2}%)",
             core_node_count,
@@ -44,7 +43,6 @@ impl OneBreakCoreContractionHierarchy {
         );
 
         OneBreakCoreContractionHierarchy {
-            _order_without_core: order_without_core,
             rank,
             is_core,
             fw_search: OwnedDijkstra::new(forward),

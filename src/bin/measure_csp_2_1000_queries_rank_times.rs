@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut search = TwoRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
     search
         .set_reset_flags(is_parking_node.to_bytes())
-        .set_restriction(32_400_000, 32_400_000, 16_200_000, 270_000);
+        .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
     let mut dijkstra = Dijkstra::new(&graph);

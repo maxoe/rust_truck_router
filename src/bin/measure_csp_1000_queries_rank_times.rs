@@ -120,6 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     },
                 });
             }
+            println!("Time was {:.2}", time.as_secs_f64() * 1000.0);
         }
         result.push(rank_times);
     }
@@ -149,6 +150,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file = LineWriter::new(file);
     writeln!(file, "{}", LocalMeasurementResult::get_header())?;
     for r in stat_logs {
+        println!("Time is still {}", r.standard.standard.time.as_secs_f64() * 1000.0);
+        println!("csv is {}", r.as_csv());
         writeln!(file, "{}", r.as_csv())?;
     }
 
