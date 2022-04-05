@@ -1,5 +1,5 @@
 use rust_truck_router::{
-    algo::{core_ch::CoreContractionHierarchy, mcd::OneRestrictionDijkstra},
+    algo::{core_ch::CoreContractionHierarchy, csp::OneRestrictionDijkstra},
     types::OwnedGraph,
 };
 use std::{error::Error, path::Path};

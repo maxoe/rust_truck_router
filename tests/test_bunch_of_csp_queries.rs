@@ -1,5 +1,5 @@
 use bit_vec::BitVec;
-use rust_truck_router::{algo::mcd::*, types::OwnedGraph};
+use rust_truck_router::{algo::csp::*, types::OwnedGraph};
 
 #[test]
 fn simple() {

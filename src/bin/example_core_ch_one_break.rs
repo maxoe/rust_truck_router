@@ -1,5 +1,5 @@
 use rust_truck_router::{
-    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, mcd::OneRestrictionDijkstra, one_break_core_ch::OneBreakCoreContractionHierarchy},
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp::OneRestrictionDijkstra, one_break_core_ch::OneBreakCoreContractionHierarchy},
     io::*,
     types::*,
 };

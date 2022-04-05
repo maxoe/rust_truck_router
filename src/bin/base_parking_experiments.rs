@@ -1,5 +1,5 @@
 use rust_truck_router::{
-    algo::{dijkstra::Dijkstra, mcd::*},
+    algo::{csp::*, dijkstra::Dijkstra},
     io::*,
     time::measure,
     types::*,

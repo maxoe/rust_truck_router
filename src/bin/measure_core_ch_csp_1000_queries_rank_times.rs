@@ -1,6 +1,6 @@
 use rand::Rng;
 use rust_truck_router::{
-    algo::{dijkstra::Dijkstra, one_break_core_ch::OneBreakCoreContractionHierarchy},
+    algo::{csp_core_ch::CSPCoreContractionHierarchy, dijkstra::Dijkstra},
     experiments::measurement::{CSP1MeasurementResult, MeasurementResult},
     io::*,
     types::*,
@@ -23,9 +23,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
-    let mut search = OneBreakCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut search = CSPCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     search.check();
-    search.add_restriction(16_200_000, 2_700_000);
+    search.set_restriction(16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
     let mut dijkstra = Dijkstra::new(&graph);
@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("Progress {}/{}", n, n);
 
-    let file = File::create("measure_one_break_core_ch_1000_queries_rank_times-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
+    let file = File::create("measure_core_ch_csp_1000_queries_rank_times-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);
 
     writeln!(

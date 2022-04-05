@@ -1,6 +1,6 @@
 use rand::Rng;
 use rust_truck_router::{
-    algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd_2::TwoRestrictionDijkstra},
+    algo::{ch::*, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra, dijkstra::Dijkstra},
     experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,
     types::*,

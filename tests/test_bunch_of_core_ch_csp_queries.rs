@@ -1,7 +1,7 @@
 use bit_vec::BitVec;
 use rand::{Rng, SeedableRng};
 use rust_truck_router::{
-    algo::{csp_core_ch::CSPCoreContractionHierarchy, mcd::OneRestrictionDijkstra},
+    algo::{csp::OneRestrictionDijkstra, csp_core_ch::CSPCoreContractionHierarchy},
     io::{load_routingkit_bitvector, Load},
     types::{EdgeId, Graph, NodeId, OwnedGraph, Weight},
 };

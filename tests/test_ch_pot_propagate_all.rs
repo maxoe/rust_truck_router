@@ -33,7 +33,7 @@ fn some_ch_pot_queries() -> Result<(), Box<dyn Error>> {
         instance_mcd_acc.init_new_s(s);
         for t in 0..5 {
             let dijkstra_dist = dijkstra.dist_query(t);
-            assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query(t));
+            assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query_propagate_all_labels(t));
             assert_eq!(dijkstra_dist, dijkstra_pot.dist_query(t));
 
             let dijkstra_path = dijkstra.current_node_path_to(t);
@@ -89,7 +89,7 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
         instance_mcd_acc.init_new_s(s);
 
         let dijkstra_dist = dijkstra.dist_query(t);
-        assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query(t));
+        assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query_propagate_all_labels(t));
         assert_eq!(dijkstra_dist, dijkstra_pot.dist_query(t));
 
         let dijkstra_path = dijkstra.current_node_path_to(t);

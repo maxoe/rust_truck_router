@@ -524,10 +524,6 @@ if __name__ == "__main__":
 
     RUN_ALL_MEASUREMENTS = args.force
     PROHIBIT_MEASUREMENTS = args.plot
-    # plot_variable_max_driving_time()
-    # plot_variable_pause_time()
-    # plot_1000_csp_queries(args.graph)
-    # plot_1000_csp_2_queries(args.graph)
 
     if RUN_ALL_MEASUREMENTS and PROHIBIT_MEASUREMENTS:
         print("Cannot force and prohibit measurements and the same time")
@@ -537,5 +533,8 @@ if __name__ == "__main__":
         plot_rank_times("measure_csp_1000_queries_rank_times", g)
         plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
         plot_rank_times_from_simple_meaurement(
-            "measure_one_break_core_ch_1000_queries_rank_times", g
+            "measure_core_ch_csp_1000_queries_rank_times", g
+        )
+        plot_rank_times_from_simple_meaurement(
+            "measure_core_ch_csp_2_1000_queries_rank_times", g
         )

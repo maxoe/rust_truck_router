@@ -2,25 +2,26 @@ use crate::{io::Load, types::*};
 use bit_vec::BitVec;
 use std::{path::Path, time::Instant};
 
-use super::csp::OneRestrictionDijkstra;
+use super::csp_2::TwoRestrictionDijkstra;
 
-pub struct CSPCoreContractionHierarchy<'a> {
+pub struct CSP2CoreContractionHierarchy<'a> {
     _order_without_core: Vec<u32>,
     pub rank: Vec<u32>,
     pub is_core: BitVec,
-    pub fw_search: OneRestrictionDijkstra<'a>,
-    pub bw_search: OneRestrictionDijkstra<'a>,
+    pub fw_search: TwoRestrictionDijkstra<'a>,
+    pub bw_search: TwoRestrictionDijkstra<'a>,
     fw_finished: bool,
     bw_finished: bool,
     s: NodeId,
     t: NodeId,
-    pub restriction: DrivingTimeRestriction,
+    pub restriction_short: DrivingTimeRestriction,
+    pub restriction_long: DrivingTimeRestriction,
     pub last_dist: Option<Weight>,
 }
 
-impl<'a> CSPCoreContractionHierarchy<'a> {
+impl<'a> CSP2CoreContractionHierarchy<'a> {
     pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        Ok(CSPCoreContractionHierarchy::build(
+        Ok(CSP2CoreContractionHierarchy::build(
             Vec::<u32>::load_from(path.as_ref().join("rank"))?,
             Vec::<u32>::load_from(path.as_ref().join("order_without_core"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
@@ -43,17 +44,21 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
             core_node_count as f32 * 100.0 / rank.len() as f32
         );
 
-        CSPCoreContractionHierarchy {
+        CSP2CoreContractionHierarchy {
             _order_without_core: order_without_core,
             rank,
             is_core,
-            fw_search: OneRestrictionDijkstra::new_from_owned(forward),
-            bw_search: OneRestrictionDijkstra::new_from_owned(backward),
+            fw_search: TwoRestrictionDijkstra::new_from_owned(forward),
+            bw_search: TwoRestrictionDijkstra::new_from_owned(backward),
             fw_finished: false,
             bw_finished: false,
             s: node_count as NodeId,
             t: node_count as NodeId,
-            restriction: DrivingTimeRestriction {
+            restriction_short: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            restriction_long: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
@@ -61,17 +66,30 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
         }
     }
 
-    pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) {
-        self.restriction = DrivingTimeRestriction { pause_time, max_driving_time };
+    pub fn set_restriction(&mut self, max_driving_time_long: Weight, pause_time_long: Weight, max_driving_time_short: Weight, pause_time_short: Weight) {
+        self.restriction_short = DrivingTimeRestriction {
+            pause_time: pause_time_short,
+            max_driving_time: max_driving_time_short,
+        };
+        self.restriction_long = DrivingTimeRestriction {
+            pause_time: pause_time_long,
+            max_driving_time: max_driving_time_long,
+        };
 
         self.fw_search.set_reset_flags(&self.is_core.to_bytes());
-        self.fw_search.set_restriction(max_driving_time, pause_time);
+        self.fw_search
+            .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
         self.bw_search.set_reset_flags(&self.is_core.to_bytes());
-        self.bw_search.set_restriction(max_driving_time, pause_time);
+        self.bw_search
+            .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
     }
 
-    pub fn clear_restriction(&mut self) {
-        self.restriction = DrivingTimeRestriction {
+    pub fn clear_restrictions(&mut self) {
+        self.restriction_short = DrivingTimeRestriction {
+            pause_time: 0,
+            max_driving_time: Weight::infinity(),
+        };
+        self.restriction_long = DrivingTimeRestriction {
             pause_time: 0,
             max_driving_time: Weight::infinity(),
         };
@@ -145,7 +163,7 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
             let total_dist = fw_label.distance.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
-            if total_dist[1] < self.restriction.max_driving_time {
+            if total_dist[1] < self.restriction_short.max_driving_time {
                 // subpaths can be connected without additional break
                 return total_dist[0];
             }
@@ -153,8 +171,8 @@ impl<'a> CSPCoreContractionHierarchy<'a> {
             // need parking at node
             if self.is_core.get(node as usize).unwrap() {
                 // can park at node and connect subpaths
-                if fw_label.distance[1].max(bw_label.distance[1]) < self.restriction.max_driving_time {
-                    return total_dist[0] + self.restriction.pause_time;
+                if fw_label.distance[1].max(bw_label.distance[1]) < self.restriction_short.max_driving_time {
+                    return total_dist[0] + self.restriction_short.pause_time;
                 }
             }
 

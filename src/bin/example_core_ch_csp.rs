@@ -1,5 +1,5 @@
 use rust_truck_router::{
-    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp_core_ch::CSPCoreContractionHierarchy, mcd::OneRestrictionDijkstra},
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp::OneRestrictionDijkstra, csp_core_ch::CSPCoreContractionHierarchy},
     io::*,
     types::*,
 };
@@ -68,18 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 270_000);
     let csp_pot_dist = csp_pot.dist_query(t);
 
-    println!("{}", csp_pot.info());
     let csp_pot_num_breaks = if let Some(path) = csp_pot.current_best_path_to(t, true) {
-        // dbg!(path.0.clone());
-        // for (&node, dist) in path.0.iter().zip(path.1.clone()) {
-        //     core_ch.init_new_t(node);
-        //     let core_dist = core_ch.run_query();
-
-        //     if core_dist.unwrap() != dist[0] {
-        //         println!("Failing at node {}", node);
-        //     }
-        //     assert_eq!(core_dist.unwrap(), dist[0]);
-        // }
         Some(csp_pot.reset_nodes_on_path(&path).len())
     } else {
         None
