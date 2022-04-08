@@ -185,19 +185,6 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
 
         let mut tentative_distance = Weight::infinity();
 
-        let mut fw_min_key = 0;
-        let mut bw_min_key = 0;
-
-        if !self.fw_finished {
-            // safe after init
-            fw_min_key = self.fw_search.min_key().unwrap();
-        }
-
-        if !self.bw_finished {
-            // safe after init
-            bw_min_key = self.bw_search.min_key().unwrap();
-        }
-
         let mut settled_fw = BitVec::from_elem(self.fw_search.graph.num_nodes(), false);
         let mut settled_bw = BitVec::from_elem(self.bw_search.graph.num_nodes(), false);
         let mut _middle_node = self.fw_search.graph.num_nodes() as NodeId;
@@ -207,9 +194,9 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
 
         let time = Instant::now();
         while !self.fw_finished || !self.bw_finished {
-            if self.bw_finished || !self.fw_finished && fw_next {
+            if !self.fw_finished && (self.bw_finished || fw_next) {
                 if let Some(State {
-                    distance: dist_from_queue_at_v,
+                    distance: _dist_from_queue_at_v,
                     node,
                 }) = self.fw_search.settle_next_label(self.t)
                 {
@@ -217,6 +204,7 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
 
                     // fw search found t -> done here
                     if node == self.t {
+                        println!("Forward settled t");
                         tentative_distance = self.fw_search.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
                         self.bw_finished = true;
@@ -234,8 +222,7 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
                         }
                     }
 
-                    if self.fw_search.min_key().is_none() {
-                        // || self.fw_search.get_settled_labels_at(node).last().unwrap().0.distance[0] >= tentative_distance {
+                    if self.fw_search.min_key().is_none() || self.fw_search.min_key().unwrap() >= tentative_distance {
                         self.fw_finished = true;
                     }
 
@@ -255,7 +242,7 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
                 }
             } else {
                 if let Some(State {
-                    distance: dist_from_queue_at_v,
+                    distance: _dist_from_queue_at_v,
                     node,
                 }) = self.bw_search.settle_next_label(self.s)
                 {
@@ -263,6 +250,7 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
 
                     // bw search found s -> done here
                     if node == self.s {
+                        println!("Backward settled s");
                         tentative_distance = self.bw_search.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
 
                         self.fw_finished = true;
@@ -282,7 +270,6 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
                     }
 
                     if self.bw_search.min_key().is_none() || self.bw_search.min_key().unwrap() >= tentative_distance {
-                        // self.bw_search.get_settled_labels_at(node).last().unwrap().0.distance[0] >= tentative_distance {
                         self.bw_finished = true;
                     }
 

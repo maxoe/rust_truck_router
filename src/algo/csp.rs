@@ -354,7 +354,7 @@ where
         let next = self.data.queue.pop();
 
         if let Some(State {
-            distance: tentative_distance_from_queue,
+            distance: _tentative_distance_from_queue,
             node: node_id,
         }) = next
         {

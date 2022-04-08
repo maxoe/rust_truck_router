@@ -1,8 +1,5 @@
 use rust_truck_router::{
-    algo::{
-        ch::ContractionHierarchy, ch_potential::CHPotential, csp::OneRestrictionDijkstra, csp_core_ch::CSPCoreContractionHierarchy,
-        csp_core_ch_chpot::CSPAstarCoreContractionHierarchy,
-    },
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp::OneRestrictionDijkstra, csp_core_ch_chpot::CSPAstarCoreContractionHierarchy},
     io::*,
     types::*,
 };
@@ -81,6 +78,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(dist, core_ch.last_dist);
 
     println!(" - Done");
+
+    // println!("Forward summary");
+    // println!("{}", core_ch.fw_search.info());
+    // println!("Backward summary");
+    // println!("{}", core_ch.bw_search.info());
 
     Ok(())
 }

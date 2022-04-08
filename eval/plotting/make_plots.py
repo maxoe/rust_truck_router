@@ -4,17 +4,6 @@ from cProfile import label, run
 from math import log2
 from multiprocessing.pool import RUN
 from os.path import join
-import numpy as np
-import pandas as pd
-
-import matplotlib.pyplot as plt
-from matplotlib import style
-import matplotlib.ticker as ticker
-import matplotlib.patches as mpatches
-import pandas as pd
-import numpy as np
-import math
-
 import subprocess
 import os
 import glob
@@ -26,6 +15,14 @@ import hashlib
 import argparse
 import time
 import argparse
+
+import matplotlib.pyplot as plt
+from matplotlib import style
+import matplotlib.ticker as ticker
+import matplotlib.patches as mpatches
+import pandas as pd
+import numpy as np
+import math
 
 from pandas.core.base import DataError
 
@@ -340,8 +337,8 @@ if __name__ == "__main__":
         exit(0)
 
     for g in args.graph:
-        # plot_rank_times("measure_csp_1000_queries_rank_times", g)
-        # plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
+        plot_rank_times("measure_csp_1000_queries_rank_times", g)
+        plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
         plot_rank_times_from_simple_meaurement(
             "measure_core_ch_csp_1000_queries_rank_times", g
         )
