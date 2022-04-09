@@ -1,10 +1,10 @@
 use rand::Rng;
 use rust_truck_router::{
     algo::{
-        ch::ContractionHierarchy, ch_potential::CHPotential, csp::OneRestrictionDijkstra, csp_core_ch_chpot::CSPAstarCoreContractionHierarchy,
+        ch::ContractionHierarchy, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra, csp_2_core_ch_chpot::CSP2AstarCoreContractionHierarchy,
         dijkstra::Dijkstra,
     },
-    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,
     types::*,
 };
@@ -27,9 +27,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
-    let mut search = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut search = CSP2AstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     search.check();
-    search.set_restriction(16_200_000, 2_700_000);
+    search.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
     let mut dijkstra = Dijkstra::new(&graph);
@@ -39,24 +39,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[derive(Debug, Clone, Copy)]
     struct LocalMeasurementResult {
         pub dijkstra_rank_exponent: usize,
-        standard: CSP1MeasurementResult,
+        standard: CSP2MeasurementResult,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
         const OWN_HEADER: &'static str = "dijkstra_rank_exponent";
 
         fn get_header() -> String {
-            format!("{},{}", Self::OWN_HEADER, CSP1MeasurementResult::get_header())
+            format!("{},{}", Self::OWN_HEADER, CSP2MeasurementResult::get_header())
         }
         fn as_csv(&self) -> String {
             format!("{},{}", self.dijkstra_rank_exponent, self.standard.as_csv())
         }
     }
-
     let mut stat_logs = Vec::with_capacity(n * log_num_nodes);
 
-    let mut csp_pot = OneRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
-    csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000);
+    let mut csp_pot = TwoRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
+    csp_pot
+        .set_reset_flags(is_parking_node.to_bytes())
+        .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     for _i in 0..n {
         print!("Progress {}/{}\r", _i, n);
@@ -87,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
-                    standard: CSP1MeasurementResult {
+                    standard: CSP2MeasurementResult {
                         standard: CSPMeasurementResult {
                             graph_num_nodes: graph.num_nodes(),
                             graph_num_edges: graph.num_arcs(),
@@ -101,13 +102,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                             path_number_nodes: Some(path.0.len()),
                             path_number_flagged_nodes: Some(number_flagged_nodes.len()),
                         },
-                        path_number_pauses: Some(number_pauses.len()),
+                        path_number_short_pauses: Some(number_pauses.0.len()),
+                        path_number_long_pauses: Some(number_pauses.1.len()),
                     },
                 });
             } else {
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
-                    standard: CSP1MeasurementResult {
+                    standard: CSP2MeasurementResult {
                         standard: CSPMeasurementResult {
                             graph_num_nodes: graph.num_nodes(),
                             graph_num_edges: graph.num_arcs(),
@@ -121,7 +123,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                             path_number_nodes: None,
                             path_number_flagged_nodes: None,
                         },
-                        path_number_pauses: None,
+                        path_number_short_pauses: None,
+                        path_number_long_pauses: None,
                     },
                 });
             }
@@ -129,7 +132,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("Progress {}/{}", n, n);
 
-    let file = File::create("measure_chpot_core_ch_csp_1000_queries-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
+    let file = File::create("measure_chpot_core_ch_csp_2_1000_queries-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);
     writeln!(file, "{}", LocalMeasurementResult::get_header())?;
     for r in stat_logs {

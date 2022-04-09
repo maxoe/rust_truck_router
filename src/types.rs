@@ -70,10 +70,8 @@ impl WeightOps for Weight {
     }
 
     #[inline(always)]
-    fn reset_distance(&mut self, i: usize, _pause_time: Weight) {
-        if i == 0 {
-            *self = 0;
-        }
+    fn reset_distance(&mut self, _i: usize, _pause_time: Weight) {
+        ()
     }
 
     #[inline(always)]
@@ -105,7 +103,7 @@ impl WeightOps for Weight2 {
 
     #[inline(always)]
     fn reset_distance(&mut self, i: usize, pause_time: Weight) {
-        if i < 2 {
+        if i == 1 {
             self[0] += pause_time;
             self[1] = 0;
         }

@@ -1,14 +1,20 @@
-use crate::{io::Load, types::*};
+use crate::{
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential},
+    io::Load,
+    types::*,
+};
 use bit_vec::BitVec;
 use std::{path::Path, time::Instant};
 
-use super::csp_2::TwoRestrictionDijkstra;
+use super::{astar::Potential, csp_2::TwoRestrictionDijkstra};
 
-pub struct CSP2CoreContractionHierarchy<'a> {
+pub struct CSP2AstarCoreContractionHierarchy<'a> {
     pub rank: Vec<u32>,
     pub is_core: BitVec,
-    pub fw_search: TwoRestrictionDijkstra<'a>,
-    pub bw_search: TwoRestrictionDijkstra<'a>,
+    pub is_reachable_from_core_in_fw: BitVec,
+    pub is_reachable_from_core_in_bw: BitVec,
+    pub fw_search: TwoRestrictionDijkstra<'a, CHPotential>,
+    pub bw_search: TwoRestrictionDijkstra<'a, CHPotential>,
     fw_finished: bool,
     bw_finished: bool,
     s: NodeId,
@@ -18,22 +24,41 @@ pub struct CSP2CoreContractionHierarchy<'a> {
     pub last_dist: Option<Weight>,
 }
 
-impl<'a> CSP2CoreContractionHierarchy<'a> {
+impl<'a> CSP2AstarCoreContractionHierarchy<'a> {
     pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        Ok(CSP2CoreContractionHierarchy::build(
+        Ok(CSP2AstarCoreContractionHierarchy::build(
             Vec::<u32>::load_from(path.as_ref().join("rank"))?,
+            Vec::<u32>::load_from(path.as_ref().join("order"))?,
             Vec::<u32>::load_from(path.as_ref().join("core"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
             OwnedGraph::load_from_routingkit_dir(path.as_ref().join("backward"))?,
+            ContractionHierarchy::load_from_routingkit_dir(path.as_ref().join("../ch"))?,
         ))
     }
 
-    pub fn build(rank: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph) -> Self {
-        let node_count = forward.num_nodes();
+    pub fn build(rank: Vec<u32>, order: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph, ch: ContractionHierarchy) -> Self {
+        let node_count = rank.len();
 
         let mut is_core = BitVec::from_elem(node_count, false);
+        let mut is_reachable_from_core_in_bw = BitVec::from_elem(node_count, false);
+        let mut is_reachable_from_core_in_fw = BitVec::from_elem(node_count, false);
+
         for &n in core.iter() {
             is_core.set(rank[n as usize] as usize, true);
+        }
+
+        for &n in core.iter() {
+            for i in forward.first_out()[n as usize]..forward.first_out()[n as usize + 1] {
+                if !is_core.get(forward.head()[i as usize] as usize).unwrap() {
+                    is_reachable_from_core_in_fw.set(forward.head()[i as usize] as usize, true);
+                }
+            }
+
+            for i in backward.first_out()[n as usize]..backward.first_out()[n as usize + 1] {
+                if !is_core.get(backward.head()[i as usize] as usize).unwrap() {
+                    is_reachable_from_core_in_bw.set(backward.head()[i as usize] as usize, true);
+                }
+            }
         }
 
         let core_node_count = core.len();
@@ -43,11 +68,15 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
             core_node_count as f32 * 100.0 / rank.len() as f32
         );
 
-        CSP2CoreContractionHierarchy {
+        ch.check();
+
+        CSP2AstarCoreContractionHierarchy {
             rank,
             is_core,
-            fw_search: TwoRestrictionDijkstra::new_from_owned(forward),
-            bw_search: TwoRestrictionDijkstra::new_from_owned(backward),
+            is_reachable_from_core_in_fw,
+            is_reachable_from_core_in_bw,
+            fw_search: TwoRestrictionDijkstra::new_with_potential_from_owned(forward, CHPotential::from_ch_with_node_mapping(ch.clone(), order.clone())),
+            bw_search: TwoRestrictionDijkstra::new_with_potential_from_owned(backward, CHPotential::from_ch_with_node_mapping_backwards(ch, order)),
             fw_finished: false,
             bw_finished: false,
             s: node_count as NodeId,
@@ -82,7 +111,7 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
             .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
     }
 
-    pub fn clear_restrictions(&mut self) {
+    pub fn clear_restriction(&mut self) {
         self.restriction_short = DrivingTimeRestriction {
             pause_time: 0,
             max_driving_time: Weight::infinity(),
@@ -133,10 +162,12 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
     pub fn reset(&mut self) {
         if self.s != self.rank.len() as NodeId {
             self.fw_search.init_new_s(self.s);
+            self.bw_search.potential.init_new_t(self.s);
         }
 
         if self.t != self.rank.len() as NodeId {
             self.bw_search.init_new_s(self.t);
+            self.fw_search.potential.init_new_t(self.t);
         }
 
         self.fw_finished = false;
@@ -180,34 +211,30 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
         if self.s == self.rank.len() as NodeId || self.t == self.rank.len() as NodeId {
             return None;
         }
-        let mut tentative_distance = Weight::infinity();
-
-        let mut fw_min_key = 0;
-        let mut bw_min_key = 0;
 
         self.reset();
-        if !self.fw_finished {
-            // safe after init
-            fw_min_key = self.fw_search.min_key().unwrap();
-        }
 
-        if !self.bw_finished {
-            // safe after init
-            bw_min_key = self.bw_search.min_key().unwrap();
-        }
+        let mut tentative_distance = Weight::infinity();
 
         let mut settled_fw = BitVec::from_elem(self.fw_search.graph.num_nodes(), false);
         let mut settled_bw = BitVec::from_elem(self.bw_search.graph.num_nodes(), false);
         let mut _middle_node = self.fw_search.graph.num_nodes() as NodeId;
         let mut fw_next = true;
 
-        let mut _needs_core = false;
+        // to cancel no path found queries early
+        let mut fw_in_core = false;
+        let mut bw_in_core = false;
+        let mut fw_search_reachable_from_core = false;
+        let mut bw_search_reachable_from_core = false;
 
         let time = Instant::now();
-        while !self.fw_finished || !self.bw_finished {
-            if self.bw_finished || !self.fw_finished && fw_next {
+        while (!self.fw_finished || !self.bw_finished)
+            && !(self.fw_finished && !fw_search_reachable_from_core && bw_in_core)
+            && !(self.bw_finished && !bw_search_reachable_from_core && fw_in_core)
+        {
+            if !self.fw_finished && (self.bw_finished || fw_next) {
                 if let Some(State {
-                    distance: dist_from_queue_at_v,
+                    distance: _dist_from_queue_at_v,
                     node,
                 }) = self.fw_search.settle_next_label(self.t)
                 {
@@ -215,10 +242,10 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
 
                     // fw search found t -> done here
                     if node == self.t {
-                        tentative_distance = dist_from_queue_at_v[0];
+                        println!("Forward settled t");
+                        tentative_distance = self.fw_search.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        _needs_core = false;
 
                         break;
                     }
@@ -232,32 +259,32 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                         }
                     }
 
-                    fw_min_key = self.fw_search.min_key().unwrap_or_else(|| {
+                    if self.fw_search.min_key().is_none() || self.fw_search.min_key().unwrap() >= tentative_distance {
                         self.fw_finished = true;
-                        fw_min_key
-                    });
+                    }
 
-                    if fw_min_key >= tentative_distance {
-                        self.fw_finished = true;
+                    if self.is_reachable_from_core_in_bw.get(node as usize).unwrap() {
+                        fw_search_reachable_from_core = true;
+                    }
+
+                    if self.is_core.get(node as usize).unwrap() {
+                        fw_in_core = true;
+                        fw_search_reachable_from_core = true;
                     }
 
                     if self.fw_finished {
                         println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !fw_in_core {
                         println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.is_core.get(node as usize).unwrap() {
-                        _needs_core = true;
                     }
 
                     fw_next = false;
                 }
             } else {
                 if let Some(State {
-                    distance: dist_from_queue_at_v,
+                    distance: _dist_from_queue_at_v,
                     node,
                 }) = self.bw_search.settle_next_label(self.s)
                 {
@@ -265,11 +292,11 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
 
                     // bw search found s -> done here
                     if node == self.s {
-                        tentative_distance = dist_from_queue_at_v[0];
+                        println!("Backward settled s");
+                        tentative_distance = self.bw_search.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
 
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        _needs_core = false;
 
                         break;
                     }
@@ -283,25 +310,25 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                         }
                     }
 
-                    bw_min_key = self.bw_search.min_key().unwrap_or_else(|| {
+                    if self.bw_search.min_key().is_none() || self.bw_search.min_key().unwrap() >= tentative_distance {
                         self.bw_finished = true;
-                        bw_min_key
-                    });
+                    }
 
-                    if bw_min_key >= tentative_distance {
-                        self.bw_finished = true;
+                    if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() {
+                        bw_search_reachable_from_core = true;
+                    }
+
+                    if self.is_core.get(node as usize).unwrap() {
+                        bw_in_core = true;
+                        bw_search_reachable_from_core = true;
                     }
 
                     if self.bw_finished {
                         println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !bw_in_core {
                         println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.is_core.get(node as usize).unwrap() {
-                        _needs_core = true;
                     }
 
                     fw_next = true;

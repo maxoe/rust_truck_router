@@ -345,4 +345,13 @@ if __name__ == "__main__":
         # plot_rank_times_from_simple_meaurement(
         #     "measure_core_ch_csp_2_1000_queries_rank_times", g
         # )
-        plot_rank_times("measure_chpot_core_ch_csp_1000_queries", g)
+
+        plot_rank_times_from_simple_meaurement(
+            "measure_chpot_core_ch_csp_1000_queries_rank_times", g
+        )
+        plot_rank_times_from_simple_meaurement(
+            "measure_chpot_core_ch_csp_2_1000_queries_rank_times", g
+        )
+
+        # plot_rank_times("measure_chpot_core_ch_csp_1000_queries", g)
+        # plot_rank_times("measure_chpot_core_ch_csp_2_1000_queries", g)

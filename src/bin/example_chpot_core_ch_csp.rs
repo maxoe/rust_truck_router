@@ -1,5 +1,5 @@
 use rust_truck_router::{
-    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp::OneRestrictionDijkstra, csp_core_ch_chpot::CSPAstarCoreContractionHierarchy},
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra, csp_2_core_ch_chpot::CSP2AstarCoreContractionHierarchy},
     io::*,
     types::*,
 };
@@ -26,8 +26,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
     // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
 
-    let mut core_ch = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
-    core_ch.set_restriction(16_200_000, 2_700_000);
+    // let mut core_ch = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    // core_ch.set_restriction(16_200_000, 2_700_000);
+    let mut core_ch = CSP2AstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    core_ch.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
     core_ch.check();
 
     let mut time = Instant::now();
@@ -58,13 +60,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     print!("Validating result using constrained dijkstra");
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
-    let mut csp_pot = OneRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
+    let mut csp_pot = TwoRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
     csp_pot.init_new_s(s);
-    csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000);
+    csp_pot
+        .set_reset_flags(is_parking_node.to_bytes())
+        .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000); //.set_restriction(16_200_000, 2_700_000);
     let csp_pot_dist = csp_pot.dist_query(t);
 
     let csp_pot_num_breaks = if let Some(path) = csp_pot.current_best_path_to(t, true) {
-        Some(csp_pot.reset_nodes_on_path(&path).len())
+        Some(csp_pot.reset_nodes_on_path(&path).0.len())
     } else {
         None
     };
