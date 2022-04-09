@@ -240,7 +240,7 @@ def plot_rank_times(name, graph):
     to_plot = [
         ("time_ms", "log"),
     ]
-
+    # csp_1000_queries = csp_1000_queries.loc[csp_1000_queries["path_distance"] == -1]
     for (column_name, plot_scale) in to_plot:
         if column_name in csp_1000_queries.columns:
             fig, ax = plt.subplots(figsize=(10, 5))
@@ -337,14 +337,12 @@ if __name__ == "__main__":
         exit(0)
 
     for g in args.graph:
-        plot_rank_times("measure_csp_1000_queries_rank_times", g)
-        plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
-        plot_rank_times_from_simple_meaurement(
-            "measure_core_ch_csp_1000_queries_rank_times", g
-        )
-        plot_rank_times_from_simple_meaurement(
-            "measure_core_ch_csp_2_1000_queries_rank_times", g
-        )
-        plot_rank_times_from_simple_meaurement(
-            "measure_chpot_core_ch_csp_1000_queries_rank_times", g
-        )
+        # plot_rank_times("measure_csp_1000_queries_rank_times", g)
+        # plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
+        # plot_rank_times_from_simple_meaurement(
+        #     "measure_core_ch_csp_1000_queries_rank_times", g
+        # )
+        # plot_rank_times_from_simple_meaurement(
+        #     "measure_core_ch_csp_2_1000_queries_rank_times", g
+        # )
+        plot_rank_times("measure_chpot_core_ch_csp_1000_queries", g)
