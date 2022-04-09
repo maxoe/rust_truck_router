@@ -11,6 +11,8 @@ use super::{astar::Potential, csp::OneRestrictionDijkstra};
 pub struct CSPAstarCoreContractionHierarchy<'a> {
     pub rank: Vec<u32>,
     pub is_core: BitVec,
+    pub is_reachable_from_core_in_fw: BitVec,
+    pub is_reachable_from_core_in_bw: BitVec,
     pub fw_search: OneRestrictionDijkstra<'a, CHPotential>,
     pub bw_search: OneRestrictionDijkstra<'a, CHPotential>,
     fw_finished: bool,
@@ -34,11 +36,28 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
     }
 
     pub fn build(rank: Vec<u32>, order: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph, ch: ContractionHierarchy) -> Self {
-        let node_count = forward.num_nodes();
+        let node_count = rank.len();
 
         let mut is_core = BitVec::from_elem(node_count, false);
+        let mut is_reachable_from_core_in_bw = BitVec::from_elem(node_count, false);
+        let mut is_reachable_from_core_in_fw = BitVec::from_elem(node_count, false);
+
         for &n in core.iter() {
             is_core.set(rank[n as usize] as usize, true);
+        }
+
+        for &n in core.iter() {
+            for i in forward.first_out()[n as usize]..forward.first_out()[n as usize + 1] {
+                if !is_core.get(forward.head()[i as usize] as usize).unwrap() {
+                    is_reachable_from_core_in_fw.set(forward.head()[i as usize] as usize, true);
+                }
+            }
+
+            for i in backward.first_out()[n as usize]..backward.first_out()[n as usize + 1] {
+                if !is_core.get(backward.head()[i as usize] as usize).unwrap() {
+                    is_reachable_from_core_in_bw.set(backward.head()[i as usize] as usize, true);
+                }
+            }
         }
 
         let core_node_count = core.len();
@@ -53,6 +72,8 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
         CSPAstarCoreContractionHierarchy {
             rank,
             is_core,
+            is_reachable_from_core_in_fw,
+            is_reachable_from_core_in_bw,
             fw_search: OneRestrictionDijkstra::new_with_potential_from_owned(forward, CHPotential::from_ch_with_node_mapping(ch.clone(), order.clone())),
             bw_search: OneRestrictionDijkstra::new_with_potential_from_owned(backward, CHPotential::from_ch_with_node_mapping_backwards(ch, order)),
             fw_finished: false,
@@ -190,10 +211,17 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
         let mut _middle_node = self.fw_search.graph.num_nodes() as NodeId;
         let mut fw_next = true;
 
-        let mut _needs_core = false;
+        // to cancel no path found queries early
+        let mut fw_in_core = false;
+        let mut bw_in_core = false;
+        let mut fw_search_reachable_from_core = false;
+        let mut bw_search_reachable_from_core = false;
 
         let time = Instant::now();
-        while !self.fw_finished || !self.bw_finished {
+        while (!self.fw_finished || !self.bw_finished)
+            && !(self.fw_finished && !fw_search_reachable_from_core && bw_in_core)
+            && !(self.bw_finished && !bw_search_reachable_from_core && fw_in_core)
+        {
             if !self.fw_finished && (self.bw_finished || fw_next) {
                 if let Some(State {
                     distance: _dist_from_queue_at_v,
@@ -208,7 +236,6 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
                         tentative_distance = self.fw_search.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        _needs_core = false;
 
                         break;
                     }
@@ -226,16 +253,21 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
                         self.fw_finished = true;
                     }
 
+                    if self.is_reachable_from_core_in_bw.get(node as usize).unwrap() {
+                        fw_search_reachable_from_core = true;
+                    }
+
+                    if self.is_core.get(node as usize).unwrap() {
+                        fw_in_core = true;
+                        fw_search_reachable_from_core = true;
+                    }
+
                     if self.fw_finished {
                         println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !fw_in_core {
                         println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.is_core.get(node as usize).unwrap() {
-                        _needs_core = true;
                     }
 
                     fw_next = false;
@@ -255,7 +287,6 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
 
                         self.fw_finished = true;
                         self.bw_finished = true;
-                        _needs_core = false;
 
                         break;
                     }
@@ -273,16 +304,21 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
                         self.bw_finished = true;
                     }
 
+                    if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() {
+                        bw_search_reachable_from_core = true;
+                    }
+
+                    if self.is_core.get(node as usize).unwrap() {
+                        bw_in_core = true;
+                        bw_search_reachable_from_core = true;
+                    }
+
                     if self.bw_finished {
                         println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
+                    if self.is_core.get(node as usize).unwrap() && !bw_in_core {
                         println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.is_core.get(node as usize).unwrap() {
-                        _needs_core = true;
                     }
 
                     fw_next = true;

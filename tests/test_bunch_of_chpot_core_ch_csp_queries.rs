@@ -29,7 +29,7 @@ fn test_instance_queries() -> Result<(), Box<dyn Error>> {
         for t in 0..5 {
             chpot.init_new_t(t);
             for max_driving_time in 1..(max_restriction + 1) {
-                println!("Testing {} -> {}; max_driving_time: {}", s, t, max_driving_time);
+                // println!("Testing {} -> {}; max_driving_time: {}", s, t, max_driving_time);
                 core_ch.init_new_s(s);
                 core_ch.init_new_t(t);
                 core_ch.set_restriction(max_driving_time, pause_time);

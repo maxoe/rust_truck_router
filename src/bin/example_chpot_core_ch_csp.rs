@@ -18,13 +18,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
-    // those use a break on hgv ger and europe
-    // let s = 5945495;
-    // let t = 11838613;
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
-    // let s = 141734;
-    // let t = 334504; //171930; //334504;
 
     // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
@@ -32,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
 
     let mut core_ch = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
-    core_ch.set_restriction(16_200_000, 270_000);
+    core_ch.set_restriction(16_200_000, 2_700_000);
     core_ch.check();
 
     let mut time = Instant::now();
@@ -65,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ch.check();
     let mut csp_pot = OneRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
     csp_pot.init_new_s(s);
-    csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 270_000);
+    csp_pot.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000);
     let csp_pot_dist = csp_pot.dist_query(t);
 
     let csp_pot_num_breaks = if let Some(path) = csp_pot.current_best_path_to(t, true) {
@@ -78,11 +73,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(dist, core_ch.last_dist);
 
     println!(" - Done");
-
-    // println!("Forward summary");
-    // println!("{}", core_ch.fw_search.info());
-    // println!("Backward summary");
-    // println!("{}", core_ch.bw_search.info());
 
     Ok(())
 }
