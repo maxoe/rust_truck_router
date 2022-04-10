@@ -1,11 +1,9 @@
-use stud_rust_base::{
-    algo::{ch::*, ch_potential::CHPotential, mcd_2::TwoRestrictionDijkstra},
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra},
     io::*,
-    osm_id_mapper::OSMIDMapper,
     types::*,
 };
 
-use rand::Rng;
 use std::{
     env,
     error::Error,
@@ -44,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // instance_mcd_acc
     //     .set_reset_flags(is_parking_node.to_bytes())
     //     .set_restriction(16_200_000, 1_950_000);
-    let mut instance_mcd_acc = TwoRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
+    let mut instance_mcd_acc = TwoRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
     instance_mcd_acc
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(32_400_000, 32_400_000, 16_200_000, 270_000);

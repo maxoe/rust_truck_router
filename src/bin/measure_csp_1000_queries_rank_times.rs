@@ -1,4 +1,10 @@
 use rand::Rng;
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, csp::OneRestrictionDijkstra, dijkstra::Dijkstra},
+    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    io::*,
+    types::*,
+};
 use std::{
     env,
     error::Error,
@@ -6,12 +12,6 @@ use std::{
     io::{stdout, LineWriter, Write},
     path::Path,
     time::Instant,
-};
-use stud_rust_base::{
-    algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd::OneRestrictionDijkstra},
-    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
-    io::*,
-    types::*,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -27,11 +27,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut search = OneRestrictionDijkstra::new_with_potential(graph.borrow(), CHPotential::from_ch(ch));
+    let mut search = OneRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
     search.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
-    let mut dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra = Dijkstra::new(&graph);
 
     let n = 100;
     let mut result = Vec::with_capacity(n);
@@ -39,14 +39,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[derive(Debug, Clone, Copy)]
     struct LocalMeasurementResult {
         pub dijkstra_rank_exponent: usize,
-        standard: CSPMeasurementResult,
+        standard: CSP1MeasurementResult,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
         const OWN_HEADER: &'static str = "dijkstra_rank_exponent";
 
         fn get_header() -> String {
-            format!("{},{}", Self::OWN_HEADER, CSPMeasurementResult::get_header())
+            format!("{},{}", Self::OWN_HEADER, CSP1MeasurementResult::get_header())
         }
         fn as_csv(&self) -> String {
             format!("{},{}", self.dijkstra_rank_exponent, self.standard.as_csv())
@@ -82,36 +82,45 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
-                    standard: CSPMeasurementResult {
-                        num_queue_pushes: search.num_queue_pushes,
-                        num_settled: search.num_settled,
-                        num_labels_propagated: search.num_labels_propagated,
-                        num_labels_reset: search.num_labels_reset,
-                        num_nodes_searched: search.get_number_of_visited_nodes(),
-                        time,
-                        path_distance: dist,
-                        path_number_nodes: Some(path.0.len()),
-                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                    standard: CSP1MeasurementResult {
+                        standard: CSPMeasurementResult {
+                            graph_num_nodes: graph.num_nodes(),
+                            graph_num_edges: graph.num_arcs(),
+                            num_queue_pushes: search.num_queue_pushes,
+                            num_settled: search.num_settled,
+                            num_labels_propagated: search.num_labels_propagated,
+                            num_labels_reset: search.num_labels_reset,
+                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            time,
+                            path_distance: dist,
+                            path_number_nodes: Some(path.0.len()),
+                            path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                        },
                         path_number_pauses: Some(number_pauses.len()),
                     },
                 });
             } else {
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
-                    standard: CSPMeasurementResult {
-                        num_queue_pushes: search.num_queue_pushes,
-                        num_settled: search.num_settled,
-                        num_labels_propagated: search.num_labels_propagated,
-                        num_labels_reset: search.num_labels_reset,
-                        num_nodes_searched: search.get_number_of_visited_nodes(),
-                        time,
-                        path_distance: None,
-                        path_number_nodes: None,
-                        path_number_flagged_nodes: None,
+                    standard: CSP1MeasurementResult {
+                        standard: CSPMeasurementResult {
+                            graph_num_nodes: graph.num_nodes(),
+                            graph_num_edges: graph.num_arcs(),
+                            num_queue_pushes: search.num_queue_pushes,
+                            num_settled: search.num_settled,
+                            num_labels_propagated: search.num_labels_propagated,
+                            num_labels_reset: search.num_labels_reset,
+                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            time,
+                            path_distance: None,
+                            path_number_nodes: None,
+                            path_number_flagged_nodes: None,
+                        },
                         path_number_pauses: None,
                     },
                 });
             }
+            println!("Time was {:.2}", time.as_secs_f64() * 1000.0);
         }
         result.push(rank_times);
     }
@@ -141,6 +150,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file = LineWriter::new(file);
     writeln!(file, "{}", LocalMeasurementResult::get_header())?;
     for r in stat_logs {
+        println!("Time is still {}", r.standard.standard.time.as_secs_f64() * 1000.0);
+        println!("csv is {}", r.as_csv());
         writeln!(file, "{}", r.as_csv())?;
     }
 

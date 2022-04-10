@@ -1,4 +1,10 @@
 use rand::Rng;
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra, dijkstra::Dijkstra},
+    experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    io::*,
+    types::*,
+};
 use std::{
     env,
     error::Error,
@@ -6,12 +12,6 @@ use std::{
     io::{stdout, LineWriter, Write},
     path::Path,
     time::Instant,
-};
-use stud_rust_base::{
-    algo::{ch::*, ch_potential::CHPotential, dijkstra::Dijkstra, mcd_2::TwoRestrictionDijkstra},
-    experiments::measurement::{CSP2MeasurementResult, MeasurementResult},
-    io::*,
-    types::*,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -27,13 +27,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut search = TwoRestrictionDijkstra::new_with_potential(graph.borrow(), CHPotential::from_ch(ch));
+    let mut search = TwoRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
     search
         .set_reset_flags(is_parking_node.to_bytes())
-        .set_restriction(32_400_000, 32_400_000, 16_200_000, 270_000);
+        .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
-    let mut dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra = Dijkstra::new(&graph);
 
     let n = 100;
     let mut result = Vec::with_capacity(n);
@@ -85,15 +85,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
                     standard: CSP2MeasurementResult {
-                        num_queue_pushes: search.num_queue_pushes,
-                        num_settled: search.num_settled,
-                        num_labels_propagated: search.num_labels_propagated,
-                        num_labels_reset: search.num_labels_reset,
-                        num_nodes_searched: search.get_number_of_visited_nodes(),
-                        time,
-                        path_distance: dist,
-                        path_number_nodes: Some(path.0.len()),
-                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                        standard: CSPMeasurementResult {
+                            graph_num_nodes: graph.num_nodes(),
+                            graph_num_edges: graph.num_arcs(),
+                            num_queue_pushes: search.num_queue_pushes,
+                            num_settled: search.num_settled,
+                            num_labels_propagated: search.num_labels_propagated,
+                            num_labels_reset: search.num_labels_reset,
+                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            time,
+                            path_distance: dist,
+                            path_number_nodes: Some(path.0.len()),
+                            path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                        },
                         path_number_short_pauses: Some(number_pauses.0.len()),
                         path_number_long_pauses: Some(number_pauses.1.len()),
                     },
@@ -102,15 +106,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
                     standard: CSP2MeasurementResult {
-                        num_queue_pushes: search.num_queue_pushes,
-                        num_settled: search.num_settled,
-                        num_labels_propagated: search.num_labels_propagated,
-                        num_labels_reset: search.num_labels_reset,
-                        num_nodes_searched: search.get_number_of_visited_nodes(),
-                        time,
-                        path_distance: None,
-                        path_number_nodes: None,
-                        path_number_flagged_nodes: None,
+                        standard: CSPMeasurementResult {
+                            graph_num_nodes: graph.num_nodes(),
+                            graph_num_edges: graph.num_arcs(),
+                            num_queue_pushes: search.num_queue_pushes,
+                            num_settled: search.num_settled,
+                            num_labels_propagated: search.num_labels_propagated,
+                            num_labels_reset: search.num_labels_reset,
+                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            time,
+                            path_distance: None,
+                            path_number_nodes: None,
+                            path_number_flagged_nodes: None,
+                        },
                         path_number_short_pauses: None,
                         path_number_long_pauses: None,
                     },

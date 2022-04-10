@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use stud_rust_base::{
+use rust_truck_router::{
     algo::{ch::ContractionHierarchy, dijkstra::Dijkstra},
     io::*,
     types::{OwnedGraph, *},
@@ -29,7 +29,7 @@ fn some_ch_queries() -> Result<(), Box<dyn Error>> {
     let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
-    let mut dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra = Dijkstra::new(&graph);
 
     for s in 0..5 {
         dijkstra.init_new_s(s);
@@ -60,7 +60,7 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
-    let mut instance = Dijkstra::new(graph.borrow());
+    let mut instance = Dijkstra::new(&graph);
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);

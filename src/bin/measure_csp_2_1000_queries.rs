@@ -1,4 +1,10 @@
 use rand::Rng;
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra},
+    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
+    io::*,
+    types::*,
+};
 use std::{
     env,
     error::Error,
@@ -7,27 +13,21 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
-use stud_rust_base::{
-    algo::{ch::*, ch_potential::CHPotential, mcd_2::TwoRestrictionDijkstra},
-    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
-    io::*,
-    types::*,
-};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
 
-    let first_out = Vec::<stud_rust_base::types::EdgeId>::load_from(path.join("first_out"))?;
-    let head = Vec::<stud_rust_base::types::NodeId>::load_from(path.join("head"))?;
-    let travel_time = Vec::<stud_rust_base::types::Weight>::load_from(path.join("travel_time"))?;
+    let first_out = Vec::<rust_truck_router::types::EdgeId>::load_from(path.join("first_out"))?;
+    let head = Vec::<rust_truck_router::types::NodeId>::load_from(path.join("head"))?;
+    let travel_time = Vec::<rust_truck_router::types::Weight>::load_from(path.join("travel_time"))?;
 
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
     let pot = CHPotential::from_ch(ch);
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut search = TwoRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), pot);
+    let mut search = TwoRestrictionDijkstra::new_with_potential(&graph_mcd, pot);
     search
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
@@ -49,6 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         time = time.checked_add(Instant::now() - start).unwrap();
 
         results.push(CSPMeasurementResult {
+            graph_num_nodes: graph_mcd.num_nodes(),
+            graph_num_edges: graph_mcd.num_arcs(),
             num_queue_pushes: search.num_queue_pushes,
             num_settled: search.num_settled,
             num_labels_propagated: search.num_labels_propagated,
@@ -58,7 +60,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             path_distance: None,
             path_number_nodes: None,
             path_number_flagged_nodes: None,
-            path_number_pauses: None,
         });
     }
 

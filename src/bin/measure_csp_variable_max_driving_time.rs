@@ -1,9 +1,9 @@
 use rand::Rng;
-use stud_rust_base::{
-    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, mcd::*},
-    experiments::measurement::{CSPMeasurementResult, MeasurementResult},
+use rust_truck_router::{
+    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp::*},
+    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,
-    osm_id_mapper::OSMIDMapper,
+    // osm_id_mapper::OSMIDMapper,
     types::*,
 };
 
@@ -27,10 +27,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut search = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
+    let mut search = OneRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
     search.set_reset_flags(is_parking_node.to_bytes());
 
-    let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
+    // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
     // let s = 422258;
     // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
@@ -49,14 +49,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[derive(Debug, Clone, Copy)]
     struct LocalMeasurementResult {
         pub max_driving_time_ms: u32,
-        standard: CSPMeasurementResult,
+        standard: CSP1MeasurementResult,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
         const OWN_HEADER: &'static str = "max_driving_time_ms";
 
         fn get_header() -> String {
-            format!("{},{}", Self::OWN_HEADER, CSPMeasurementResult::get_header())
+            format!("{},{}", Self::OWN_HEADER, CSP1MeasurementResult::get_header())
         }
         fn as_csv(&self) -> String {
             format!("{},{}", self.max_driving_time_ms, self.standard.as_csv())
@@ -86,32 +86,40 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 results.push(LocalMeasurementResult {
                     max_driving_time_ms: current_max_distance,
-                    standard: CSPMeasurementResult {
-                        num_queue_pushes: search.num_queue_pushes,
-                        num_settled: search.num_settled,
-                        num_labels_propagated: search.num_labels_propagated,
-                        num_labels_reset: search.num_labels_reset,
-                        num_nodes_searched: search.get_number_of_visited_nodes(),
-                        time,
-                        path_distance: Some(dist),
-                        path_number_nodes: Some(path.0.len()),
-                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                    standard: CSP1MeasurementResult {
+                        standard: CSPMeasurementResult {
+                            graph_num_nodes: graph_mcd.num_nodes(),
+                            graph_num_edges: graph_mcd.num_arcs(),
+                            num_queue_pushes: search.num_queue_pushes,
+                            num_settled: search.num_settled,
+                            num_labels_propagated: search.num_labels_propagated,
+                            num_labels_reset: search.num_labels_reset,
+                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            time,
+                            path_distance: Some(dist),
+                            path_number_nodes: Some(path.0.len()),
+                            path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                        },
                         path_number_pauses: Some(number_pauses.len()),
                     },
                 });
             } else {
                 results.push(LocalMeasurementResult {
                     max_driving_time_ms: current_max_distance,
-                    standard: CSPMeasurementResult {
-                        num_queue_pushes: search.num_queue_pushes,
-                        num_settled: search.num_settled,
-                        num_labels_propagated: search.num_labels_propagated,
-                        num_labels_reset: search.num_labels_reset,
-                        num_nodes_searched: search.get_number_of_visited_nodes(),
-                        time,
-                        path_distance: None,
-                        path_number_nodes: None,
-                        path_number_flagged_nodes: None,
+                    standard: CSP1MeasurementResult {
+                        standard: CSPMeasurementResult {
+                            graph_num_nodes: graph_mcd.num_nodes(),
+                            graph_num_edges: graph_mcd.num_arcs(),
+                            num_queue_pushes: search.num_queue_pushes,
+                            num_settled: search.num_settled,
+                            num_labels_propagated: search.num_labels_propagated,
+                            num_labels_reset: search.num_labels_reset,
+                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            time,
+                            path_distance: None,
+                            path_number_nodes: None,
+                            path_number_flagged_nodes: None,
+                        },
                         path_number_pauses: None,
                     },
                 });

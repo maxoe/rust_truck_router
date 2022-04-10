@@ -293,6 +293,11 @@ impl<T: Ord> Heap<T> {
     pub fn popped(&self) -> &[T] {
         &self.data[self.split..]
     }
+
+    pub fn popped_sorted(&mut self) -> &[T] {
+        self.data[self.split..].sort_unstable();
+        &self.data[self.split..]
+    }
 }
 
 /// Hole represents a hole in a slice i.e., an index without valid value

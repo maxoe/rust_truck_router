@@ -1,5 +1,5 @@
-use stud_rust_base::{
-    algo::{dijkstra::Dijkstra, mcd::*},
+use rust_truck_router::{
+    algo::{csp::*, dijkstra::Dijkstra},
     io::*,
     types::*,
 };
@@ -22,14 +22,14 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
-    let mut instance = Dijkstra::new(graph.borrow());
+    let mut instance = Dijkstra::new(&graph);
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         let t = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         println!("Query #{} from {} to {} without constraints", i, s, t);
         instance.init_new_s(s);
-        let mut instance_mcd = OneRestrictionDijkstra::new(graph_mcd.borrow());
+        let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
         instance_mcd.init_new_s(s);
         instance_mcd.set_reset_flags(is_parking_node.to_bytes());
 

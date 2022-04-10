@@ -1,7 +1,7 @@
 [package]
-name = "stud-rust-base"
+name = "rust_truck_router"
 version = "0.1.0"
-authors = ["Tim Zeitz <tim.zeitz@kit.edu>"]
+authors = ["Max Oesterle <max_oesterle@web.de>", "Tim Zeitz <tim.zeitz@kit.edu>"]
 edition = "2021"
 
 [dependencies]
@@ -12,3 +12,8 @@ bit-vec = "0.6.3"
 
 [profile.dev]
 opt-level = 3
+
+[profile.release]
+lto = true
+debug = true
+codegen-units = 1

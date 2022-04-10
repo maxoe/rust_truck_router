@@ -1,5 +1,5 @@
-use stud_rust_base::{
-    algo::{ch::*, ch_potential::CHPotential, mcd_2::TwoRestrictionDijkstra},
+use rust_truck_router::{
+    algo::{ch::*, ch_potential::CHPotential, csp::OneRestrictionDijkstra},
     io::*,
     types::*,
 };
@@ -28,6 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
 
+    //let s = 9504444;
+    //let t = 3438839;
+
     // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
     // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
@@ -36,14 +39,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    // let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
-    // instance_mcd_acc
-    //     .set_reset_flags(is_parking_node.to_bytes())
-    //     .set_restriction(16_200_000, 1_950_000);
-    let mut instance_mcd_acc = TwoRestrictionDijkstra::new_with_potential(graph_mcd.borrow(), CHPotential::from_ch(ch));
+    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
     instance_mcd_acc
         .set_reset_flags(is_parking_node.to_bytes())
-        .set_restriction(32_400_000, 32_400_000, 16_200_000, 270_000);
+        .set_restriction(16_200_000, 2_700_000);
+    // let mut instance_mcd_acc = TwoRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
+    // instance_mcd_acc
+    //     .set_reset_flags(is_parking_node.to_bytes())
+    //     .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let timer = Instant::now();
     instance_mcd_acc.init_new_s(s);
@@ -74,14 +77,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude,osm_id,is_parking_used")?;
         let used_p = instance_mcd_acc.reset_nodes_on_path(&(p, _d));
-        for &node_id in used_p.0.iter() {
+        for &node_id in used_p.iter() {
             writeln!(
                 file,
                 "{},{},{},{}",
                 latitude[node_id as usize],
                 longitude[node_id as usize],
                 osm_node_id[node_id as usize],
-                used_p.0.contains(&node_id)
+                used_p.contains(&node_id)
             )?;
         }
 

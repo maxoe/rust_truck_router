@@ -15,10 +15,6 @@ pub const INFINITY: Weight = std::u32::MAX / 2;
 pub type Weight2 = [Weight; 2];
 pub type Weight3 = [Weight; 3];
 
-// pub trait Label: Ord + Zero + Add {
-//     fn link(&self, other: &Self) -> Self;
-// }
-
 pub trait DefaultReset: Clone {
     const DEFAULT: Self;
     fn reset(&mut self) {
@@ -49,6 +45,7 @@ pub trait WeightOps: Ord + Clone + Copy + std::fmt::Debug {
     fn zero() -> Self;
     fn infinity() -> Self;
     fn reset_distance(&mut self, i: usize, pause_time: Weight);
+    fn add(&self, other: Self) -> Self;
 }
 
 impl WeightOps for Weight {
@@ -59,7 +56,7 @@ impl WeightOps for Weight {
 
     #[inline(always)]
     fn link(&self, other: Weight) -> Self {
-        (self + other).min(INFINITY)
+        self + other
     }
 
     #[inline(always)]
@@ -73,10 +70,13 @@ impl WeightOps for Weight {
     }
 
     #[inline(always)]
-    fn reset_distance(&mut self, i: usize, _pause_time: Weight) {
-        if i == 0 {
-            *self = 0;
-        }
+    fn reset_distance(&mut self, _i: usize, _pause_time: Weight) {
+        ()
+    }
+
+    #[inline(always)]
+    fn add(&self, other: Self) -> Self {
+        self + other
     }
 }
 
@@ -88,7 +88,7 @@ impl WeightOps for Weight2 {
 
     #[inline(always)]
     fn link(&self, other: Weight) -> Self {
-        [(self[0] + other).min(INFINITY), (self[1] + other).min(INFINITY)]
+        [self[0] + other, self[1] + other]
     }
 
     #[inline(always)]
@@ -103,10 +103,15 @@ impl WeightOps for Weight2 {
 
     #[inline(always)]
     fn reset_distance(&mut self, i: usize, pause_time: Weight) {
-        if i < 2 {
+        if i == 1 {
             self[0] += pause_time;
             self[1] = 0;
         }
+    }
+
+    #[inline(always)]
+    fn add(&self, other: Self) -> Self {
+        [self[0] + other[0], self[1] + other[1]]
     }
 }
 
@@ -118,11 +123,7 @@ impl WeightOps for Weight3 {
 
     #[inline(always)]
     fn link(&self, other: Weight) -> Self {
-        [
-            (self[0] + other).min(INFINITY),
-            (self[1] + other).min(INFINITY),
-            (self[2] + other).min(INFINITY),
-        ]
+        [self[0] + other, self[1] + other, self[2] + other]
     }
 
     #[inline(always)]
@@ -146,8 +147,14 @@ impl WeightOps for Weight3 {
             self[2] = 0;
         }
     }
+
+    #[inline(always)]
+    fn add(&self, other: Self) -> Self {
+        [self[0] + other[0], self[1] + other[1], self[2] + other[2]]
+    }
 }
 
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub struct DrivingTimeRestriction {
     pub pause_time: Weight,
     pub max_driving_time: Weight,
@@ -188,7 +195,7 @@ pub trait OutgoingEdgeIterable: Graph {
 }
 
 pub type OwnedGraph = FirstOutGraph<Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
-pub type BorrowedGraph<'a> = FirstOutGraph<&'a [EdgeId], &'a [NodeId], &'a [Weight]>;
+pub type BorrowedGraph<'a> = &'a OwnedGraph;
 
 impl<FirstOutContainer, HeadContainer, WeightsContainer> FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
 where
@@ -206,16 +213,8 @@ where
     pub fn head(&self) -> &[NodeId] {
         self.head.as_ref()
     }
-    pub fn weights(&self) -> &[<FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> as Graph>::WeightType] {
+    pub fn weights(&self) -> &[Weight] {
         self.weights.as_ref()
-    }
-
-    pub fn borrow(&self) -> FirstOutGraph<&[EdgeId], &[NodeId], &[<FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> as Graph>::WeightType]> {
-        FirstOutGraph {
-            first_out: self.first_out(),
-            head: self.head(),
-            weights: self.weights(),
-        }
     }
 }
 

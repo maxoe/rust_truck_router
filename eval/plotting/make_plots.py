@@ -4,17 +4,6 @@ from cProfile import label, run
 from math import log2
 from multiprocessing.pool import RUN
 from os.path import join
-import numpy as np
-import pandas as pd
-
-import matplotlib.pyplot as plt
-from matplotlib import style
-import matplotlib.ticker as ticker
-import matplotlib.patches as mpatches
-import pandas as pd
-import numpy as np
-import math
-
 import subprocess
 import os
 import glob
@@ -26,6 +15,14 @@ import hashlib
 import argparse
 import time
 import argparse
+
+import matplotlib.pyplot as plt
+from matplotlib import style
+import matplotlib.ticker as ticker
+import matplotlib.patches as mpatches
+import pandas as pd
+import numpy as np
+import math
 
 from pandas.core.base import DataError
 
@@ -208,9 +205,12 @@ def exp2_ticks_from_exponent(exponent):
     return r"$2^{{ {:2d} }}$".format(exponent)
 
 
-def make_dijkstra_rank_tick_labels(ax_axis, series):
-    ax_axis.set_ticks(series + 1)
-    ax_axis.set_ticklabels([exp2_ticks_from_exponent(int(i)) for i in series])
+def make_dijkstra_rank_tick_labels_from_exponent(ax_axis, exponents):
+    ax_axis.set_ticklabels([exp2_ticks_from_exponent(int(i)) for i in exponents])
+
+
+def make_dijkstra_rank_tick_labels_from_number(ax_axis, exponents):
+    ax_axis.set_ticklabels([exp2_ticks(int(i)) for i in exponents])
 
 
 def get_boxplot_outliers(df, by_column_name):
@@ -223,170 +223,6 @@ def get_boxplot_outliers(df, by_column_name):
     return df.loc[filter]
 
 
-def plot_variable_max_driving_time():
-    run_measurement_conditionally(
-        "measure_csp_variable_max_driving_time", "parking_ger_hgv"
-    )
-
-    run_measurement_conditionally(
-        "measure_csp_variable_max_driving_time", "parking_ger"
-    )
-
-    csp_parking_hgv = (
-        read_measurement("measure_csp_variable_max_driving_time-parking_ger_hgv")
-        .set_index("max_driving_time_ms")
-        .fillna(-1)
-    )
-
-    csp_parking = (
-        read_measurement("measure_csp_variable_max_driving_time-parking_ger")
-        .set_index("max_driving_time_ms")
-        .fillna(-1)
-    )
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking_hgv[["path_number_flagged_nodes", "time_ms"]].boxplot(
-        by="path_number_flagged_nodes", ax=ax
-    )
-    ax.set_yscale("log")
-    ax.set_xlabel("number of parkings on path (-1: no path)")
-    ax.set_ylabel("time [ms]")
-
-    # reduce tick labels
-    every_nth = 4
-    for n, label in enumerate(ax.xaxis.get_ticklabels()):
-        if n % every_nth != 0:
-            label.set_visible(False)
-
-    write_plt()
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_number_parkings.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking_hgv[["path_number_pauses", "time_ms"]].boxplot(
-        by="path_number_pauses", ax=ax
-    )
-    ax.set_yscale("log")
-    ax.set_xlabel("number of breaks (-1: no path)")
-    ax.set_ylabel("time [ms]")
-
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_number_breaks.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking[["path_number_pauses", "time_ms"]].boxplot(
-        by="path_number_pauses", ax=ax
-    )
-    ax.set_yscale("log")
-    ax.set_xlabel("number of breaks (-1: no path)")
-    ax.set_ylabel("time [ms]")
-
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_number_breaks_all_parkings.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking_hgv[["path_number_pauses", "num_nodes_searched"]].boxplot(
-        by="path_number_pauses", ax=ax
-    )
-    ax.set_yscale("log")
-    ax.set_xlabel("number of breaks (-1: no path)")
-    ax.set_ylabel("#nodes visited")
-
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_number_breaks_search_space.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking_hgv[["num_labels_reset", "time_ms"]].boxplot(
-        by="num_labels_reset", ax=ax
-    )
-    ax.set_yscale("log")
-    ax.set_xlabel("number of labels which were reset")
-    ax.set_ylabel("time [ms]")
-
-    # reduce tick labels
-    every_nth = 50
-    for n, label in enumerate(ax.xaxis.get_ticklabels()):
-        if n % every_nth != 0:
-            label.set_visible(False)
-
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_number_labels_reset.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-
-def plot_variable_pause_time():
-    run_measurement_conditionally("measure_csp_variable_pause_time", "parking_ger_hgv")
-
-    csp_parking = read_measurement(
-        "measure_csp_variable_pause_time-parking_ger_hgv"
-    ).fillna(-1)
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking.set_index("pause_duration_ms")["time_ms"].plot(ax=ax)
-    ax.set_yscale("log")
-    ax.set_xlabel("pause duration [ms]")
-    ax.set_ylabel("time [ms]")
-
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_pause_duration.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking.set_index("pause_duration_ms")["num_labels_propagated"].plot(ax=ax)
-    ax.set_yscale("log")
-    ax.set_xlabel("pause duration [ms]")
-    ax.set_ylabel("labels propagated")
-
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_pause_duration_labels_propagated.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_parking.set_index("pause_duration_ms")["num_nodes_searched"].plot(ax=ax)
-    ax.set_yscale("log")
-    ax.set_xlabel("pause duration [ms]")
-    ax.set_ylabel("nodes searched")
-
-    plt.savefig(
-        os.path.join(OUTPUT_PATH, "variable_pause_duration_nodes_searched.png"),
-        dpi=1200,
-    )
-    plt.close()
-
-
-def plot_1000_csp_queries(graph):
-    run_measurement_conditionally("measure_csp_1000_queries", graph)
-
-    csp_1000_queries = read_measurement("measure_csp_1000_queries-" + graph).fillna(-1)
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_1000_queries[["path_number_pauses", "time_ms"]].boxplot(
-        by="path_number_pauses", ax=ax
-    )
-
-    ax.set_xlabel("number of pauses on path (-1: no path)")
-    ax.set_ylabel("time [ms]")
-
-    write_plt("1000_queries_csp.png", graph)
-
-
 def plot_rank_times(name, graph):
     run_measurement_conditionally(name, graph)
 
@@ -394,11 +230,63 @@ def plot_rank_times(name, graph):
         name + "-" + graph,
     )
 
+    # plot only 2^10 and larger
+    csp_1000_queries = csp_1000_queries.loc[
+        csp_1000_queries["dijkstra_rank_exponent"] >= 10
+    ]
+
     colors = ggPlotColors(4)
 
-    # 1 plot with number of breaks
+    to_plot = [
+        ("time_ms", "log"),
+    ]
+    # csp_1000_queries = csp_1000_queries.loc[csp_1000_queries["path_distance"] == -1]
+    for (column_name, plot_scale) in to_plot:
+        if column_name in csp_1000_queries.columns:
+            fig, ax = plt.subplots(figsize=(10, 5))
+            bp = csp_1000_queries.boxplot(
+                ax=ax, by="dijkstra_rank_exponent", column=column_name
+            )
+
+            bp.get_figure().gca().set_title("")
+            fig.suptitle("")
+
+            ax.set_xlabel("dijkstra rank")
+            ax.set_ylabel(column_name)
+            ax.set_yscale(plot_scale)
+
+            if plot_scale == "linear":
+                ax.set_ylim(bottom=-0.1)
+                ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+
+            make_dijkstra_rank_tick_labels_from_exponent(
+                ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
+            )
+
+            plt.title(name + ": " + graph)
+            fig.tight_layout()
+
+            write_plt(name + "-" + column_name + ".png", graph)
+
+
+def plot_rank_times_from_simple_meaurement(name, graph):
+    run_measurement_conditionally(name, graph)
+
+    csp_1000_queries = read_measurement(
+        name + "-" + graph,
+    )
+
+    # plot only 2^10 and larger
+    csp_1000_queries = csp_1000_queries.loc[
+        :, csp_1000_queries.columns.astype(int) >= 2 ** 10
+    ]
+
+    colors = ggPlotColors(4)
+
     fig, ax = plt.subplots(figsize=(10, 5))
-    bp = csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
+    bp = csp_1000_queries.boxplot(
+        ax=ax,
+    )
 
     bp.get_figure().gca().set_title("")
     fig.suptitle("")
@@ -407,114 +295,14 @@ def plot_rank_times(name, graph):
     ax.set_ylabel("query time [ms]")
     ax.set_yscale("log")
 
-    make_dijkstra_rank_tick_labels(
-        ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
+    make_dijkstra_rank_tick_labels_from_number(
+        ax.xaxis, csp_1000_queries.columns.astype(int).unique()
     )
 
-    ax2 = ax.twinx()
+    plt.title(name + ": " + graph)
+    fig.tight_layout()
 
-    # DIRTY HACK BUT SOMEWHERE IT IS SHIFTED AGAINST EACH OTHER
-    csp_1000_queries["dijkstra_rank_exponent"] = (
-        csp_1000_queries["dijkstra_rank_exponent"] + 1
-    )
-
-    if "path_number_pauses" in csp_1000_queries.columns:
-        csp_1000_queries.groupby("dijkstra_rank_exponent")[
-            "path_number_pauses"
-        ].mean().plot(
-            ax=ax2,
-            color=colors[1],
-            style=".-",
-            x=csp_1000_queries["dijkstra_rank_exponent"] + 1,
-        )
-
-        patch1 = mpatches.Patch(color=colors[0], label="query time")
-        patch2 = mpatches.Patch(color=colors[1], label="mean #breaks")
-        ax2.legend(handles=[patch1, patch2], loc=0)
-
-    else:
-        gb = csp_1000_queries.groupby("dijkstra_rank_exponent").mean()
-
-        gb["path_number_short_pauses"].plot(
-            ax=ax2,
-            color=colors[1],
-            style=".-",
-        )
-        gb["path_number_long_pauses"].plot(ax=ax2, color=colors[2], style=".-")
-
-        patch1 = mpatches.Patch(color=colors[0], label="query time")
-        patch2 = mpatches.Patch(color=colors[1], label="mean #short breaks")
-        patch3 = mpatches.Patch(color=colors[2], label="mean #long breaks")
-        ax2.legend(handles=[patch1, patch2, patch3], loc=0)
-
-    ax2.set_ylim(bottom=0)
-    ax2.set_ylabel("#")
-    ax2.grid(False)
-    ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-    plt.title("1000 queries on " + graph)
-
-    write_plt(name + "_breaks" + ".png", graph)
-
-    # 2 plot with number of reset labels
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    # REVERSE DIRTY HACK
-    csp_1000_queries["dijkstra_rank_exponent"] = (
-        csp_1000_queries["dijkstra_rank_exponent"] - 1
-    )
-
-    bp = csp_1000_queries.boxplot(ax=ax, by="dijkstra_rank_exponent", column="time_ms")
-
-    bp.get_figure().gca().set_title("")
-    fig.suptitle("")
-
-    ax.set_xlabel("dijkstra rank")
-    ax.set_ylabel("query time [ms]")
-    ax.set_yscale("log")
-
-    make_dijkstra_rank_tick_labels(
-        ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
-    )
-
-    ax2 = ax.twinx()
-
-    # DIRTY HACK AGAIN
-    csp_1000_queries["dijkstra_rank_exponent"] = (
-        csp_1000_queries["dijkstra_rank_exponent"] + 1
-    )
-
-    gb = csp_1000_queries.groupby("dijkstra_rank_exponent").mean()
-    gb["num_labels_reset"].plot(ax=ax2, color=colors[3], style=".-")
-
-    patch1 = mpatches.Patch(color=colors[0], label="query time")
-    patch2 = mpatches.Patch(color=colors[3], label="mean #labels reset during search")
-    ax2.legend(handles=[patch1, patch2], loc=0)
-
-    ax2.set_ylim(bottom=0)
-    ax2.set_ylabel("#")
-    ax2.grid(False)
-    ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-    plt.title("1000 queries on " + graph)
-
-    write_plt(name + "_labels_reset" + ".png", graph)
-
-
-def plot_1000_csp_2_queries(graph):
-    run_measurement_conditionally("measure_csp_2_1000_queries", graph)
-
-    csp_1000_queries = read_measurement("measure_csp_2_1000_queries-" + graph).fillna(
-        -1
-    )
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    csp_1000_queries[["path_number_pauses", "time_ms"]].boxplot(
-        by="path_number_pauses", ax=ax
-    )
-
-    ax.set_xlabel("number of pauses on path (-1: no path)")
-    ax.set_ylabel("time [ms]")
-
-    write_plt("1000_queries_csp_2.png", graph)
+    write_plt(name + "-time_ms.png", graph)
 
 
 if __name__ == "__main__":
@@ -543,15 +331,27 @@ if __name__ == "__main__":
 
     RUN_ALL_MEASUREMENTS = args.force
     PROHIBIT_MEASUREMENTS = args.plot
-    # plot_variable_max_driving_time()
-    # plot_variable_pause_time()
-    # plot_1000_csp_queries(args.graph)
-    # plot_1000_csp_2_queries(args.graph)
 
     if RUN_ALL_MEASUREMENTS and PROHIBIT_MEASUREMENTS:
         print("Cannot force and prohibit measurements and the same time")
         exit(0)
 
     for g in args.graph:
-        plot_rank_times("measure_csp_1000_queries_rank_times", g)
-        plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
+        # plot_rank_times("measure_csp_1000_queries_rank_times", g)
+        # plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
+        # plot_rank_times_from_simple_meaurement(
+        #     "measure_core_ch_csp_1000_queries_rank_times", g
+        # )
+        # plot_rank_times_from_simple_meaurement(
+        #     "measure_core_ch_csp_2_1000_queries_rank_times", g
+        # )
+
+        plot_rank_times_from_simple_meaurement(
+            "measure_chpot_core_ch_csp_1000_queries_rank_times", g
+        )
+        plot_rank_times_from_simple_meaurement(
+            "measure_chpot_core_ch_csp_2_1000_queries_rank_times", g
+        )
+
+        # plot_rank_times("measure_chpot_core_ch_csp_1000_queries", g)
+        # plot_rank_times("measure_chpot_core_ch_csp_2_1000_queries", g)

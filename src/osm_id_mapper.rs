@@ -4,7 +4,7 @@
 //!
 //! ```
 //! use bit_vec::BitVec;
-//! use stud_rust_base::osm_id_mapper::*;
+//! use rust_truck_router::osm_id_mapper::*;
 //!
 //! let bv = BitVec::from_fn(5, |i| i == 1 || i == 2 || i == 4);
 //!

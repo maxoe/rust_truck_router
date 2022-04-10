@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```no_run
-//! # use stud_rust_base::io::*;
+//! # use rust_truck_router::io::*;
 //!
 //! let head = Vec::<u32>::load_from("head_file_name")?;
 //! let lat = Vec::<f32>::load_from("node_latitude_file_name")?;
