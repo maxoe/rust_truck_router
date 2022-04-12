@@ -8,7 +8,7 @@ use std::{
 use crate::{
     algo::astar::{NoPotential, Potential},
     index_heap::*,
-    rrr_heap::Heap,
+    rrr_indexed_heap::AutoIndexedHeap,
     timestamped_vector::TimestampedVector,
     types::*,
 };
@@ -20,11 +20,12 @@ pub struct Label<T> {
     pub distance: T,
     pub prev_node: NodeId,
     pub incoming_edge_weight: Weight,
+    pub prev_label: Option<usize>,
 }
 
-type MCDHeap<L> = Heap<Reverse<Label<L>>>;
+type MCDHeap<L> = AutoIndexedHeap<Reverse<Label<L>>>;
 
-impl<L: Clone> DefaultReset for MCDHeap<L> {
+impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap<L> {
     const DEFAULT: MCDHeap<L> = MCDHeap::<L>::new();
 }
 pub struct MultiCriteriaDijkstraData<L: WeightOps> {
@@ -140,6 +141,7 @@ where
                 prev_node: self.graph.num_nodes() as NodeId,
                 distance: [0, 0, 0],
                 incoming_edge_weight: Weight::infinity(),
+                prev_label: None,
             }));
         }
     }
@@ -214,7 +216,7 @@ where
 
         //get best settled or unsettled label
         //max because the type is Reverse<Label<..>>
-        let best_settled_at_t = self.data.per_node_labels.get(t as usize).popped().iter().max();
+        let best_settled_at_t = self.data.per_node_labels.get(t as usize).popped().max();
         let best_unsettled_at_t = self.data.per_node_labels.get(t as usize).iter().max();
 
         let best_label_at_t = match (best_settled_at_t, best_unsettled_at_t) {
@@ -238,30 +240,18 @@ where
             }
 
             while next_node != self.data.invalid_node_id {
-                // search label in current_node's label set which matches distance
-                'outer: for next_label in self.data.per_node_labels.get(next_node as usize).popped() {
-                    let mut dist_candidates = [next_label.0.distance.link(current_label.0.incoming_edge_weight); 3];
+                current_label = self
+                    .data
+                    .per_node_labels
+                    .get(next_node as usize)
+                    .get_key_by_index(current_label.0.prev_label.unwrap())
+                    .unwrap(); //next_label;
+                current_node = next_node;
+                next_node = current_label.0.prev_node;
 
-                    if self.reset_flags.get(current_node as usize).unwrap() {
-                        dist_candidates[1].reset_distance(1, self.restriction_short.pause_time);
-
-                        dist_candidates[2].reset_distance(1, self.restriction_short.pause_time);
-                        dist_candidates[2].reset_distance(2, self.restriction_long.pause_time);
-                    };
-
-                    for candidate in dist_candidates {
-                        if candidate == current_label.0.distance {
-                            current_label = next_label;
-                            current_node = next_node;
-                            next_node = current_label.0.prev_node;
-
-                            path.push(current_node);
-                            if with_distances {
-                                distances.push(current_label.0.distance);
-                            }
-                            break 'outer;
-                        }
-                    }
+                path.push(current_node);
+                if with_distances {
+                    distances.push(current_label.0.distance);
                 }
             }
 
@@ -360,7 +350,7 @@ where
         self.reset();
     }
 
-    pub fn get_settled_labels_at(&mut self, node: NodeId) -> &[Reverse<Label<Weight3>>] {
+    pub fn get_settled_labels_at(&mut self, node: NodeId) -> impl DoubleEndedIterator<Item = &Reverse<Label<Weight3>>> + '_ {
         self.data.per_node_labels.get_mut(node as usize).popped_sorted()
     }
 
@@ -408,6 +398,7 @@ where
                 self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
             }
 
+            let label_index = self.data.per_node_labels.get_mut(node_id as usize).peek_index().unwrap();
             let label = self.data.per_node_labels.get_mut(node_id as usize).pop().unwrap();
             let tentative_dist_without_pot = label.0.distance;
 
@@ -456,6 +447,7 @@ where
                         neighbor_label_set.push(Reverse(Label {
                             distance: current_new_dist,
                             prev_node: node_id,
+                            prev_label: Some(label_index),
                             incoming_edge_weight: edge_weight,
                         }));
 
@@ -535,7 +527,8 @@ where
                 self.last_distance = self.data.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
             }
 
-            while let Some(label) = self.data.per_node_labels.get_mut(node_id as usize).pop() {
+            while let Some(label_index) = self.data.per_node_labels.get_mut(node_id as usize).peek_index() {
+                let label = self.data.per_node_labels.get_mut(node_id as usize).pop().unwrap();
                 let tentative_dist_without_pot = label.0.distance;
 
                 // with hopping reduction
@@ -575,6 +568,7 @@ where
                                 neighbor_label_set.push(Reverse(Label {
                                     distance: current_new_dist,
                                     prev_node: node_id,
+                                    prev_label: Some(label_index),
                                     incoming_edge_weight: edge_weight,
                                 }));
 
@@ -683,7 +677,7 @@ where
         for i in 0..self.data.per_node_labels.len() {
             let label = self.data.per_node_labels.get(i);
             let number_of_unsettled = label.iter().count();
-            let number_of_settled = label.popped().len();
+            let number_of_settled = label.popped().count();
 
             if number_of_settled != 0 {
                 label_sizes.push(number_of_unsettled + number_of_settled);
@@ -728,14 +722,14 @@ where
         (0..self.data.per_node_labels.len())
             .map(|i| {
                 let h = self.data.per_node_labels.get(i);
-                h.iter().count() + h.popped().len()
+                h.iter().count() + h.popped().count()
             })
             .collect()
     }
 
     pub fn get_number_of_visited_nodes(&self) -> usize {
         (0..self.data.per_node_labels.len())
-            .filter(|i| self.data.per_node_labels.get(*i).popped().len() != 0)
+            .filter(|i| self.data.per_node_labels.get(*i).popped().count() != 0)
             .count()
     }
 }

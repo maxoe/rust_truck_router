@@ -160,15 +160,12 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
         let s_to_v = self.fw_search.get_settled_labels_at(node);
         let v_to_t = self.bw_search.get_settled_labels_at(node);
 
-        assert!(s_to_v.is_sorted());
-        assert!(v_to_t.is_sorted());
+        let mut current_fw = s_to_v.rev().map(|r| r.0).peekable();
+        let mut current_bw = v_to_t.rev().map(|r| r.0).peekable();
 
-        if s_to_v.is_empty() || v_to_t.is_empty() {
+        if current_fw.peek().is_none() || current_bw.peek().is_none() {
             return Weight::infinity();
         }
-
-        let mut current_fw = s_to_v.into_iter().rev().map(|r| r.0).peekable();
-        let mut current_bw = v_to_t.into_iter().rev().map(|r| r.0).peekable();
 
         while let (Some(fw_label), Some(bw_label)) = (current_fw.peek(), current_bw.peek()) {
             let total_dist = fw_label.distance.add(bw_label.distance);
