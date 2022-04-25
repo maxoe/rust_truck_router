@@ -26,19 +26,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut search = OneRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
-    search.set_reset_flags(is_parking_node.to_bytes());
+    let graph = OwnedGraph::new(first_out, head, travel_time);
+    let mut search_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let search = OneRestrictionDijkstra::new(graph.borrow());
+    search_state.set_reset_flags(is_parking_node.to_bytes());
 
     // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
     // let s = 422258;
     // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
-    let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
-    search.init_new_s(s);
+    let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
+    search_state.init_new_s(s);
     // let t = 4548361;
     // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
-    let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
+    let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
     let n = 1;
     let max_driving_dist_step = 10000;
@@ -70,31 +71,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     for (i, current_max_distance) in it.enumerate() {
         for j in 0..n {
             println!("Query {}/{}", i * n + j + 1, number_of_steps);
-            search.set_restriction(current_max_distance, pause_duration);
-            search.reset();
+            search_state.set_restriction(current_max_distance, pause_duration);
+            search_state.reset();
 
             let start = Instant::now();
-            let result = search.dist_query(t);
+            let result = search.dist_query(&mut search_state, t);
             let time = start.elapsed();
 
             // println!("{}", search.info());
 
             if let Some(dist) = result {
-                let path = search.current_best_path_to(t, true).unwrap();
-                let number_flagged_nodes = search.flagged_nodes_on_path(&path);
-                let number_pauses = search.reset_nodes_on_path(&path);
+                let path = search_state.current_best_path_to(t, true).unwrap();
+                let number_flagged_nodes = search_state.flagged_nodes_on_path(&path);
+                let number_pauses = search_state.reset_nodes_on_path(&path);
 
                 results.push(LocalMeasurementResult {
                     max_driving_time_ms: current_max_distance,
                     standard: CSP1MeasurementResult {
                         standard: CSPMeasurementResult {
-                            graph_num_nodes: graph_mcd.num_nodes(),
-                            graph_num_edges: graph_mcd.num_arcs(),
-                            num_queue_pushes: search.num_queue_pushes,
-                            num_settled: search.num_settled,
-                            num_labels_propagated: search.num_labels_propagated,
-                            num_labels_reset: search.num_labels_reset,
-                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            graph_num_nodes: graph.num_nodes(),
+                            graph_num_edges: graph.num_arcs(),
+                            num_queue_pushes: search_state.num_queue_pushes,
+                            num_settled: search_state.num_settled,
+                            num_labels_propagated: search_state.num_labels_propagated,
+                            num_labels_reset: search_state.num_labels_reset,
+                            num_nodes_searched: search_state.get_number_of_visited_nodes(),
                             time,
                             path_distance: Some(dist),
                             path_number_nodes: Some(path.0.len()),
@@ -108,13 +109,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     max_driving_time_ms: current_max_distance,
                     standard: CSP1MeasurementResult {
                         standard: CSPMeasurementResult {
-                            graph_num_nodes: graph_mcd.num_nodes(),
-                            graph_num_edges: graph_mcd.num_arcs(),
-                            num_queue_pushes: search.num_queue_pushes,
-                            num_settled: search.num_settled,
-                            num_labels_propagated: search.num_labels_propagated,
-                            num_labels_reset: search.num_labels_reset,
-                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            graph_num_nodes: graph.num_nodes(),
+                            graph_num_edges: graph.num_arcs(),
+                            num_queue_pushes: search_state.num_queue_pushes,
+                            num_settled: search_state.num_settled,
+                            num_labels_propagated: search_state.num_labels_propagated,
+                            num_labels_reset: search_state.num_labels_reset,
+                            num_nodes_searched: search_state.get_number_of_visited_nodes(),
                             time,
                             path_distance: None,
                             path_number_nodes: None,

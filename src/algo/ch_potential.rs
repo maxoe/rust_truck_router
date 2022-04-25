@@ -1,63 +1,53 @@
 use crate::{
-    algo::{astar::Potential, ch::ContractionHierarchy},
+    algo::astar::Potential,
     timestamped_vector::TimestampedVector,
-    types::{Graph, NodeId, OutgoingEdgeIterable, OwnedGraph, Weight, WeightOps},
+    types::{Graph, NodeId, OutgoingEdgeIterable, Weight, WeightOps},
 };
 
-use super::dijkstra::OwnedDijkstra;
+use super::{
+    ch::BorrowedContractionHierarchy,
+    dijkstra::{Dijkstra, DijkstraData},
+};
 
-#[derive(Clone)]
-pub struct CHPotential {
+pub struct CHPotential<'a> {
     potentials: TimestampedVector<Option<Weight>>,
-    fw_graph: OwnedGraph,
-    init_dijkstra: OwnedDijkstra,
-    rank: Vec<u32>,
+    ch: BorrowedContractionHierarchy<'a>,
+    init_dijkstra_state: DijkstraData,
     node_mapping: Option<Vec<NodeId>>,
     t: NodeId,
 }
 
-impl CHPotential {
-    pub fn new(fw_graph: OwnedGraph, bw_graph: OwnedGraph, rank: Vec<u32>) -> Self {
-        let n = fw_graph.num_nodes();
+impl<'a> CHPotential<'a> {
+    pub fn from_ch(ch: BorrowedContractionHierarchy<'a>) -> Self {
+        let n = ch.forward().num_nodes();
         Self {
             potentials: TimestampedVector::with_size(n),
-            fw_graph,
-            rank,
-            init_dijkstra: OwnedDijkstra::new(bw_graph),
+            ch,
+            init_dijkstra_state: DijkstraData::new(n),
             t: n as NodeId,
             node_mapping: None,
         }
     }
 
-    pub fn new_with_node_mapping(fw_graph: OwnedGraph, bw_graph: OwnedGraph, rank: Vec<u32>, node_mapping: Vec<NodeId>) -> Self {
-        let n = fw_graph.num_nodes();
-
+    pub fn from_ch_with_node_mapping(ch: BorrowedContractionHierarchy<'a>, node_mapping: Vec<NodeId>) -> Self {
+        let n = ch.forward().num_nodes();
         Self {
             potentials: TimestampedVector::with_size(n),
-            fw_graph,
-            rank,
-            init_dijkstra: OwnedDijkstra::new(bw_graph),
+            ch,
+            init_dijkstra_state: DijkstraData::new(n),
             t: n as NodeId,
             node_mapping: Some(node_mapping),
         }
     }
 
-    pub fn from_ch(ch: ContractionHierarchy) -> Self {
-        Self::new(ch.fw_search.graph, ch.bw_search.graph, ch.rank)
-    }
-
-    pub fn from_ch_with_node_mapping(ch: ContractionHierarchy, node_mapping: Vec<NodeId>) -> Self {
-        Self::new_with_node_mapping(ch.fw_search.graph, ch.bw_search.graph, ch.rank, node_mapping)
-    }
-
-    pub fn from_ch_with_node_mapping_backwards(ch: ContractionHierarchy, node_mapping: Vec<NodeId>) -> Self {
-        Self::new_with_node_mapping(ch.bw_search.graph, ch.fw_search.graph, ch.rank, node_mapping)
+    pub fn from_ch_with_node_mapping_backwards(ch: BorrowedContractionHierarchy<'a>, node_mapping: Vec<NodeId>) -> Self {
+        Self::from_ch_with_node_mapping(ch.inverted(), node_mapping)
     }
 
     pub fn reset(&mut self) {
         self.potentials.reset();
-        self.init_dijkstra.init_new_s(self.t);
-        self.init_dijkstra.to_all();
+        self.init_dijkstra_state.init_new_s(self.t);
+        Dijkstra::new(self.ch.backward()).to_all(&mut self.init_dijkstra_state);
     }
 
     pub fn set_node_mapping(&mut self, node_mapping: Vec<NodeId>) {
@@ -78,15 +68,15 @@ impl CHPotential {
     }
 }
 
-impl Potential<Weight> for CHPotential {
+impl<'a> Potential for CHPotential<'a> {
     fn init_new_t(&mut self, ext_t: NodeId) {
-        self.t = self.rank[self.map_node(ext_t) as usize];
+        self.t = self.ch.rank()[self.map_node(ext_t) as usize];
 
         self.reset();
     }
 
     fn potential(&mut self, ext_n: NodeId) -> Weight {
-        let n = self.rank[self.map_node(ext_n) as usize];
+        let n = self.ch.rank()[self.map_node(ext_n) as usize];
 
         if let Some(p) = self.potentials.get(n as usize) {
             *p
@@ -99,9 +89,9 @@ impl Potential<Weight> for CHPotential {
                     continue;
                 }
 
-                let mut current_to_t_up_dist = self.init_dijkstra.tentative_distance_at(current_node);
+                let mut current_to_t_up_dist = self.init_dijkstra_state.tentative_distance_at(current_node);
                 let mut neighbors_complete = true;
-                for (&edge_weight, &neighbor_node) in self.fw_graph.outgoing_edge_iter(current_node) {
+                for (&edge_weight, &neighbor_node) in self.ch.forward().outgoing_edge_iter(current_node) {
                     if let Some(p) = self.potentials.get(neighbor_node as usize) {
                         current_to_t_up_dist = current_to_t_up_dist.min(p.link(edge_weight));
                     } else {

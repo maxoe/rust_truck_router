@@ -1,5 +1,11 @@
 use rust_truck_router::{
-    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra, csp_2_core_ch_chpot::CSP2AstarCoreContractionHierarchy},
+    algo::{
+        ch::ContractionHierarchy,
+        ch_potential::CHPotential,
+        core_ch::CoreContractionHierarchy,
+        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
+        csp_2_core_ch_chpot::CSP2AstarCoreCHQuery,
+    },
     io::*,
     types::*,
 };
@@ -28,17 +34,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // let mut core_ch = CSPAstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     // core_ch.set_restriction(16_200_000, 2_700_000);
-    let mut core_ch = CSP2AstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
-    core_ch.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
-    core_ch.check();
+    let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let mut core_ch_query = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
+    core_ch_query.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    core_ch_query.check();
 
     let mut time = Instant::now();
-    core_ch.init_new_s(s);
-    core_ch.init_new_t(t);
+    core_ch_query.init_new_s(s);
+    core_ch_query.init_new_t(t);
     println!("Core ch init s and t took {} ms", time.elapsed().as_secs_f64() * 1000.0);
 
     time = Instant::now();
-    let dist = core_ch.run_query();
+    let dist = core_ch_query.run_query();
 
     println!("Took {} ms", time.elapsed().as_secs_f64() * 1000.0);
 
@@ -60,21 +68,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     print!("Validating result using constrained dijkstra");
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
-    let mut csp_pot = TwoRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
-    csp_pot.init_new_s(s);
-    csp_pot
+    let mut csp_pot_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let csp_pot = TwoRestrictionDijkstra::new(graph.borrow());
+    csp_pot_state.init_new_s(s);
+    csp_pot_state
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000); //.set_restriction(16_200_000, 2_700_000);
-    let csp_pot_dist = csp_pot.dist_query(t);
+    let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
-    let csp_pot_num_breaks = if let Some(path) = csp_pot.current_best_path_to(t, true) {
-        Some(csp_pot.reset_nodes_on_path(&path).0.len())
+    let csp_pot_num_breaks = if let Some(path) = csp_pot_state.current_best_path_to(t, true) {
+        Some(csp_pot_state.reset_nodes_on_path(&path).0.len())
     } else {
         None
     };
     assert_eq!(dist, csp_pot_dist);
     assert!(dist == csp_pot_dist || (csp_pot_num_breaks.is_some() && csp_pot_num_breaks.unwrap() > 1));
-    assert_eq!(dist, core_ch.last_dist);
+    assert_eq!(dist, core_ch_query.last_dist);
 
     println!(" - Done");
 

@@ -1,74 +1,15 @@
 use rand::{Rng, SeedableRng};
 use rust_truck_router::{
-    algo::{csp_2::TwoRestrictionDijkstra, csp_2_core_ch::CSP2CoreContractionHierarchy},
+    algo::{
+        core_ch::CoreContractionHierarchy,
+        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
+        csp_2_core_ch::CSP2CoreCHQuery,
+    },
     io::{load_routingkit_bitvector, Load},
     types::{EdgeId, Graph, NodeId, OwnedGraph, Weight},
 };
 use std::{error::Error, path::Path};
 
-// #[test]
-// fn test_instance_queries() -> Result<(), Box<dyn Error>> {
-//     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/core_instance"));
-//     let graph = OwnedGraph::load_from_routingkit_dir(path.clone())?;
-//     let mut core_ch = CSP2CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
-//     core_ch.check();
-
-//     let mut csp_pot = OneRestrictionDijkstra::new(&graph);
-//     csp_pot.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes());
-
-//     let max_restriction = 10;
-//     let pause_time = 5;
-
-//     for (s, t) in (0..5).zip(0..5) {
-//         for max_driving_time in 1..(max_restriction + 1) {
-//             // println!("Testing {} -> {}; max_driving_time: {}", s, t, max_driving_time);
-//             core_ch.init_new_s(s);
-//             core_ch.init_new_t(t);
-//             core_ch.set_restriction(max_driving_time, pause_time);
-//             let dist = core_ch.run_query();
-
-//             csp_pot.init_new_s(s);
-//             csp_pot.set_restriction(max_driving_time, pause_time);
-//             let csp_pot_dist = csp_pot.dist_query(t);
-
-//             assert_eq!(dist, csp_pot_dist);
-//         }
-//     }
-
-//     Ok(())
-// }
-
-// #[test]
-// fn test_needs_two_breaks_instance() -> Result<(), Box<dyn Error>> {
-//     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/core_instance_2"));
-//     let graph = OwnedGraph::load_from_routingkit_dir(path.clone())?;
-//     let mut core_ch = CSP2CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
-//     core_ch.check();
-
-//     let mut csp_pot = OneRestrictionDijkstra::new(&graph);
-//     csp_pot.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes());
-
-//     let max_restriction = 10;
-//     let pause_time = 5;
-
-//     for (s, t) in (0..5).zip(0..5) {
-//         for max_driving_time in 1..(max_restriction + 1) {
-//             // println!("Testing {} -> {}; max_driving_time: {}", s, t, max_driving_time);
-//             core_ch.init_new_s(s);
-//             core_ch.init_new_t(t);
-//             core_ch.set_restriction(max_driving_time, pause_time);
-//             let dist = core_ch.run_query();
-
-//             csp_pot.init_new_s(s);
-//             csp_pot.set_restriction(max_driving_time, pause_time);
-//             let csp_pot_dist = csp_pot.dist_query(t);
-
-//             assert_eq!(dist, csp_pot_dist);
-//         }
-//     }
-
-//     Ok(())
-// }
 #[test]
 #[ignore]
 fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
@@ -89,12 +30,14 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
-    let mut core_ch = CSP2CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut core_ch = CSP2CoreCHQuery::new(core_ch.borrow());
     core_ch.check();
     core_ch.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
-    let mut csp_pot = TwoRestrictionDijkstra::new(&graph);
-    csp_pot
+    let mut csp_pot_state = TwoRestrictionDijkstraData::new(graph.num_nodes());
+    let csp_pot = TwoRestrictionDijkstra::new(graph.borrow());
+    csp_pot_state
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
@@ -106,8 +49,8 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
         core_ch.init_new_t(t);
         let dist = core_ch.run_query();
 
-        csp_pot.init_new_s(s);
-        let csp_pot_dist = csp_pot.dist_query(t);
+        csp_pot_state.init_new_s(s);
+        let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
         assert_eq!(dist, csp_pot_dist);
     }

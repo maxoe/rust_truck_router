@@ -1,14 +1,16 @@
-use crate::{io::Load, types::*};
+use crate::types::*;
 use bit_vec::BitVec;
-use std::{path::Path, time::Instant};
+use std::time::Instant;
 
-use super::csp_2::TwoRestrictionDijkstra;
+use super::{
+    core_ch::BorrowedCoreContractionHierarchy,
+    csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
+};
 
-pub struct CSP2CoreContractionHierarchy<'a> {
-    pub rank: Vec<u32>,
-    pub is_core: BitVec,
-    pub fw_search: TwoRestrictionDijkstra<'a>,
-    pub bw_search: TwoRestrictionDijkstra<'a>,
+pub struct CSP2CoreCHQuery<'a> {
+    core_ch: BorrowedCoreContractionHierarchy<'a>,
+    pub fw_state: TwoRestrictionDijkstraData,
+    pub bw_state: TwoRestrictionDijkstraData,
     fw_finished: bool,
     bw_finished: bool,
     s: NodeId,
@@ -18,36 +20,13 @@ pub struct CSP2CoreContractionHierarchy<'a> {
     pub last_dist: Option<Weight>,
 }
 
-impl<'a> CSP2CoreContractionHierarchy<'a> {
-    pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        Ok(CSP2CoreContractionHierarchy::build(
-            Vec::<u32>::load_from(path.as_ref().join("rank"))?,
-            Vec::<u32>::load_from(path.as_ref().join("core"))?,
-            OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
-            OwnedGraph::load_from_routingkit_dir(path.as_ref().join("backward"))?,
-        ))
-    }
-
-    pub fn build(rank: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph) -> Self {
-        let node_count = forward.num_nodes();
-
-        let mut is_core = BitVec::from_elem(node_count, false);
-        for &n in core.iter() {
-            is_core.set(rank[n as usize] as usize, true);
-        }
-
-        let core_node_count = core.len();
-        println!(
-            "Core node count: {} ({:.2}%)",
-            core_node_count,
-            core_node_count as f32 * 100.0 / rank.len() as f32
-        );
-
-        CSP2CoreContractionHierarchy {
-            rank,
-            is_core,
-            fw_search: TwoRestrictionDijkstra::new_from_owned(forward),
-            bw_search: TwoRestrictionDijkstra::new_from_owned(backward),
+impl<'a> CSP2CoreCHQuery<'a> {
+    pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>) -> Self {
+        let node_count = core_ch.rank().len();
+        CSP2CoreCHQuery {
+            core_ch,
+            fw_state: TwoRestrictionDijkstraData::new(node_count),
+            bw_state: TwoRestrictionDijkstraData::new(node_count),
             fw_finished: false,
             bw_finished: false,
             s: node_count as NodeId,
@@ -74,11 +53,11 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
             max_driving_time: max_driving_time_long,
         };
 
-        self.fw_search.set_reset_flags(&self.is_core.to_bytes());
-        self.fw_search
+        self.fw_state.set_reset_flags(&self.core_ch.is_core().to_bytes());
+        self.fw_state
             .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
-        self.bw_search.set_reset_flags(&self.is_core.to_bytes());
-        self.bw_search
+        self.bw_state.set_reset_flags(&self.core_ch.is_core().to_bytes());
+        self.bw_state
             .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
     }
 
@@ -92,60 +71,66 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
             max_driving_time: Weight::infinity(),
         };
 
-        self.fw_search.clear_reset_flags();
-        self.fw_search.clear_restriction();
-        self.bw_search.clear_reset_flags();
-        self.bw_search.clear_restriction();
+        self.fw_state.clear_reset_flags();
+        self.fw_state.clear_restriction();
+        self.bw_state.clear_reset_flags();
+        self.bw_state.clear_restriction();
     }
 
     /// Equivalent to routingkit's check_contraction_hierarchy_for_errors except the check for only up edges
     pub fn check(&self) {
-        let node_count = self.fw_search.graph.num_nodes();
-        assert_eq!(self.fw_search.graph.first_out().len(), node_count + 1);
-        assert_eq!(self.bw_search.graph.first_out().len(), node_count + 1);
+        let node_count = self.core_ch.forward().num_nodes();
+        assert_eq!(self.core_ch.forward().first_out().len(), node_count + 1);
+        assert_eq!(self.core_ch.backward().first_out().len(), node_count + 1);
 
-        let forward_arc_count = *self.fw_search.graph.first_out().last().unwrap();
+        let forward_arc_count = *self.core_ch.forward().first_out().last().unwrap();
 
-        assert_eq!(*self.fw_search.graph.first_out().first().unwrap(), 0);
-        assert!(self.fw_search.graph.first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
-        assert_eq!(self.fw_search.graph.head().len(), forward_arc_count as usize);
-        assert_eq!(self.fw_search.graph.weights().len(), forward_arc_count as usize);
-        assert!(!self.fw_search.graph.head().is_empty() && *self.fw_search.graph.head().iter().max().unwrap() < node_count as NodeId);
+        assert_eq!(*self.core_ch.forward().first_out().first().unwrap(), 0);
+        assert!(self.core_ch.forward().first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
+        assert_eq!(self.core_ch.forward().head().len(), forward_arc_count as usize);
+        assert_eq!(self.core_ch.forward().weights().len(), forward_arc_count as usize);
+        assert!(!self.core_ch.forward().head().is_empty() && *self.core_ch.forward().head().iter().max().unwrap() < node_count as NodeId);
 
-        let backward_arc_count = *self.bw_search.graph.first_out().last().unwrap();
-        assert_eq!(*self.bw_search.graph.first_out().first().unwrap(), 0);
-        assert!(self.bw_search.graph.first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
-        assert_eq!(self.bw_search.graph.head().len(), backward_arc_count as usize);
-        assert_eq!(self.bw_search.graph.weights().len(), backward_arc_count as usize);
-        assert!(!self.bw_search.graph.head().is_empty() && *self.bw_search.graph.head().iter().max().unwrap() < node_count as NodeId);
+        let backward_arc_count = *self.core_ch.backward().first_out().last().unwrap();
+        assert_eq!(*self.core_ch.backward().first_out().first().unwrap(), 0);
+        assert!(self.core_ch.backward().first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
+        assert_eq!(self.core_ch.backward().head().len(), backward_arc_count as usize);
+        assert_eq!(self.core_ch.backward().weights().len(), backward_arc_count as usize);
+        assert!(!self.core_ch.backward().head().is_empty() && *self.core_ch.backward().head().iter().max().unwrap() < node_count as NodeId);
     }
 
     pub fn init_new_s(&mut self, ext_s: NodeId) {
-        self.s = self.rank[ext_s as usize] as NodeId;
+        self.s = self.core_ch.rank()[ext_s as usize] as NodeId;
         self.reset();
     }
 
     pub fn init_new_t(&mut self, ext_t: NodeId) {
-        self.t = self.rank[ext_t as usize] as NodeId;
+        self.t = self.core_ch.rank()[ext_t as usize] as NodeId;
         self.reset();
     }
 
     pub fn reset(&mut self) {
-        if self.s != self.rank.len() as NodeId {
-            self.fw_search.init_new_s(self.s);
+        if self.s != self.core_ch.rank().len() as NodeId {
+            self.fw_state.init_new_s(self.s);
         }
 
-        if self.t != self.rank.len() as NodeId {
-            self.bw_search.init_new_s(self.t);
+        if self.t != self.core_ch.rank().len() as NodeId {
+            self.bw_state.init_new_s(self.t);
         }
 
         self.fw_finished = false;
         self.bw_finished = false;
     }
 
-    fn calculate_distance_with_break_at(&mut self, node: NodeId) -> Weight {
-        let s_to_v = self.fw_search.get_settled_labels_at(node);
-        let v_to_t = self.bw_search.get_settled_labels_at(node);
+    fn calculate_distance_with_break_at(
+        node: NodeId,
+        restriction_short: &DrivingTimeRestriction,
+        restriction_long: &DrivingTimeRestriction,
+        fw_state: &mut TwoRestrictionDijkstraData,
+        bw_state: &mut TwoRestrictionDijkstraData,
+    ) -> Weight {
+        let s_to_v = fw_state.get_settled_labels_at(node);
+        let v_to_t = bw_state.get_settled_labels_at(node);
 
         let mut current_fw = s_to_v.rev().map(|r| r.0).peekable();
         let mut current_bw = v_to_t.rev().map(|r| r.0).peekable();
@@ -157,7 +142,7 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
             let total_dist = fw_label.distance.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
-            if total_dist[1] < self.restriction_short.max_driving_time && total_dist[2] < self.restriction_long.max_driving_time {
+            if total_dist[1] < restriction_short.max_driving_time && total_dist[2] < restriction_long.max_driving_time {
                 // subpaths can be connected without additional break
                 return total_dist[0];
             }
@@ -173,7 +158,7 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
     }
 
     pub fn run_query(&mut self) -> Option<Weight> {
-        if self.s == self.rank.len() as NodeId || self.t == self.rank.len() as NodeId {
+        if self.s == self.core_ch.rank().len() as NodeId || self.t == self.core_ch.rank().len() as NodeId {
             return None;
         }
         let mut tentative_distance = Weight::infinity();
@@ -184,20 +169,23 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
         self.reset();
         if !self.fw_finished {
             // safe after init
-            fw_min_key = self.fw_search.min_key().unwrap();
+            fw_min_key = self.fw_state.min_key().unwrap();
         }
 
         if !self.bw_finished {
             // safe after init
-            bw_min_key = self.bw_search.min_key().unwrap();
+            bw_min_key = self.bw_state.min_key().unwrap();
         }
 
-        let mut settled_fw = BitVec::from_elem(self.fw_search.graph.num_nodes(), false);
-        let mut settled_bw = BitVec::from_elem(self.bw_search.graph.num_nodes(), false);
-        let mut _middle_node = self.fw_search.graph.num_nodes() as NodeId;
+        let mut settled_fw = BitVec::from_elem(self.core_ch.forward().num_nodes(), false);
+        let mut settled_bw = BitVec::from_elem(self.core_ch.backward().num_nodes(), false);
+        let mut _middle_node = self.core_ch.forward().num_nodes() as NodeId;
         let mut fw_next = true;
 
         let mut _needs_core = false;
+
+        let fw_search = TwoRestrictionDijkstra::new(self.core_ch.forward());
+        let bw_search = TwoRestrictionDijkstra::new(self.core_ch.backward());
 
         let time = Instant::now();
         while !self.fw_finished || !self.bw_finished {
@@ -205,7 +193,7 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                 if let Some(State {
                     distance: dist_from_queue_at_v,
                     node,
-                }) = self.fw_search.settle_next_label(self.t)
+                }) = fw_search.settle_next_label(&mut self.fw_state, self.t)
                 {
                     settled_fw.set(node as usize, true);
 
@@ -220,7 +208,13 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
-                        let tent_dist_at_v = self.calculate_distance_with_break_at(node);
+                        let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                            node,
+                            &self.restriction_short,
+                            &self.restriction_long,
+                            &mut self.fw_state,
+                            &mut self.bw_state,
+                        );
 
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
@@ -228,7 +222,7 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                         }
                     }
 
-                    fw_min_key = self.fw_search.min_key().unwrap_or_else(|| {
+                    fw_min_key = self.fw_state.min_key().unwrap_or_else(|| {
                         self.fw_finished = true;
                         fw_min_key
                     });
@@ -241,11 +235,11 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                         println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
+                    if self.core_ch.is_core().get(node as usize).unwrap() && !_needs_core {
                         println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() {
+                    if self.core_ch.is_core().get(node as usize).unwrap() {
                         _needs_core = true;
                     }
 
@@ -255,7 +249,7 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                 if let Some(State {
                     distance: dist_from_queue_at_v,
                     node,
-                }) = self.bw_search.settle_next_label(self.s)
+                }) = bw_search.settle_next_label(&mut self.bw_state, self.s)
                 {
                     settled_bw.set(node as usize, true);
 
@@ -271,7 +265,13 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                     }
 
                     if settled_fw.get(node as usize).unwrap() {
-                        let tent_dist_at_v = self.calculate_distance_with_break_at(node);
+                        let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                            node,
+                            &self.restriction_short,
+                            &self.restriction_long,
+                            &mut self.fw_state,
+                            &mut self.bw_state,
+                        );
 
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
@@ -279,7 +279,7 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                         }
                     }
 
-                    bw_min_key = self.bw_search.min_key().unwrap_or_else(|| {
+                    bw_min_key = self.bw_state.min_key().unwrap_or_else(|| {
                         self.bw_finished = true;
                         bw_min_key
                     });
@@ -292,11 +292,11 @@ impl<'a> CSP2CoreContractionHierarchy<'a> {
                         println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !_needs_core {
+                    if self.core_ch.is_core().get(node as usize).unwrap() && !_needs_core {
                         println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() {
+                    if self.core_ch.is_core().get(node as usize).unwrap() {
                         _needs_core = true;
                     }
 

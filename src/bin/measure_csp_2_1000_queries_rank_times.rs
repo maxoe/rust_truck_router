@@ -1,6 +1,11 @@
 use rand::Rng;
 use rust_truck_router::{
-    algo::{ch::*, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra, dijkstra::Dijkstra},
+    algo::{
+        ch::*,
+        ch_potential::CHPotential,
+        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
+        dijkstra::{Dijkstra, DijkstraData},
+    },
     experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,
     types::*,
@@ -27,13 +32,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut search = TwoRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
-    search
+    let mut search_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let search = TwoRestrictionDijkstra::new(graph.borrow());
+    search_state
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
-    let mut dijkstra = Dijkstra::new(&graph);
+    let mut dijkstra_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
 
     let n = 100;
     let mut result = Vec::with_capacity(n);
@@ -63,24 +70,23 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
-        search.init_new_s(s);
-        dijkstra.init_new_s(s);
+        search_state.init_new_s(s);
+        dijkstra_state.init_new_s(s);
 
-        let rank_order = dijkstra.ranks_only_exponentials();
-        dijkstra.ranks_only_exponentials();
+        let rank_order = dijkstra.ranks_only_exponentials(&mut dijkstra_state);
 
         let mut rank_times = Vec::with_capacity(log_num_nodes);
         for (i, current_t) in rank_order.into_iter().enumerate() {
             let start = Instant::now();
-            search.init_new_s(s);
-            let dist = search.dist_query(current_t);
+            search_state.init_new_s(s);
+            let dist = search.dist_query(&mut search_state, current_t);
             let time = start.elapsed();
             rank_times.push(time);
 
             if dist.is_some() {
-                let path = search.current_best_path_to(current_t, true).unwrap();
-                let number_flagged_nodes = search.flagged_nodes_on_path(&path);
-                let number_pauses = search.reset_nodes_on_path(&path);
+                let path = search_state.current_best_path_to(current_t, true).unwrap();
+                let number_flagged_nodes = search_state.flagged_nodes_on_path(&path);
+                let number_pauses = search_state.reset_nodes_on_path(&path);
 
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
@@ -88,11 +94,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                         standard: CSPMeasurementResult {
                             graph_num_nodes: graph.num_nodes(),
                             graph_num_edges: graph.num_arcs(),
-                            num_queue_pushes: search.num_queue_pushes,
-                            num_settled: search.num_settled,
-                            num_labels_propagated: search.num_labels_propagated,
-                            num_labels_reset: search.num_labels_reset,
-                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            num_queue_pushes: search_state.num_queue_pushes,
+                            num_settled: search_state.num_settled,
+                            num_labels_propagated: search_state.num_labels_propagated,
+                            num_labels_reset: search_state.num_labels_reset,
+                            num_nodes_searched: search_state.get_number_of_visited_nodes(),
                             time,
                             path_distance: dist,
                             path_number_nodes: Some(path.0.len()),
@@ -109,11 +115,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                         standard: CSPMeasurementResult {
                             graph_num_nodes: graph.num_nodes(),
                             graph_num_edges: graph.num_arcs(),
-                            num_queue_pushes: search.num_queue_pushes,
-                            num_settled: search.num_settled,
-                            num_labels_propagated: search.num_labels_propagated,
-                            num_labels_reset: search.num_labels_reset,
-                            num_nodes_searched: search.get_number_of_visited_nodes(),
+                            num_queue_pushes: search_state.num_queue_pushes,
+                            num_settled: search_state.num_settled,
+                            num_labels_propagated: search_state.num_labels_propagated,
+                            num_labels_reset: search_state.num_labels_reset,
+                            num_nodes_searched: search_state.get_number_of_visited_nodes(),
                             time,
                             path_distance: None,
                             path_number_nodes: None,

@@ -1,137 +1,157 @@
-use crate::{algo::dijkstra::OwnedDijkstra, io::Load, types::*};
+use crate::{io::Load, types::*};
 use bit_vec::BitVec;
-use std::{path::Path, time::Instant};
+use std::{path::Path, rc::Rc, time::Instant};
+
+use super::dijkstra::{Dijkstra, DijkstraData};
 
 #[derive(Clone)]
-pub struct CoreContractionHierarchy {
-    pub rank: Vec<u32>,
-    pub is_core: BitVec,
-    pub core_search: OwnedDijkstra,
-    pub fw_search: OwnedDijkstra,
-    pub bw_search: OwnedDijkstra,
+pub struct CoreContractionHierarchy<RankOrderContainer, FirstOutContainer, HeadContainer, WeightsContainer> {
+    rank: RankOrderContainer,
+    order: RankOrderContainer,
+    is_core: Rc<BitVec>,
+    pub forward: FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>,
+    pub backward: FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>,
+}
+
+impl<RankOrderContainer, FirstOutContainer, HeadContainer, WeightsContainer>
+    CoreContractionHierarchy<RankOrderContainer, FirstOutContainer, HeadContainer, WeightsContainer>
+where
+    RankOrderContainer: AsRef<[NodeId]>,
+    FirstOutContainer: AsRef<[EdgeId]>,
+    HeadContainer: AsRef<[NodeId]>,
+    WeightsContainer: AsRef<[Weight]>,
+{
+    pub fn new(
+        rank: RankOrderContainer,
+        order: RankOrderContainer,
+        core: RankOrderContainer,
+        forward: FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>,
+        backward: FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>,
+    ) -> Self {
+        let node_count = forward.num_nodes();
+
+        let mut is_core = BitVec::from_elem(node_count, false);
+        for &n in core.as_ref().iter() {
+            is_core.set(rank.as_ref()[n as usize] as usize, true);
+        }
+
+        let core_node_count = core.as_ref().len();
+        println!(
+            "Core node count: {} ({:.2}%)",
+            core_node_count,
+            core_node_count as f32 * 100.0 / rank.as_ref().len() as f32
+        );
+
+        CoreContractionHierarchy {
+            rank,
+            order,
+            is_core: Rc::new(is_core),
+            forward,
+            backward,
+        }
+    }
+
+    pub fn rank(&self) -> &[NodeId] {
+        self.rank.as_ref()
+    }
+
+    pub fn order(&self) -> &[NodeId] {
+        self.order.as_ref()
+    }
+
+    pub fn is_core(&self) -> Rc<BitVec> {
+        self.is_core.clone()
+    }
+
+    pub fn forward(&self) -> BorrowedGraph {
+        self.forward.borrow()
+    }
+
+    pub fn backward(&self) -> BorrowedGraph {
+        self.backward.borrow()
+    }
+
+    pub fn borrow(&self) -> BorrowedCoreContractionHierarchy {
+        CoreContractionHierarchy {
+            rank: self.rank(),
+            order: self.order(),
+            is_core: self.is_core(),
+            forward: self.forward(),
+            backward: self.backward(),
+        }
+    }
+
+    /// Equivalent to routingkit's check_contraction_hierarchy_for_errors except the check for only up edges
+    pub fn check(&self) {
+        let node_count = self.forward.num_nodes();
+        assert_eq!(self.forward.first_out().len(), node_count + 1);
+        assert_eq!(self.backward.first_out().len(), node_count + 1);
+
+        let forward_arc_count = *self.forward.first_out().last().unwrap();
+
+        assert_eq!(*self.forward.first_out().first().unwrap(), 0);
+        assert!(self.forward.first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
+        assert_eq!(self.forward.head().len(), forward_arc_count as usize);
+        assert_eq!(self.forward.weights().len(), forward_arc_count as usize);
+        assert!(!self.forward.head().is_empty() && *self.forward.head().iter().max().unwrap() < node_count as NodeId);
+
+        let backward_arc_count = *self.backward.first_out().last().unwrap();
+        assert_eq!(*self.backward.first_out().first().unwrap(), 0);
+        assert!(self.backward.first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
+        assert_eq!(self.backward.head().len(), backward_arc_count as usize);
+        assert_eq!(self.backward.weights().len(), backward_arc_count as usize);
+        assert!(!self.backward.head().is_empty() && *self.backward.head().iter().max().unwrap() < node_count as NodeId);
+    }
+}
+
+impl OwnedCoreContractionHierarchy {
+    pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
+        Ok(CoreContractionHierarchy::new(
+            Vec::<NodeId>::load_from(path.as_ref().join("rank"))?,
+            Vec::<NodeId>::load_from(path.as_ref().join("order"))?,
+            Vec::<NodeId>::load_from(path.as_ref().join("core"))?,
+            OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
+            OwnedGraph::load_from_routingkit_dir(path.as_ref().join("backward"))?,
+        ))
+    }
+}
+
+pub type OwnedCoreContractionHierarchy = CoreContractionHierarchy<Vec<NodeId>, Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
+pub type BorrowedCoreContractionHierarchy<'a> = CoreContractionHierarchy<&'a [NodeId], &'a [EdgeId], &'a [NodeId], &'a [Weight]>;
+
+pub struct CoreContractionHierarchyQuery<'a> {
+    core_ch: BorrowedCoreContractionHierarchy<'a>,
+    fw_state: DijkstraData,
+    bw_state: DijkstraData,
     fw_finished: bool,
     bw_finished: bool,
     needs_core: bool,
     s: NodeId,
     t: NodeId,
 }
-
-impl CoreContractionHierarchy {
-    pub fn load_from_routingkit_dir<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
-        Ok(CoreContractionHierarchy::build(
-            Vec::<u32>::load_from(path.as_ref().join("rank"))?,
-            Vec::<u32>::load_from(path.as_ref().join("core"))?,
-            OwnedGraph::load_from_routingkit_dir(path.as_ref().join("forward"))?,
-            OwnedGraph::load_from_routingkit_dir(path.as_ref().join("backward"))?,
-        ))
-    }
-
-    pub fn build(rank: Vec<u32>, core: Vec<NodeId>, forward: OwnedGraph, backward: OwnedGraph) -> Self {
-        let node_count = forward.num_nodes();
-
-        let mut is_core = BitVec::from_elem(node_count, false);
-        for &n in core.iter() {
-            is_core.set(rank[n as usize] as usize, true);
-        }
-
-        let core_node_count = core.len();
-        println!(
-            "Core node count: {} ({:.2}%)",
-            core_node_count,
-            core_node_count as f32 * 100.0 / rank.len() as f32
-        );
-        let mut first_out = Vec::with_capacity(core_node_count);
-        first_out.push(0);
-        let mut head = Vec::with_capacity(forward.num_arcs());
-        let mut weights = Vec::with_capacity(forward.num_arcs());
-
-        // let mut first_out_i = 0;
-        // for node_id in 0..node_count {
-        //     if is_core.get(node_id).unwrap() {
-        //         first_out.push(first_out_i as NodeId);
-
-        //         for edge_id in forward.first_out()[node_id]..forward.first_out()[node_id + 1] {
-        //             let current_head = is_core.iter().take((forward.head()[edge_id as usize] + 1) as usize).filter(|b| *b).count() as NodeId;
-
-        //             if is_core.get(current_head as usize).unwrap() {
-        //                 head.push(current_head);
-        //                 weights.push(forward.weights()[edge_id as usize]);
-        //                 first_out_i += 1;
-        //             }
-        //         }
-
-        //         for edge_id in backward.first_out()[node_id]..backward.first_out()[node_id + 1] {
-        //             let current_head = is_core.iter().take((backward.head()[edge_id as usize] + 1) as usize).filter(|b| *b).count() as NodeId;
-
-        //             if is_core.get(current_head as usize).unwrap() {
-        //                 head.push(current_head);
-        //                 weights.push(backward.weights()[edge_id as usize]);
-        //                 first_out_i += 1;
-        //             }
-        //         }
-        //     }
-        // }
-
-        // first_out.push(core_node_count as NodeId);
-
-        first_out.shrink_to_fit();
-        head.shrink_to_fit();
-        weights.shrink_to_fit();
-
-        // assert_eq!(first_out.len(), core_node_count + 1);
-        // assert_eq!(head.len(), weights.len());
-        // assert_eq!(first_out[0], 0);
-        // assert_eq!(*first_out.last().unwrap() as usize, first_out.len() - 1);
-
-        let core = OwnedGraph::new(first_out, head, weights);
-
-        // dbg!(core.num_arcs());
-        // dbg!(core.num_nodes());
-
-        CoreContractionHierarchy {
-            rank,
-            is_core,
-            core_search: OwnedDijkstra::new(core),
-            fw_search: OwnedDijkstra::new(forward),
-            bw_search: OwnedDijkstra::new(backward),
+impl<'a> CoreContractionHierarchyQuery<'a> {
+    pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>) -> Self {
+        let n = core_ch.forward().num_nodes();
+        CoreContractionHierarchyQuery {
+            core_ch,
+            fw_state: DijkstraData::new(n),
+            bw_state: DijkstraData::new(n),
             fw_finished: false,
             bw_finished: false,
             needs_core: false,
-            s: node_count as NodeId,
-            t: node_count as NodeId,
+            s: n as NodeId,
+            t: n as NodeId,
         }
     }
 
-    /// Equivalent to routingkit's check_contraction_hierarchy_for_errors except the check for only up edges
-    pub fn check(&self) {
-        let node_count = self.fw_search.graph.num_nodes();
-        assert_eq!(self.fw_search.graph.first_out().len(), node_count + 1);
-        assert_eq!(self.bw_search.graph.first_out().len(), node_count + 1);
-
-        let forward_arc_count = *self.fw_search.graph.first_out().last().unwrap();
-
-        assert_eq!(*self.fw_search.graph.first_out().first().unwrap(), 0);
-        assert!(self.fw_search.graph.first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
-        assert_eq!(self.fw_search.graph.head().len(), forward_arc_count as usize);
-        assert_eq!(self.fw_search.graph.weights().len(), forward_arc_count as usize);
-        assert!(!self.fw_search.graph.head().is_empty() && *self.fw_search.graph.head().iter().max().unwrap() < node_count as NodeId);
-
-        let backward_arc_count = *self.bw_search.graph.first_out().last().unwrap();
-        assert_eq!(*self.bw_search.graph.first_out().first().unwrap(), 0);
-        assert!(self.bw_search.graph.first_out().is_sorted_by(|l, r| Some(l.cmp(r))));
-        assert_eq!(self.bw_search.graph.head().len(), backward_arc_count as usize);
-        assert_eq!(self.bw_search.graph.weights().len(), backward_arc_count as usize);
-        assert!(!self.bw_search.graph.head().is_empty() && *self.bw_search.graph.head().iter().max().unwrap() < node_count as NodeId);
-    }
-
     pub fn init_new_s(&mut self, ext_s: NodeId) {
-        self.s = self.rank[ext_s as usize] as NodeId;
+        self.s = self.core_ch.rank[ext_s as usize] as NodeId;
 
-        if !self.is_core.get(self.s as usize).unwrap() {
-            self.fw_search.init_new_s(self.s);
+        if !self.core_ch.is_core.get(self.s as usize).unwrap() {
+            self.fw_state.init_new_s(self.s);
             self.fw_finished = false;
             // self.needs_core |= false;
-            // self.core_s = self.fw_search.graph.num_nodes() as NodeId;
+            // self.core_s = self.forward.num_nodes() as NodeId;
         } else {
             self.fw_finished = true;
             // self.needs_core = true;
@@ -140,13 +160,13 @@ impl CoreContractionHierarchy {
     }
 
     pub fn init_new_t(&mut self, ext_t: NodeId) {
-        self.t = self.rank[ext_t as usize] as NodeId;
+        self.t = self.core_ch.rank[ext_t as usize] as NodeId;
 
-        if !self.is_core.get(self.t as usize).unwrap() {
-            self.bw_search.init_new_s(self.t);
+        if !self.core_ch.is_core.get(self.t as usize).unwrap() {
+            self.bw_state.init_new_s(self.t);
             self.bw_finished = false;
             // self.needs_core |= false;
-            // self.core_t = self.bw_search.graph.num_nodes() as NodeId;
+            // self.core_t = self.backward.num_nodes() as NodeId;
         } else {
             self.bw_finished = true;
             // self.needs_core = true;
@@ -169,34 +189,37 @@ impl CoreContractionHierarchy {
         let mut bw_min_key = 0;
 
         if !self.fw_finished {
-            self.fw_search.reset();
+            self.fw_state.reset();
             // safe after dijkstra init
-            fw_min_key = self.fw_search.min_key().unwrap();
+            fw_min_key = self.fw_state.min_key().unwrap();
         }
 
         if !self.bw_finished {
-            self.bw_search.reset();
+            self.bw_state.reset();
             // safe after dijkstra init
-            bw_min_key = self.bw_search.min_key().unwrap();
+            bw_min_key = self.bw_state.min_key().unwrap();
         }
 
-        let mut settled_fw = BitVec::from_elem(self.fw_search.graph.num_nodes(), false);
-        let mut settled_bw = BitVec::from_elem(self.bw_search.graph.num_nodes(), false);
-        let mut _middle_node = self.fw_search.graph.num_nodes() as u32;
+        let mut settled_fw = BitVec::from_elem(self.core_ch.forward.num_nodes(), false);
+        let mut settled_bw = BitVec::from_elem(self.core_ch.backward.num_nodes(), false);
+        let mut _middle_node = self.core_ch.forward.num_nodes() as u32;
         let mut fw_next = true;
+
+        let fw_search = Dijkstra::new(self.core_ch.forward());
+        let bw_search = Dijkstra::new(self.core_ch.backward());
 
         let time = Instant::now();
         while !self.fw_finished || !self.bw_finished {
             let tent_dist_at_v;
 
             if self.bw_finished || !self.fw_finished && fw_next {
-                if let Some(State { distance: _, node }) = self.fw_search.settle_next_node() {
+                if let Some(State { distance: _, node }) = fw_search.settle_next_node(&mut self.fw_state) {
                     //dbg!("fw settled {}", node);
                     settled_fw.set(node as usize, true);
 
                     // fw search found t -> done here
                     if node == self.t {
-                        tentative_distance = self.fw_search.tentative_distance_at(self.t);
+                        tentative_distance = self.fw_state.tentative_distance_at(self.t);
                         self.fw_finished = true;
                         self.bw_finished = true;
                         self.needs_core = false;
@@ -204,13 +227,13 @@ impl CoreContractionHierarchy {
                         break;
                     }
                     if settled_bw.get(node as usize).unwrap() {
-                        tent_dist_at_v = self.fw_search.tentative_distance_at(node) + self.bw_search.tentative_distance_at(node);
+                        tent_dist_at_v = self.fw_state.tentative_distance_at(node) + self.bw_state.tentative_distance_at(node);
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
                             _middle_node = node;
                         }
                     }
-                    fw_min_key = self.fw_search.min_key().unwrap_or_else(|| {
+                    fw_min_key = self.fw_state.min_key().unwrap_or_else(|| {
                         self.fw_finished = true;
                         fw_min_key
                     });
@@ -225,10 +248,10 @@ impl CoreContractionHierarchy {
                     // if !self.is_core.get(node as usize).unwrap() && self.needs_core {
                     //     println!("non-core after core reached");
                     // }
-                    if self.is_core.get(node as usize).unwrap() && !self.needs_core {
+                    if self.core_ch.is_core.get(node as usize).unwrap() && !self.needs_core {
                         println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
-                    if self.is_core.get(node as usize).unwrap() {
+                    if self.core_ch.is_core.get(node as usize).unwrap() {
                         // dbg!("forward reached core");
                         //     self.fw_finished = true;
                         self.needs_core = true;
@@ -238,13 +261,13 @@ impl CoreContractionHierarchy {
                     fw_next = false;
                 }
             } else {
-                if let Some(State { distance: _, node }) = self.bw_search.settle_next_node() {
+                if let Some(State { distance: _, node }) = bw_search.settle_next_node(&mut self.bw_state) {
                     //dbg!("bw settled {}", node);
                     settled_bw.set(node as usize, true);
 
                     // bw search found s -> done here
                     if node == self.s {
-                        tentative_distance = self.bw_search.tentative_distance_at(self.s);
+                        tentative_distance = self.bw_state.tentative_distance_at(self.s);
                         self.fw_finished = true;
                         self.bw_finished = true;
                         self.needs_core = false;
@@ -253,14 +276,14 @@ impl CoreContractionHierarchy {
                     }
 
                     if settled_fw.get(node as usize).unwrap() {
-                        tent_dist_at_v = self.fw_search.tentative_distance_at(node) + self.bw_search.tentative_distance_at(node);
+                        tent_dist_at_v = self.fw_state.tentative_distance_at(node) + self.bw_state.tentative_distance_at(node);
 
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
                             _middle_node = node;
                         }
                     }
-                    bw_min_key = self.bw_search.min_key().unwrap_or_else(|| {
+                    bw_min_key = self.bw_state.min_key().unwrap_or_else(|| {
                         self.bw_finished = true;
                         bw_min_key
                     });
@@ -273,11 +296,11 @@ impl CoreContractionHierarchy {
                         println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() && !self.needs_core {
+                    if self.core_ch.is_core.get(node as usize).unwrap() && !self.needs_core {
                         println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
 
-                    if self.is_core.get(node as usize).unwrap() {
+                    if self.core_ch.is_core.get(node as usize).unwrap() {
                         // dbg!("backwards reached core");
                         //     // self.bw_finished = true;
                         self.needs_core = true;

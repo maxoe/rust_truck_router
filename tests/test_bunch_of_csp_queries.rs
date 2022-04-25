@@ -1,5 +1,8 @@
 use bit_vec::BitVec;
-use rust_truck_router::{algo::csp::*, types::OwnedGraph};
+use rust_truck_router::{
+    algo::csp::*,
+    types::{Graph, OwnedGraph},
+};
 
 #[test]
 fn simple() {
@@ -11,18 +14,19 @@ fn simple() {
     let travel_time = vec![2, 3, 3, 1, 5];
     let s = 2;
     let t = 1;
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
+    let graph = OwnedGraph::new(first_out, head, travel_time);
 
-    let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    let result = instance_mcd.dist_query(t).unwrap();
+    let mut instance_mcd_state = OneRestrictionDijkstraData::new(graph.num_nodes());
+    let instance_mcd = OneRestrictionDijkstra::new(graph.borrow());
+    instance_mcd_state.init_new_s(s);
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
 
     assert_eq!(result, 6);
 
-    instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd.set_restriction(5, 0);
-    let result = instance_mcd.dist_query(t);
+    instance_mcd_state.reset();
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state.set_restriction(5, 0);
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t);
     assert_eq!(result, None);
 }
 
@@ -35,42 +39,43 @@ fn shortes_path_breaks_constraint() {
     let travel_time = vec![1, 4, 3, 2, 4];
     let s = 0;
     let t = 4;
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd
+    let graph = OwnedGraph::new(first_out, head, travel_time);
+    let mut instance_mcd_state = OneRestrictionDijkstraData::new(graph.num_nodes());
+    let instance_mcd = OneRestrictionDijkstra::new(graph.borrow());
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
         .set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes())
         .set_restriction(5, 0);
-    let result = instance_mcd.dist_query(t).unwrap();
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 8);
-    assert_eq!(vec![0, 1, 3, 4], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 3, 4], instance_mcd_state.current_best_node_path_to(t).unwrap());
 
-    instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd
+    instance_mcd_state.reset();
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
         .set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes())
         .set_restriction(6, 0);
-    let result = instance_mcd.dist_query(t).unwrap();
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 7);
-    assert_eq!(vec![0, 1, 2, 4], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 2, 4], instance_mcd_state.current_best_node_path_to(t).unwrap());
 
-    instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd
+    instance_mcd_state.reset();
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
         .set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes())
         .set_restriction(5, 2);
-    let result = instance_mcd.dist_query(t).unwrap();
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 10);
-    assert_eq!(vec![0, 1, 3, 4], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 3, 4], instance_mcd_state.current_best_node_path_to(t).unwrap());
 
-    instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd
+    instance_mcd_state.reset();
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
         .set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes())
         .set_restriction(6, 2);
-    let result = instance_mcd.dist_query(t).unwrap();
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 9);
-    assert_eq!(vec![0, 1, 2, 4], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 2, 4], instance_mcd_state.current_best_node_path_to(t).unwrap());
 }
 
 #[test]
@@ -82,34 +87,43 @@ fn needs_loop_to_fulfill_constraint() {
     let travel_time = vec![2, 1, 3, 1];
     let s = 0;
     let t = 3;
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes()).set_restriction(5, 0);
-    let mut result = instance_mcd.dist_query(t).unwrap();
+    let graph = OwnedGraph::new(first_out, head, travel_time);
+    let mut instance_mcd_state = OneRestrictionDijkstraData::new(graph.num_nodes());
+    let instance_mcd = OneRestrictionDijkstra::new(graph.borrow());
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
+        .set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes())
+        .set_restriction(5, 0);
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 7);
-    assert_eq!(vec![0, 1, 2, 1, 3], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 2, 1, 3], instance_mcd_state.current_best_node_path_to(t).unwrap());
 
-    instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes()).set_restriction(7, 0);
-    result = instance_mcd.dist_query(t).unwrap();
+    instance_mcd_state.reset();
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
+        .set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes())
+        .set_restriction(7, 0);
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 5);
-    assert_eq!(vec![0, 1, 3], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 3], instance_mcd_state.current_best_node_path_to(t).unwrap());
 
-    instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes()).set_restriction(5, 2);
-    let mut result = instance_mcd.dist_query(t).unwrap();
+    instance_mcd_state.reset();
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
+        .set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes())
+        .set_restriction(5, 2);
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 9);
-    assert_eq!(vec![0, 1, 2, 1, 3], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 2, 1, 3], instance_mcd_state.current_best_node_path_to(t).unwrap());
 
-    instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes()).set_restriction(7, 2);
-    result = instance_mcd.dist_query(t).unwrap();
+    instance_mcd_state.reset();
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
+        .set_reset_flags(BitVec::from_fn(4, |i| i == 2).to_bytes())
+        .set_restriction(7, 2);
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 5);
-    assert_eq!(vec![0, 1, 3], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 3], instance_mcd_state.current_best_node_path_to(t).unwrap());
 }
 
 #[test]
@@ -122,15 +136,16 @@ fn ignore_parking() {
     let s = 0;
     let t = 4;
 
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd
+    let graph = OwnedGraph::new(first_out, head, travel_time);
+    let mut instance_mcd_state = OneRestrictionDijkstraData::new(graph.num_nodes());
+    let instance_mcd = OneRestrictionDijkstra::new(graph.borrow());
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
         .set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes())
         .set_restriction(5, 4);
-    let result = instance_mcd.dist_query(t).unwrap();
+    let result = instance_mcd.dist_query(&mut instance_mcd_state, t).unwrap();
     assert_eq!(result, 3);
-    assert_eq!(vec![0, 1, 3, 4], instance_mcd.current_best_node_path_to(t).unwrap());
+    assert_eq!(vec![0, 1, 3, 4], instance_mcd_state.current_best_node_path_to(t).unwrap());
 }
 
 #[test]
@@ -141,11 +156,14 @@ fn no_path_fulfills_constraint() {
     let travel_time = vec![1, 5];
     let s = 0;
     let t = 2;
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-    let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-    instance_mcd.init_new_s(s);
-    instance_mcd.set_reset_flags(BitVec::from_fn(3, |i| i == 1).to_bytes()).set_restriction(4, 0);
+    let graph = OwnedGraph::new(first_out, head, travel_time);
+    let mut instance_mcd_state = OneRestrictionDijkstraData::new(graph.num_nodes());
+    let instance_mcd = OneRestrictionDijkstra::new(graph.borrow());
+    instance_mcd_state.init_new_s(s);
+    instance_mcd_state
+        .set_reset_flags(BitVec::from_fn(3, |i| i == 1).to_bytes())
+        .set_restriction(4, 0);
 
-    assert_eq!(instance_mcd.dist_query(t), None);
-    assert_eq!(None, instance_mcd.current_best_node_path_to(t));
+    assert_eq!(instance_mcd.dist_query(&mut instance_mcd_state, t), None);
+    assert_eq!(None, instance_mcd_state.current_best_node_path_to(t));
 }

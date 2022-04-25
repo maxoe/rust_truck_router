@@ -1,6 +1,11 @@
 use rand::{Rng, SeedableRng};
 use rust_truck_router::{
-    algo::{csp_2::TwoRestrictionDijkstra, csp_2_core_ch_chpot::CSP2AstarCoreContractionHierarchy},
+    algo::{
+        ch::ContractionHierarchy,
+        core_ch::CoreContractionHierarchy,
+        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
+        csp_2_core_ch_chpot::CSP2AstarCoreCHQuery,
+    },
     io::{load_routingkit_bitvector, Load},
     types::{EdgeId, Graph, NodeId, OwnedGraph, Weight},
 };
@@ -25,12 +30,15 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
-    let mut core_ch = CSP2AstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let mut core_ch = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch.check();
     core_ch.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
-    let mut csp_pot = TwoRestrictionDijkstra::new(&graph);
-    csp_pot
+    let mut csp_pot_state = TwoRestrictionDijkstraData::new(graph.num_nodes());
+    let csp_pot = TwoRestrictionDijkstra::new(graph.borrow());
+    csp_pot_state
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
@@ -42,8 +50,8 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
         core_ch.init_new_t(t);
         let dist = core_ch.run_query();
 
-        csp_pot.init_new_s(s);
-        let csp_pot_dist = csp_pot.dist_query(t);
+        csp_pot_state.init_new_s(s);
+        let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
         assert_eq!(dist, csp_pot_dist);
     }

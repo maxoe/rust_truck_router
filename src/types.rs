@@ -195,7 +195,7 @@ pub trait OutgoingEdgeIterable: Graph {
 }
 
 pub type OwnedGraph = FirstOutGraph<Vec<EdgeId>, Vec<NodeId>, Vec<Weight>>;
-pub type BorrowedGraph<'a> = &'a OwnedGraph;
+pub type BorrowedGraph<'a> = FirstOutGraph<&'a [EdgeId], &'a [NodeId], &'a [Weight]>;
 
 impl<FirstOutContainer, HeadContainer, WeightsContainer> FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
 where
@@ -215,6 +215,14 @@ where
     }
     pub fn weights(&self) -> &[Weight] {
         self.weights.as_ref()
+    }
+
+    pub fn borrow(&self) -> FirstOutGraph<&[EdgeId], &[NodeId], &[<FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> as Graph>::WeightType]> {
+        FirstOutGraph {
+            first_out: self.first_out(),
+            head: self.head(),
+            weights: self.weights(),
+        }
     }
 }
 
@@ -249,6 +257,8 @@ impl OwnedGraph {
         })
     }
 }
+
+impl<'a> Copy for BorrowedGraph<'a> {}
 
 impl<FirstOutContainer, HeadContainer, WeightsContainer> OutgoingEdgeIterable for FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>
 where

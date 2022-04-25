@@ -2,7 +2,10 @@ use std::error::Error;
 use std::path::Path;
 
 use rust_truck_router::{
-    algo::{ch::ContractionHierarchy, dijkstra::Dijkstra},
+    algo::{
+        ch::{ContractionHierarchy, ContractionHierarchyQuery},
+        dijkstra::{Dijkstra, DijkstraData},
+    },
     io::*,
     types::{OwnedGraph, *},
 };
@@ -26,18 +29,20 @@ fn some_ch_queries() -> Result<(), Box<dyn Error>> {
     let travel_time = vec![1, 4, 3, 2, 4];
 
     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/"));
-    let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let mut ch_query = ContractionHierarchyQuery::new(ch.borrow());
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
-    let mut dijkstra = Dijkstra::new(&graph);
+    let mut dijkstra_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
 
     for s in 0..5 {
-        dijkstra.init_new_s(s);
-        ch.init_new_s(s);
+        dijkstra_state.init_new_s(s);
+        ch_query.init_new_s(s);
         for t in 0..5 {
             println!("Testing {} to {}", s, t);
-            ch.init_new_t(t);
-            assert_eq!(dijkstra.dist_query(t), ch.run_query());
+            ch_query.init_new_t(t);
+            assert_eq!(dijkstra.dist_query(&mut dijkstra_state, t), ch_query.run_query());
         }
     }
 
@@ -54,22 +59,24 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
-    let mut ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
+    let mut ch_query = ContractionHierarchyQuery::new(ch.borrow());
 
     let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
-    let mut instance = Dijkstra::new(&graph);
+    let mut instance_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         let t = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
         println!("Query #{} from {} to {}", i, s, t);
-        instance.init_new_s(s);
-        ch.init_new_s(s);
-        ch.init_new_t(t);
-        assert_eq!(instance.dist_query(t), ch.run_query());
+        instance_state.init_new_s(s);
+        ch_query.init_new_s(s);
+        ch_query.init_new_t(t);
+        assert_eq!(dijkstra.dist_query(&mut instance_state, t), ch_query.run_query());
         // assert_eq!(instance.current_node_path_to(t), instance_mcd.current_best_node_path_to(t))
     }
 

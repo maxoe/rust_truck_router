@@ -1,5 +1,9 @@
 use rust_truck_router::{
-    algo::{ch::*, ch_potential::CHPotential, csp::OneRestrictionDijkstra},
+    algo::{
+        ch::*,
+        ch_potential::CHPotential,
+        csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
+    },
     io::*,
     types::*,
 };
@@ -23,10 +27,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
     // let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
+    let graph = OwnedGraph::new(first_out, head, travel_time);
 
-    let s = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
-    let t = rand::thread_rng().gen_range(0..graph_mcd.num_nodes() as NodeId);
+    let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
+    let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
     //let s = 9504444;
     //let t = 3438839;
@@ -39,8 +43,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
-    instance_mcd_acc
+    let mut instance_mcd_acc_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    instance_mcd_acc_state
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(16_200_000, 2_700_000);
     // let mut instance_mcd_acc = TwoRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
@@ -49,10 +53,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let timer = Instant::now();
-    instance_mcd_acc.init_new_s(s);
-    instance_mcd_acc.dist_query(t);
+    instance_mcd_acc_state.init_new_s(s);
+
+    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow());
+    instance_mcd_acc.dist_query(&mut instance_mcd_acc_state, t);
     println!("Elapsed: {}ms", timer.elapsed().as_secs_f64() * 1000.0);
-    print!("{}", instance_mcd_acc.info());
+    print!("{}", instance_mcd_acc_state.info());
 
     // instance_mcd_acc.reset();
     // instance_mcd_acc.dist_query_propagate_all_labels(t);
@@ -62,9 +68,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let longitude = Vec::<f32>::load_from(path.join("longitude"))?;
     let osm_node_id = Vec::<u64>::load_from(path.join("osm_node_id"))?;
     assert_eq!(latitude.len(), longitude.len());
-    assert_eq!(latitude.len(), graph_mcd.num_nodes());
+    assert_eq!(latitude.len(), graph.num_nodes());
 
-    if let Some((p, _d)) = instance_mcd_acc.current_best_path_to(t, true) {
+    if let Some((p, _d)) = instance_mcd_acc_state.current_best_path_to(t, true) {
         let file = File::create("path_acc.csv")?;
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude")?;
@@ -76,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let file = File::create("path_flagged_acc.csv")?;
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude,osm_id,is_parking_used")?;
-        let used_p = instance_mcd_acc.reset_nodes_on_path(&(p, _d));
+        let used_p = instance_mcd_acc_state.reset_nodes_on_path(&(p, _d));
         for &node_id in used_p.iter() {
             writeln!(
                 file,
@@ -110,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut file = LineWriter::new(file);
     writeln!(file, "latitude,longitude,num_labels")?;
 
-    for (i, n) in instance_mcd_acc
+    for (i, n) in instance_mcd_acc_state
         .get_per_node_number_of_labels()
         .into_iter()
         .enumerate()

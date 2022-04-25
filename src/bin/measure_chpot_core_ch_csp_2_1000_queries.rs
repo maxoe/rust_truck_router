@@ -1,8 +1,12 @@
 use rand::Rng;
 use rust_truck_router::{
     algo::{
-        ch::ContractionHierarchy, ch_potential::CHPotential, csp_2::TwoRestrictionDijkstra, csp_2_core_ch_chpot::CSP2AstarCoreContractionHierarchy,
-        dijkstra::Dijkstra,
+        ch::ContractionHierarchy,
+        ch_potential::CHPotential,
+        core_ch::CoreContractionHierarchy,
+        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
+        csp_2_core_ch_chpot::CSP2AstarCoreCHQuery,
+        dijkstra::{Dijkstra, DijkstraData},
     },
     experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,
@@ -23,16 +27,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_out = Vec::<EdgeId>::load_from(path.join("first_out"))?;
     let head = Vec::<NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
-    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
-    let mut search = CSP2AstarCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    let mut search = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     search.check();
     search.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
-    let mut dijkstra = Dijkstra::new(&graph);
+    let mut dijkstra_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
 
     let n = 100;
 
@@ -54,8 +60,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let mut stat_logs = Vec::with_capacity(n * log_num_nodes);
 
-    let mut csp_pot = TwoRestrictionDijkstra::new_with_potential(&graph, CHPotential::from_ch(ch));
-    csp_pot
+    let mut csp_pot_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let csp_pot = TwoRestrictionDijkstra::new(graph.borrow());
+    csp_pot_state
         .set_reset_flags(is_parking_node.to_bytes())
         .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
@@ -66,11 +73,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
         search.init_new_s(s);
-        dijkstra.init_new_s(s);
-        csp_pot.init_new_s(s);
+        dijkstra_state.init_new_s(s);
+        csp_pot_state.init_new_s(s);
 
-        let rank_order = dijkstra.ranks_only_exponentials();
-        dijkstra.ranks_only_exponentials();
+        let rank_order = dijkstra.ranks_only_exponentials(&mut dijkstra_state);
 
         for (i, current_t) in rank_order.into_iter().enumerate() {
             let start = Instant::now();
@@ -79,12 +85,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             let dist = search.run_query();
             let time = start.elapsed();
 
-            let chpot_dist = csp_pot.dist_query(current_t);
+            let chpot_dist = csp_pot.dist_query(&mut csp_pot_state, current_t);
 
             if chpot_dist.is_some() {
-                let path = csp_pot.current_best_path_to(current_t, true).unwrap();
-                let number_flagged_nodes = csp_pot.flagged_nodes_on_path(&path);
-                let number_pauses = csp_pot.reset_nodes_on_path(&path);
+                let path = csp_pot_state.current_best_path_to(current_t, true).unwrap();
+                let number_flagged_nodes = csp_pot_state.flagged_nodes_on_path(&path);
+                let number_pauses = csp_pot_state.reset_nodes_on_path(&path);
 
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
@@ -92,11 +98,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                         standard: CSPMeasurementResult {
                             graph_num_nodes: graph.num_nodes(),
                             graph_num_edges: graph.num_arcs(),
-                            num_queue_pushes: csp_pot.num_queue_pushes,
-                            num_settled: csp_pot.num_settled,
-                            num_labels_propagated: csp_pot.num_labels_propagated,
-                            num_labels_reset: csp_pot.num_labels_reset,
-                            num_nodes_searched: csp_pot.get_number_of_visited_nodes(),
+                            num_queue_pushes: csp_pot_state.num_queue_pushes,
+                            num_settled: csp_pot_state.num_settled,
+                            num_labels_propagated: csp_pot_state.num_labels_propagated,
+                            num_labels_reset: csp_pot_state.num_labels_reset,
+                            num_nodes_searched: csp_pot_state.get_number_of_visited_nodes(),
                             time,
                             path_distance: dist,
                             path_number_nodes: Some(path.0.len()),
@@ -113,11 +119,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                         standard: CSPMeasurementResult {
                             graph_num_nodes: graph.num_nodes(),
                             graph_num_edges: graph.num_arcs(),
-                            num_queue_pushes: csp_pot.num_queue_pushes,
-                            num_settled: csp_pot.num_settled,
-                            num_labels_propagated: csp_pot.num_labels_propagated,
-                            num_labels_reset: csp_pot.num_labels_reset,
-                            num_nodes_searched: csp_pot.get_number_of_visited_nodes(),
+                            num_queue_pushes: csp_pot_state.num_queue_pushes,
+                            num_settled: csp_pot_state.num_settled,
+                            num_labels_propagated: csp_pot_state.num_labels_propagated,
+                            num_labels_reset: csp_pot_state.num_labels_reset,
+                            num_nodes_searched: csp_pot_state.get_number_of_visited_nodes(),
                             time,
                             path_distance: None,
                             path_number_nodes: None,

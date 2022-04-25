@@ -1,5 +1,8 @@
 use rust_truck_router::{
-    algo::{csp::*, dijkstra::Dijkstra},
+    algo::{
+        csp::*,
+        dijkstra::{Dijkstra, DijkstraData},
+    },
     io::*,
     types::*,
 };
@@ -16,25 +19,24 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
-    let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
+    let graph = OwnedGraph::new(first_out, head, travel_time);
     println!("Graph with {} nodes and {} edges", graph.num_nodes(), graph.num_arcs());
 
-    let graph_mcd = OwnedGraph::new(first_out, head, travel_time);
-
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
-    let mut instance = Dijkstra::new(&graph);
+    let mut instance_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
 
     for i in 0..100 {
-        let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
-        let t = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
+        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
+        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
         println!("Query #{} from {} to {} without constraints", i, s, t);
-        instance.init_new_s(s);
-        let mut instance_mcd = OneRestrictionDijkstra::new(&graph_mcd);
-        instance_mcd.init_new_s(s);
-        instance_mcd.set_reset_flags(is_parking_node.to_bytes());
-
-        assert_eq!(instance.dist_query(t), instance_mcd.dist_query(t));
-        assert_eq!(instance.current_node_path_to(t), instance_mcd.current_best_node_path_to(t));
+        instance_state.init_new_s(s);
+        let mut instance_mcd_state = OneRestrictionDijkstraData::new(graph.num_nodes());
+        instance_mcd_state.init_new_s(s);
+        instance_mcd_state.set_reset_flags(is_parking_node.to_bytes());
+        let instance_mcd = OneRestrictionDijkstra::new(graph.borrow());
+        assert_eq!(dijkstra.dist_query(&mut instance_state, t), instance_mcd.dist_query(&mut instance_mcd_state, t));
+        assert_eq!(instance_state.current_node_path_to(t), instance_mcd_state.current_best_node_path_to(t));
     }
 
     Ok(())

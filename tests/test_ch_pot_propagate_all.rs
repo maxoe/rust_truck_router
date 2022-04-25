@@ -1,7 +1,12 @@
 use std::{error::Error, path::Path};
 
 use rust_truck_router::{
-    algo::{ch::ContractionHierarchy, ch_potential::CHPotential, csp::*, dijkstra::Dijkstra},
+    algo::{
+        ch::ContractionHierarchy,
+        ch_potential::CHPotential,
+        csp::*,
+        dijkstra::{Dijkstra, DijkstraData},
+    },
     io::*,
     types::{OwnedGraph, *},
 };
@@ -20,43 +25,31 @@ fn some_ch_pot_queries() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
-    let graph_mcd = FirstOutGraph::new(first_out, head, travel_time);
-    let mut dijkstra = Dijkstra::new(&graph);
-    let ch_pot = CHPotential::from_ch(ch);
-    let mut dijkstra_pot = Dijkstra::new_with_potential(&graph, ch_pot.clone());
-    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(&graph_mcd, ch_pot);
+    let graph = OwnedGraph::new(first_out, head, travel_time);
+    let mut dijkstra_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra_pot_state = DijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let dijkstra_pot = Dijkstra::new(graph.borrow());
+    let mut instance_mcd_acc_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow());
 
     for s in 0..5 {
-        dijkstra.init_new_s(s);
-        dijkstra_pot.init_new_s(s);
-        instance_mcd_acc.init_new_s(s);
+        dijkstra_state.init_new_s(s);
+        dijkstra_pot_state.init_new_s(s);
+        instance_mcd_acc_state.init_new_s(s);
         for t in 0..5 {
-            let dijkstra_dist = dijkstra.dist_query(t);
-            assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query_propagate_all_labels(t));
-            assert_eq!(dijkstra_dist, dijkstra_pot.dist_query(t));
+            let dijkstra_dist = dijkstra.dist_query(&mut dijkstra_state, t);
+            assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query_propagate_all_labels(&mut instance_mcd_acc_state, t));
+            assert_eq!(dijkstra_dist, dijkstra_pot.dist_query(&mut dijkstra_pot_state, t));
 
-            let dijkstra_path = dijkstra.current_node_path_to(t);
-            assert_eq!(dijkstra_path, dijkstra_pot.current_node_path_to(t));
-            assert_eq!(dijkstra_path, instance_mcd_acc.current_best_node_path_to(t));
+            let dijkstra_path = dijkstra_state.current_node_path_to(t);
+            assert_eq!(dijkstra_path, dijkstra_pot_state.current_node_path_to(t));
+            assert_eq!(dijkstra_path, instance_mcd_acc_state.current_best_node_path_to(t));
         }
     }
 
     Ok(())
 }
-
-// #[test]
-// fn test_reset() -> Result<(), Box<dyn Error>> {
-//     let path = std::env::current_dir()?.as_path().join(Path::new("test_data/ch_instances/"));
-//     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
-//     ch.check();
-
-//     let mut ch_pot = CHPotential::from_ch(ch);
-//     ch_pot.init_new_t(4);
-//     ch_pot.reset();
-
-//     Ok(())
-// }
 
 /// Careful, can produce false positive if random query has an ambiguous shortest path
 #[test]
@@ -71,31 +64,32 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let graph = OwnedGraph::new(first_out.clone(), head.clone(), travel_time.clone());
-    let graph_mcd = FirstOutGraph::new(first_out, head, travel_time);
-    let mut dijkstra = Dijkstra::new(&graph);
-    let ch_pot = CHPotential::from_ch(ch);
-    let mut dijkstra_pot = Dijkstra::new_with_potential(&graph, ch_pot.clone());
-    let mut instance_mcd_acc = OneRestrictionDijkstra::new_with_potential(&graph_mcd, ch_pot);
+    let mut dijkstra_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
+    let mut dijkstra_pot_state = DijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let dijkstra_pot = Dijkstra::new(graph.borrow());
+    let mut instance_mcd_acc_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow());
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542290214824);
 
     for i in 0..100 {
-        let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
-        let t = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);
+        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
+        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
         println!("Query #{} from {} to {}", i, s, t);
 
-        dijkstra.init_new_s(s);
-        dijkstra_pot.init_new_s(s);
-        instance_mcd_acc.init_new_s(s);
+        dijkstra_state.init_new_s(s);
+        dijkstra_pot_state.init_new_s(s);
+        instance_mcd_acc_state.init_new_s(s);
 
-        let dijkstra_dist = dijkstra.dist_query(t);
-        assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query_propagate_all_labels(t));
-        assert_eq!(dijkstra_dist, dijkstra_pot.dist_query(t));
+        let dijkstra_dist = dijkstra.dist_query(&mut dijkstra_state, t);
+        assert_eq!(dijkstra_dist, instance_mcd_acc.dist_query_propagate_all_labels(&mut instance_mcd_acc_state, t));
+        assert_eq!(dijkstra_dist, dijkstra_pot.dist_query(&mut dijkstra_pot_state, t));
 
-        let dijkstra_path = dijkstra.current_node_path_to(t);
+        let dijkstra_path = dijkstra_state.current_node_path_to(t);
 
-        assert_eq!(dijkstra_path, dijkstra_pot.current_node_path_to(t));
-        assert_eq!(dijkstra_path, instance_mcd_acc.current_best_node_path_to(t));
+        assert_eq!(dijkstra_path, dijkstra_pot_state.current_node_path_to(t));
+        assert_eq!(dijkstra_path, instance_mcd_acc_state.current_best_node_path_to(t));
     }
 
     Ok(())

@@ -1,6 +1,10 @@
 use rand::Rng;
 use rust_truck_router::{
-    algo::{csp_core_ch::CSPCoreContractionHierarchy, dijkstra::Dijkstra},
+    algo::{
+        core_ch::CoreContractionHierarchy,
+        csp_core_ch::CSPCoreCHQuery,
+        dijkstra::{Dijkstra, DijkstraData},
+    },
     experiments::measurement::{CSP1MeasurementResult, MeasurementResult},
     io::*,
     types::*,
@@ -23,12 +27,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
-    let mut search = CSPCoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
+    let mut search = CSPCoreCHQuery::new(core_ch.borrow());
     search.check();
     search.set_restriction(16_200_000, 2_700_000);
 
     let log_num_nodes = (graph.num_nodes() as f32).log2() as usize;
-    let mut dijkstra = Dijkstra::new(&graph);
+    let mut dijkstra_state = DijkstraData::new(graph.num_nodes());
+    let dijkstra = Dijkstra::new(graph.borrow());
 
     let n = 100;
     let mut result = Vec::with_capacity(n);
@@ -59,10 +65,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
         search.init_new_s(s);
-        dijkstra.init_new_s(s);
+        dijkstra_state.init_new_s(s);
 
-        let rank_order = dijkstra.ranks_only_exponentials();
-        dijkstra.ranks_only_exponentials();
+        let rank_order = dijkstra.ranks_only_exponentials(&mut dijkstra_state);
 
         let mut rank_times = Vec::with_capacity(log_num_nodes);
         for (_i, current_t) in rank_order.into_iter().enumerate() {
