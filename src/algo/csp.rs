@@ -623,4 +623,119 @@ impl<'a> OneRestrictionDijkstra<'a> {
 
         next
     }
+
+    pub fn settle_next_label_prune_bw_lower_bound<P: Potential>(
+        &self,
+        state: &mut OneRestrictionDijkstraData<P>,
+        tentative_distance: Weight,
+        bw_min_key: Weight2,
+        bw_potential: &mut P,
+        t: NodeId,
+    ) -> Option<State<Weight2>> {
+        let next = state.queue.pop();
+
+        if let Some(State {
+            distance: _tentative_distance_from_queue,
+            node: node_id,
+        }) = next
+        {
+            state.num_settled += 1;
+
+            if node_id == t {
+                state.last_distance = state.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
+            }
+
+            let label_index = state.per_node_labels.get_mut(node_id as usize).peek_index().unwrap();
+            let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
+            let tentative_dist_without_pot = label.0.distance;
+
+            // check if next unsettled lable exists for node and push to queue
+            if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
+                let pot = state.potential.potential(node_id);
+                state.queue.push(State {
+                    distance: state.estimated_dist_with_restriction(next_best_label.0.distance, pot),
+                    node: node_id,
+                });
+            }
+
+            // with hopping reduction
+            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
+                // [new_dist without, new_dist with parking]
+                let mut new_dist = Vec::with_capacity(2);
+                new_dist.push(tentative_dist_without_pot.link(edge_weight));
+
+                // constraint and target pruning
+                if new_dist[0][1] >= state.restriction.max_driving_time
+                    || state.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
+                {
+                    continue;
+                }
+
+                if state.reset_flags.get(neighbor_node as usize).unwrap() {
+                    new_dist.push(new_dist[0]);
+                    new_dist[1].reset_distance(1, state.restriction.pause_time);
+                    state.num_labels_reset += 1;
+                }
+
+                for current_new_dist in new_dist {
+                    // pruning with bw lower bound
+                    // current_new_dist + bw_min_key - bw_potential(neighbor_node) >= tentative_distance
+                    // tentative_distance + bw_potential(neighbor_node) <= current_new_dist + bw_min_key
+                    if tentative_distance
+                        .link(bw_potential.potential(neighbor_node))
+                        .dominates(&(current_new_dist.add(bw_min_key)[0]))
+                    {
+                        continue;
+                    }
+
+                    let is_set = state.per_node_labels.is_set(neighbor_node as usize);
+                    state.per_node_labels.get_mut(neighbor_node as usize);
+                    assert!(
+                        is_set
+                            || (state.per_node_labels.get(neighbor_node as usize).iter().count()
+                                + state.per_node_labels.get(neighbor_node as usize).popped().count())
+                                == 0
+                    );
+                    let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
+                    let mut dominated = false;
+                    neighbor_label_set.retain(|&neighbor_label| {
+                        dominated |= neighbor_label.0.distance.dominates(&current_new_dist);
+                        dominated || !current_new_dist.dominates(&neighbor_label.0.distance)
+                    });
+
+                    if !dominated {
+                        state.num_labels_propagated += 1;
+                        neighbor_label_set.push(Reverse(Label {
+                            distance: current_new_dist,
+                            prev_node: node_id,
+                            incoming_edge_weight: edge_weight,
+                            prev_label: Some(label_index),
+                        }));
+
+                        let pot = state.potential.potential(neighbor_node);
+                        let dist_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+                        if state.queue.contains_index(neighbor_node as usize) {
+                            // decrease key seems to increase key if given a larger key than existing
+                            if state.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {
+                                state.queue.decrease_key(State {
+                                    distance: dist_with_potential,
+                                    node: neighbor_node,
+                                });
+                            }
+                        } else {
+                            state.num_queue_pushes += 1;
+                            state.queue.push(State {
+                                distance: dist_with_potential,
+                                node: neighbor_node,
+                            });
+                        }
+                    }
+                }
+            }
+        } else {
+            state.last_distance = None;
+        }
+
+        next
+    }
 }

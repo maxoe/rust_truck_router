@@ -3,7 +3,7 @@ use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy,
         core_ch::CoreContractionHierarchy,
-        csp_core_ch_chpot::CSPAstarCoreContractionHierarchy,
+        csp_core_ch_chpot::CSPAstarCoreCHQuery,
         dijkstra::{Dijkstra, DijkstraData},
     },
     io::*,
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
-    let mut search = CSPAstarCoreContractionHierarchy::new(core_ch.borrow(), ch.borrow());
+    let mut search = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     search.check();
     search.set_restriction(16_200_000, 2_700_000);
 

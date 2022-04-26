@@ -227,8 +227,17 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                 if let Some(State {
                     distance: _dist_from_queue_at_v,
                     node,
-                }) = fw_search.settle_next_label(&mut self.fw_state, self.t)
-                {
+                }) = if tentative_distance < Weight::infinity() && self.bw_state.min_key().is_some() {
+                    fw_search.settle_next_label_prune_bw_lower_bound(
+                        &mut self.fw_state,
+                        tentative_distance,
+                        self.bw_state.peek_queue().map(|s| s.distance).unwrap(),
+                        &mut self.bw_state.potential,
+                        self.t,
+                    )
+                } else {
+                    fw_search.settle_next_label(&mut self.fw_state, self.t)
+                } {
                     settled_fw.set(node as usize, true);
 
                     // fw search found t -> done here
@@ -283,8 +292,17 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                 if let Some(State {
                     distance: _dist_from_queue_at_v,
                     node,
-                }) = bw_search.settle_next_label(&mut self.bw_state, self.s)
-                {
+                }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
+                    bw_search.settle_next_label_prune_bw_lower_bound(
+                        &mut self.bw_state,
+                        tentative_distance,
+                        self.fw_state.peek_queue().map(|s| s.distance).unwrap(),
+                        &mut self.fw_state.potential,
+                        self.s,
+                    )
+                } else {
+                    bw_search.settle_next_label(&mut self.bw_state, self.s)
+                } {
                     settled_bw.set(node as usize, true);
 
                     // bw search found s -> done here

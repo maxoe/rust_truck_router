@@ -5,7 +5,7 @@ use rust_truck_router::{
         ch::ContractionHierarchy,
         core_ch::CoreContractionHierarchy,
         csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
-        csp_core_ch_chpot::CSPAstarCoreContractionHierarchy,
+        csp_core_ch_chpot::CSPAstarCoreCHQuery,
     },
     io::{load_routingkit_bitvector, Load},
     types::{EdgeId, Graph, NodeId, OwnedGraph, Weight},
@@ -19,7 +19,7 @@ fn test_instance_queries() -> Result<(), Box<dyn Error>> {
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
 
-    let mut core_ch = CSPAstarCoreContractionHierarchy::new(core_ch.borrow(), ch.borrow());
+    let mut core_ch = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch.check();
     let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
     let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
@@ -59,7 +59,7 @@ fn test_needs_two_breaks_instance() -> Result<(), Box<dyn Error>> {
     let graph = OwnedGraph::load_from_routingkit_dir(path.clone())?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
-    let mut core_ch = CSPAstarCoreContractionHierarchy::new(core_ch.borrow(), ch.borrow());
+    let mut core_ch = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch.check();
 
     let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
@@ -107,7 +107,7 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542210214824);
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
-    let mut core_ch = CSPAstarCoreContractionHierarchy::new(core_ch.borrow(), ch.borrow());
+    let mut core_ch = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch.check();
     core_ch.set_restriction(max_driving_time, pause_time);
 
