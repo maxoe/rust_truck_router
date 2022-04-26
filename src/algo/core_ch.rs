@@ -150,12 +150,8 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
         if !self.core_ch.is_core.get(self.s as usize).unwrap() {
             self.fw_state.init_new_s(self.s);
             self.fw_finished = false;
-            // self.needs_core |= false;
-            // self.core_s = self.forward.num_nodes() as NodeId;
         } else {
             self.fw_finished = true;
-            // self.needs_core = true;
-            // self.core_s = ext_s;
         }
     }
 
@@ -165,22 +161,10 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
         if !self.core_ch.is_core.get(self.t as usize).unwrap() {
             self.bw_state.init_new_s(self.t);
             self.bw_finished = false;
-            // self.needs_core |= false;
-            // self.core_t = self.backward.num_nodes() as NodeId;
         } else {
             self.bw_finished = true;
-            // self.needs_core = true;
-            // self.core_t = ext_t;
         }
     }
-
-    // fn to_core_index(&self, n: NodeId) -> Option<NodeId> {
-    //     if self.is_core.get(n as usize).is_none() {
-    //         None
-    //     } else {
-    //         Some(self.is_core.iter().take((n) as usize).filter(|b| *b).count() as NodeId)
-    //     }
-    // }
 
     pub fn run_query(&mut self) -> Option<Weight> {
         let mut tentative_distance = Weight::infinity();
@@ -214,7 +198,6 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
 
             if self.bw_finished || !self.fw_finished && fw_next {
                 if let Some(State { distance: _, node }) = fw_search.settle_next_node(&mut self.fw_state) {
-                    //dbg!("fw settled {}", node);
                     settled_fw.set(node as usize, true);
 
                     // fw search found t -> done here
@@ -245,24 +228,18 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
                     if self.fw_finished {
                         println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
-                    // if !self.is_core.get(node as usize).unwrap() && self.needs_core {
-                    //     println!("non-core after core reached");
-                    // }
+
                     if self.core_ch.is_core.get(node as usize).unwrap() && !self.needs_core {
                         println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
                     }
                     if self.core_ch.is_core.get(node as usize).unwrap() {
-                        // dbg!("forward reached core");
-                        //     self.fw_finished = true;
                         self.needs_core = true;
-                        //     self.core_s.push(node);
                     }
 
                     fw_next = false;
                 }
             } else {
                 if let Some(State { distance: _, node }) = bw_search.settle_next_node(&mut self.bw_state) {
-                    //dbg!("bw settled {}", node);
                     settled_bw.set(node as usize, true);
 
                     // bw search found s -> done here
@@ -301,10 +278,7 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
                     }
 
                     if self.core_ch.is_core.get(node as usize).unwrap() {
-                        // dbg!("backwards reached core");
-                        //     // self.bw_finished = true;
                         self.needs_core = true;
-                        //     self.core_t.push(node);
                     }
 
                     fw_next = true;
@@ -312,34 +286,10 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
             }
         }
 
-        if
-        /* !self.needs_core &&*/
-        tentative_distance == Weight::infinity() {
+        if tentative_distance == Weight::infinity() {
             return None;
         }
 
-        //if !self.needs_core {
         return Some(tentative_distance);
-        //}
-
-        // dbg!("Searching in core");
-        // dbg!(self.core_s);
-        // dbg!(self.core_t);
-
-        // for current_core_s in self.core_s
-        // self.core_search.init_new_s(self.to_core_index(self.core_s).unwrap());
-
-        // if let Some(core_dist) = self.core_search.dist_query(self.to_core_index(self.core_t).unwrap()) {
-        //     dbg!(core_dist);
-        //     Some(
-        //         self.fw_search.tentative_distance_at(self.to_core_index(self.core_s).unwrap())
-        //             + self.bw_search.tentative_distance_at(self.to_core_index(self.core_t).unwrap())
-        //             + core_dist,
-        //     )
-        // } else {
-        //     dbg!("core search failed");
-        //     None
-        // }
-        // None
     }
 }

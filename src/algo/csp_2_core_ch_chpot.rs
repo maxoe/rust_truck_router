@@ -136,12 +136,10 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
 
     pub fn init_new_s(&mut self, ext_s: NodeId) {
         self.s = self.core_ch.rank()[ext_s as usize] as NodeId;
-        self.reset();
     }
 
     pub fn init_new_t(&mut self, ext_t: NodeId) {
         self.t = self.core_ch.rank()[ext_t as usize] as NodeId;
-        self.reset();
     }
 
     pub fn reset(&mut self) {
@@ -196,6 +194,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
     }
 
     pub fn run_query(&mut self) -> Option<Weight> {
+        let time = Instant::now();
         if self.s == self.core_ch.rank().len() as NodeId || self.t == self.core_ch.rank().len() as NodeId {
             return None;
         }
@@ -218,7 +217,8 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         let fw_search = TwoRestrictionDijkstra::new(self.core_ch.forward());
         let bw_search = TwoRestrictionDijkstra::new(self.core_ch.backward());
 
-        let time = Instant::now();
+        println!("init finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
+        let time_search = Instant::now();
         while (!self.fw_finished || !self.bw_finished)
             && !(self.fw_finished && !fw_search_reachable_from_core && bw_in_core)
             && !(self.bw_finished && !bw_search_reachable_from_core && fw_in_core)
@@ -270,11 +270,11 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                     }
 
                     if self.fw_finished {
-                        println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
+                        println!("fw finished in {} ms", time_search.elapsed().as_secs_f64() * 1000.0);
                     }
 
                     if self.core_ch.is_core().get(node as usize).unwrap() && !fw_in_core {
-                        println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
+                        println!("fw core reached in {} ms", time_search.elapsed().as_secs_f64() * 1000.0);
                     }
 
                     fw_next = false;
@@ -327,11 +327,11 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                     }
 
                     if self.bw_finished {
-                        println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
+                        println!("bw finished in {} ms", time_search.elapsed().as_secs_f64() * 1000.0);
                     }
 
                     if self.core_ch.is_core().get(node as usize).unwrap() && !bw_in_core {
-                        println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
+                        println!("bw core reached in {} ms", time_search.elapsed().as_secs_f64() * 1000.0);
                     }
 
                     fw_next = true;

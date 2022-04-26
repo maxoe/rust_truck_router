@@ -117,12 +117,10 @@ impl<'a> CSPAstarCoreContractionHierarchy<'a> {
 
     pub fn init_new_s(&mut self, ext_s: NodeId) {
         self.s = self.core_ch.rank()[ext_s as usize] as NodeId;
-        self.reset();
     }
 
     pub fn init_new_t(&mut self, ext_t: NodeId) {
         self.t = self.core_ch.rank()[ext_t as usize] as NodeId;
-        self.reset();
     }
 
     pub fn reset(&mut self) {

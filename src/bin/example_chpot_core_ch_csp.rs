@@ -21,7 +21,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
-    // let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
@@ -36,31 +35,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     // core_ch.set_restriction(16_200_000, 2_700_000);
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+
     let mut core_ch_query = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
+
     core_ch_query.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
     core_ch_query.check();
 
-    let mut time = Instant::now();
     core_ch_query.init_new_s(s);
     core_ch_query.init_new_t(t);
-    println!("Core ch init s and t took {} ms", time.elapsed().as_secs_f64() * 1000.0);
 
-    time = Instant::now();
+    let time = Instant::now();
     let dist = core_ch_query.run_query();
-
     println!("Took {} ms", time.elapsed().as_secs_f64() * 1000.0);
 
     if dist.is_some() {
         println!("From {} to {}: {}", s, t, dist.unwrap());
-
-        // if core_ch.last_num_breaks {
-        //     println!(
-        //         "Used one break:\n\t- max driving time: {} ms\n\t- pause time: {} ms",
-        //         core_ch.restrictions[0].max_driving_time, core_ch.restrictions[0].pause_time
-        //     );
-        // } else {
-        //     println!("No break used");
-        // }
     } else {
         println!("No path found")
     }
