@@ -28,8 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
     let mut search_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
-    let search = OneRestrictionDijkstra::new(graph.borrow());
-    search_state.set_reset_flags(is_parking_node.to_bytes());
+    let search = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
     // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
@@ -82,8 +81,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if let Some(dist) = result {
                 let path = search_state.current_best_path_to(t, true).unwrap();
-                let number_flagged_nodes = search_state.flagged_nodes_on_path(&path);
-                let number_pauses = search_state.reset_nodes_on_path(&path);
+                let number_flagged_nodes = search.flagged_nodes_on_path(&path);
+                let number_pauses = search.reset_nodes_on_path(&path);
 
                 results.push(LocalMeasurementResult {
                     max_driving_time_ms: current_max_distance,

@@ -224,97 +224,68 @@ def get_boxplot_outliers(df, by_column_name):
     return df.loc[filter]
 
 
-def plot_rank_times(name, graph):
+def plot_all_rank_times(problem, graph):
+    name = "measure_all_" + problem + "_1000_queries_rank_times"
+
     run_measurement_conditionally(name, graph)
 
-    csp_1000_queries = read_measurement(
+    queries_all = read_measurement(
         name + "-" + graph,
     )
 
     # plot only 2^10 and larger
-    csp_1000_queries = csp_1000_queries.loc[
-        csp_1000_queries["dijkstra_rank_exponent"] >= 10
-    ]
+    queries_all = queries_all.loc[queries_all["dijkstra_rank_exponent"] >= 10]
 
     colors = ggPlotColors(4)
 
     to_plot = [
         ("time_ms", "log"),
     ]
-    # csp_1000_queries = csp_1000_queries.loc[csp_1000_queries["path_distance"] == -1]
-    for (column_name, plot_scale) in to_plot:
-        if column_name in csp_1000_queries.columns:
-            fig, ax = plt.subplots(figsize=(10, 5))
-            bp = csp_1000_queries.boxplot(
-                ax=ax, by="dijkstra_rank_exponent", column=column_name
-            )
 
-            bp.get_figure().gca().set_title("")
-            fig.suptitle("")
+    algos = ["astar_chpot", "core_ch", "core_ch_chpot"]
 
-            ax.set_xlabel("dijkstra rank")
-            ax.set_ylabel(column_name)
-            ax.set_yscale(plot_scale)
+    for algo in algos:
+        queries = queries_all.loc[queries_all["algo"] == algo]
+        # queries = queries.loc[queries["path_distance"] == -1]
+        for (column_name, plot_scale) in to_plot:
+            if column_name in queries.columns:
+                fig, ax = plt.subplots(figsize=(10, 5))
+                bp = queries.boxplot(
+                    ax=ax, by="dijkstra_rank_exponent", column=column_name
+                )
 
-            if plot_scale == "linear":
-                ax.set_ylim(bottom=-0.1)
-                ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+                bp.get_figure().gca().set_title("")
+                fig.suptitle("")
 
-            make_dijkstra_rank_tick_labels_from_exponent(
-                ax.xaxis, csp_1000_queries["dijkstra_rank_exponent"].unique()
-            )
+                ax.set_xlabel("dijkstra rank")
+                ax.set_ylabel(column_name)
+                ax.set_yscale(plot_scale)
 
-            plt.title(name + ": " + graph)
-            fig.tight_layout()
+                if plot_scale == "linear":
+                    ax.set_ylim(bottom=-0.1)
+                    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 
-            write_plt(name + "-" + column_name + ".png", graph)
+                make_dijkstra_rank_tick_labels_from_exponent(
+                    ax.xaxis, queries["dijkstra_rank_exponent"].unique()
+                )
 
+                plt.title(name + "-" + algo + ": " + graph)
+                fig.tight_layout()
 
-def plot_rank_times_from_simple_meaurement(name, graph):
-    run_measurement_conditionally(name, graph)
-
-    csp_1000_queries = read_measurement(
-        name + "-" + graph,
-    )
-
-    # plot only 2^10 and larger
-    csp_1000_queries = csp_1000_queries.loc[
-        :, csp_1000_queries.columns.astype(int) >= 2 ** 10
-    ]
-
-    colors = ggPlotColors(4)
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    bp = csp_1000_queries.boxplot(
-        ax=ax,
-    )
-
-    bp.get_figure().gca().set_title("")
-    fig.suptitle("")
-
-    ax.set_xlabel("dijkstra rank")
-    ax.set_ylabel("query time [ms]")
-    ax.set_yscale("log")
-
-    make_dijkstra_rank_tick_labels_from_number(
-        ax.xaxis, csp_1000_queries.columns.astype(int).unique()
-    )
-
-    plt.title(name + ": " + graph)
-    fig.tight_layout()
-
-    write_plt(name + "-time_ms.png", graph)
+                write_plt(name + "-" + algo + "-" + column_name + ".png", graph)
 
 
-def plot_csp_rank_times_perf_profile(graph):
+def plot_rank_times_perf_profile(problem, graph):
     algos = ["astar_chpot", "core_ch_chpot"]
     algo_times = np.ndarray([])
     linespecs = ["r-", "b-"]  # , "g-"]
 
-    run_measurement_conditionally("measure_all_csp_1000_queries_rank_times", g)
+    run_measurement_conditionally(
+        "measure_all_" + problem + "_1000_queries_rank_times", g
+    )
 
     algo_results = read_measurement(
-        "measure_all_csp_1000_queries_rank_times-" + g,
+        "measure_all_" + problem + "_1000_queries_rank_times-" + g,
     )
 
     algo_results = algo_results.loc[algo_results["dijkstra_rank_exponent"] >= 10]
@@ -327,7 +298,7 @@ def plot_csp_rank_times_perf_profile(graph):
 
     algo_times = np.asarray(algo_times).T
     perfprof(algo_times, linespecs=linespecs, legendnames=algos)
-    write_plt("measure_all_csp_1000_queries_rank_times-" + g + ".png")
+    write_plt("measure_all_" + problem + "_1000_queries_rank_times-perfprofile.png", g)
 
 
 if __name__ == "__main__":
@@ -362,14 +333,6 @@ if __name__ == "__main__":
         exit(0)
 
     for g in args.graph:
-        plot_rank_times("measure_csp_1000_queries_rank_times", g)
-        plot_rank_times("measure_csp_2_1000_queries_rank_times", g)
-        plot_rank_times_from_simple_meaurement(
-            "measure_core_ch_csp_1000_queries_rank_times", g
-        )
-        plot_rank_times_from_simple_meaurement(
-            "measure_core_ch_csp_2_1000_queries_rank_times", g
-        )
-        plot_rank_times("measure_chpot_core_ch_csp_1000_queries", g)
-        plot_rank_times("measure_chpot_core_ch_csp_2_1000_queries", g)
-        plot_csp_rank_times_perf_profile(g)
+        for p in ["csp", "csp_2"]:
+            plot_all_rank_times(p, g)
+            plot_rank_times_perf_profile(p, g)

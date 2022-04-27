@@ -4,7 +4,6 @@ use rust_truck_router::{
         ch_potential::CHPotential,
         core_ch::CoreContractionHierarchy,
         csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
-        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
     },
     io::*,
@@ -60,17 +59,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut csp_pot_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     // let mut csp_pot_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     // let csp_pot = TwoRestrictionDijkstra::new(graph.borrow());
-    let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+    let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     csp_pot_state.init_new_s(s);
-    csp_pot_state.set_reset_flags(is_parking_node.to_bytes()).set_restriction(16_200_000, 2_700_000); //.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    csp_pot_state.set_restriction(16_200_000, 2_700_000); //.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
     let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
-    let csp_pot_num_breaks = if let Some(path) = csp_pot_state.current_best_path_to(t, true) {
-        // Some(csp_pot_state.reset_nodes_on_path(&path).0.len())
-        Some(csp_pot_state.reset_nodes_on_path(&path).len())
-    } else {
-        None
-    };
+    let csp_pot_num_breaks = csp_pot_state.current_best_path_to(t, true).map(|path| csp_pot.reset_nodes_on_path(&path).len());
+
     assert_eq!(dist, csp_pot_dist);
     assert!(dist == csp_pot_dist || (csp_pot_num_breaks.is_some() && csp_pot_num_breaks.unwrap() > 1));
     assert_eq!(dist, core_ch_query.last_dist);

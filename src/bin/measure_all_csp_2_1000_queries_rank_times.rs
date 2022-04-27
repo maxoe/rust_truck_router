@@ -238,7 +238,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("Progress {}/{}", n, n);
 
-    let file = File::create("measure_all_csp_1000_queries_rank_times-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
+    let file = File::create("measure_all_csp_2_1000_queries_rank_times-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);
     writeln!(file, "{}", LocalMeasurementResult::get_header())?;
     for r in stat_logs {

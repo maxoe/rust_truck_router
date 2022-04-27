@@ -4,7 +4,7 @@ use core::mem::ManuallyDrop;
 use core::ptr;
 
 #[derive(Ord, Eq, PartialEq, PartialOrd, Clone, Copy)]
-struct IndexedType<T> {
+pub struct IndexedType<T> {
     pub e: T,
     index: usize,
 }
@@ -17,8 +17,9 @@ impl<T> Indexing for IndexedType<T> {
 
 #[derive(Clone)]
 pub struct AutoIndexedHeap<T> {
-    data: Vec<IndexedType<T>>,
-    positions: Vec<usize>,
+    pub data: Vec<IndexedType<T>>,
+    pub positions: Vec<usize>,
+    pub removed_without_pop: Vec<usize>,
     split: usize,
     // cmp: C,
 }
@@ -30,6 +31,7 @@ impl<T> AutoIndexedHeap<T> {
         Self {
             data: vec![],
             positions: vec![],
+            removed_without_pop: vec![],
             split: 0,
         }
     }
@@ -61,11 +63,23 @@ impl<T: Ord + Copy> AutoIndexedHeap<T> {
 
     pub fn push(&mut self, item: T) -> usize {
         let old_len = self.split;
-        let new_item_index = self.data.len();
-        self.data.push(IndexedType {
-            e: item,
-            index: new_item_index,
-        });
+
+        // use free space in data vector or push new
+        let new_item_index = if let Some(new_item_index) = self.removed_without_pop.pop() {
+            self.data[new_item_index] = IndexedType {
+                e: item,
+                index: new_item_index,
+            };
+            new_item_index
+        } else {
+            let new_item_index = self.data.len();
+            self.data.push(IndexedType {
+                e: item,
+                index: new_item_index,
+            });
+            new_item_index
+        };
+
         self.positions.push(new_item_index);
         let pushed_idx = self.positions.len() - 1;
         self.positions.swap(old_len, pushed_idx);
@@ -78,7 +92,7 @@ impl<T: Ord + Copy> AutoIndexedHeap<T> {
     }
 
     pub fn contains_index(&self, id: usize) -> bool {
-        id < self.data.len()
+        id < self.data.len() && !self.removed_without_pop.contains(&id)
     }
 
     pub fn is_popped(&self, id: usize) -> bool {
@@ -91,6 +105,13 @@ impl<T: Ord + Copy> AutoIndexedHeap<T> {
         }
 
         Some(&self.data[id].e)
+    }
+
+    pub fn reset(&mut self) {
+        self.data.clear();
+        self.positions.clear();
+        self.removed_without_pop.clear();
+        self.split = 0;
     }
 
     // The implementations of sift_up and sift_down use unsafe blocks in
@@ -305,7 +326,6 @@ impl<T: Ord + Copy> AutoIndexedHeap<T> {
         let mut first_removed = self.split;
         let mut i = 0;
         let mut removed_from_heap = 0;
-        let mut new_indices = Vec::with_capacity(self.data.len());
 
         self.positions.retain_mut(|p| {
             let keep = f(&self.data[*p].e);
@@ -317,7 +337,7 @@ impl<T: Ord + Copy> AutoIndexedHeap<T> {
             }
 
             if !keep {
-                new_indices.push(i);
+                self.removed_without_pop.push(*p);
             }
 
             i += 1;

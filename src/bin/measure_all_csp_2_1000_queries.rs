@@ -4,11 +4,11 @@ use rust_truck_router::{
         ch::*,
         ch_potential::CHPotential,
         core_ch::CoreContractionHierarchy,
-        csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
+        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
         csp_core_ch::CSPCoreCHQuery,
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
     },
-    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult},
     io::*,
     types::*,
 };
@@ -36,9 +36,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     ch.check();
     core_ch.check();
 
-    let mut astar_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
-    astar_state.set_restriction(16_200_000, 2_700_000);
-    let astar = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
+    let mut astar_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    astar_state.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    let astar = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
     let mut core_ch_query = CSPCoreCHQuery::new(core_ch.borrow());
     core_ch_query.set_restriction(16_200_000, 2_700_000);
@@ -51,14 +51,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {
         pub algo: String,
-        standard: CSP1MeasurementResult,
+        standard: CSP2MeasurementResult,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
         const OWN_HEADER: &'static str = "algo";
 
         fn get_header() -> String {
-            format!("{},{}", Self::OWN_HEADER, CSP1MeasurementResult::get_header())
+            format!("{},{}", Self::OWN_HEADER, CSP2MeasurementResult::get_header())
         }
         fn as_csv(&self) -> String {
             format!("{},{}", self.algo, self.standard.as_csv())
@@ -101,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             stat_logs.push(LocalMeasurementResult {
                 algo: String::from("astar_chpot"),
-                standard: CSP1MeasurementResult {
+                standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
                         graph_num_edges: graph.num_arcs(),
@@ -115,13 +115,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                         path_number_nodes: Some(path.0.len()),
                         path_number_flagged_nodes: Some(number_flagged_nodes.len()),
                     },
-                    path_number_pauses: Some(number_pauses.len()),
+                    path_number_short_pauses: Some(number_pauses.0.len()),
+                    path_number_long_pauses: Some(number_pauses.1.len()),
                 },
             });
 
             stat_logs.push(LocalMeasurementResult {
                 algo: String::from("core_ch"),
-                standard: CSP1MeasurementResult {
+                standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
                         graph_num_edges: graph.num_arcs(),
@@ -135,13 +136,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                         path_number_nodes: Some(path.0.len()),
                         path_number_flagged_nodes: Some(number_flagged_nodes.len()),
                     },
-                    path_number_pauses: Some(number_pauses.len()),
+                    path_number_short_pauses: Some(number_pauses.0.len()),
+                    path_number_long_pauses: Some(number_pauses.1.len()),
                 },
             });
 
             stat_logs.push(LocalMeasurementResult {
                 algo: String::from("core_ch_chpot"),
-                standard: CSP1MeasurementResult {
+                standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
                         graph_num_edges: graph.num_arcs(),
@@ -155,13 +157,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                         path_number_nodes: Some(path.0.len()),
                         path_number_flagged_nodes: Some(number_flagged_nodes.len()),
                     },
-                    path_number_pauses: Some(number_pauses.len()),
+                    path_number_short_pauses: Some(number_pauses.0.len()),
+                    path_number_long_pauses: Some(number_pauses.1.len()),
                 },
             });
         } else {
             stat_logs.push(LocalMeasurementResult {
                 algo: String::from("astar_chpot"),
-                standard: CSP1MeasurementResult {
+                standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
                         graph_num_edges: graph.num_arcs(),
@@ -175,12 +178,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                         path_number_nodes: None,
                         path_number_flagged_nodes: None,
                     },
-                    path_number_pauses: None,
+                    path_number_short_pauses: None,
+                    path_number_long_pauses: None,
                 },
             });
             stat_logs.push(LocalMeasurementResult {
                 algo: String::from("core_ch"),
-                standard: CSP1MeasurementResult {
+                standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
                         graph_num_edges: graph.num_arcs(),
@@ -194,12 +198,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                         path_number_nodes: None,
                         path_number_flagged_nodes: None,
                     },
-                    path_number_pauses: None,
+                    path_number_short_pauses: None,
+                    path_number_long_pauses: None,
                 },
             });
             stat_logs.push(LocalMeasurementResult {
                 algo: String::from("core_ch_chpot"),
-                standard: CSP1MeasurementResult {
+                standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
                         graph_num_edges: graph.num_arcs(),
@@ -213,14 +218,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                         path_number_nodes: None,
                         path_number_flagged_nodes: None,
                     },
-                    path_number_pauses: None,
+                    path_number_short_pauses: None,
+                    path_number_long_pauses: None,
                 },
             });
         }
     }
     println!("Progress {}/{}", n, n);
 
-    let file = File::create("measure_all_csp_1000_queries-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
+    let file = File::create("measure_all_csp_2_1000_queries-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);
     writeln!(file, "{}", LocalMeasurementResult::get_header())?;
     for r in stat_logs {

@@ -7,38 +7,22 @@ use std::{
 use crate::{
     algo::astar::{NoPotential, Potential},
     index_heap::*,
-    rrr_indexed_heap::AutoIndexedHeap,
     timestamped_vector::TimestampedVector,
     types::*,
 };
 use bit_vec::BitVec;
 use num::Integer;
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
-pub struct Label<T> {
-    pub distance: T,
-    pub prev_node: NodeId,
-    pub incoming_edge_weight: Weight,
-    pub prev_label: Option<usize>,
-}
-
-type MCDHeap<L> = AutoIndexedHeap<Reverse<Label<L>>>;
-
-impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap<L> {
-    const DEFAULT: MCDHeap<L> = MCDHeap::<L>::new();
-}
-
 pub struct TwoRestrictionDijkstraData<P = NoPotential>
 where
     P: Potential,
 {
     pub queue: IndexdMinHeap<State<Weight3>>,
-    pub per_node_labels: TimestampedVector<MCDHeap<Weight3>>,
+    pub per_node_labels: TimestampedVector<MCDHeap<Weight3>, u16>,
     invalid_node_id: NodeId,
     s: NodeId,
     restriction_short: DrivingTimeRestriction,
     restriction_long: DrivingTimeRestriction,
-    reset_flags: BitVec,
     pub potential: P,
     pub num_queue_pushes: u32,
     pub num_settled: u32,
@@ -63,7 +47,6 @@ impl TwoRestrictionDijkstraData<NoPotential> {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
-            reset_flags: BitVec::from_elem(num_nodes, false),
             potential: NoPotential {},
             num_queue_pushes: 0,
             num_settled: 0,
@@ -97,9 +80,8 @@ where
                 distance: self.estimated_dist_with_restriction([0, 0, 0], pot),
             });
             self.per_node_labels.get_mut(self.s as usize).push(Reverse(Label {
-                prev_node: self.invalid_node_id,
                 distance: [0, 0, 0],
-                incoming_edge_weight: Weight::infinity(),
+                prev_node: self.invalid_node_id,
                 prev_label: None,
             }));
         }
@@ -119,7 +101,6 @@ where
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
-            reset_flags: BitVec::from_elem(num_nodes, false),
             potential,
             num_queue_pushes: 0,
             num_settled: 0,
@@ -202,42 +183,6 @@ where
         self.current_best_path_to(t, false).map(|p| p.0)
     }
 
-    pub fn flagged_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight3>)) -> Vec<NodeId> {
-        self.flagged_nodes_on_node_path(&path.0)
-    }
-
-    pub fn flagged_nodes_on_node_path(&self, path: &[NodeId]) -> Vec<NodeId> {
-        let mut flagged_nodes = Vec::new();
-        for &node in path {
-            if self.reset_flags.get(node as usize).unwrap() {
-                flagged_nodes.push(node)
-            }
-        }
-
-        flagged_nodes
-    }
-
-    pub fn flagged_nodes_on_best_path_to(&self, t: NodeId) -> Option<Vec<NodeId>> {
-        self.current_best_path_to(t, true).map(|path| self.flagged_nodes_on_path(&path))
-    }
-
-    pub fn reset_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight3>)) -> (Vec<NodeId>, Vec<NodeId>) {
-        let mut reset_nodes_short = Vec::new();
-        let mut reset_nodes_long = Vec::new();
-
-        for (node, dist) in path.0.iter().zip(&path.1) {
-            if self.reset_flags.get(*node as usize).unwrap() && dist[1] == 0 && dist[0] != 0 {
-                reset_nodes_short.push(*node)
-            }
-
-            if self.reset_flags.get(*node as usize).unwrap() && dist[2] == 0 && dist[0] != 0 {
-                reset_nodes_long.push(*node)
-            }
-        }
-
-        (reset_nodes_short, reset_nodes_long)
-    }
-
     pub fn set_restriction(
         &mut self,
         max_driving_time_long: Weight,
@@ -270,139 +215,12 @@ where
         self
     }
 
-    pub fn set_reset_flags<B: AsRef<[u8]>>(&mut self, flags: B) -> &mut Self {
-        self.reset_flags = BitVec::from_bytes(flags.as_ref());
-        self
-    }
-
-    pub fn clear_reset_flags(&mut self) {
-        self.reset_flags = BitVec::from_elem(self.invalid_node_id as usize, false);
-        self.reset();
-    }
-
     pub fn get_settled_labels_at(&mut self, node: NodeId) -> impl DoubleEndedIterator<Item = &Reverse<Label<Weight3>>> + '_ {
         self.per_node_labels.get_mut(node as usize).popped_sorted()
     }
 
     pub fn peek_queue(&self) -> Option<&State<Weight3>> {
         self.queue.peek()
-    }
-
-    pub fn info(&self) -> String {
-        let mut s = "\n\nSummary for CSP\n\n".to_string();
-
-        if self.num_settled == 0 {
-            writeln!(s, "No query").unwrap();
-            return s;
-        }
-
-        writeln!(s, "Graph: ").unwrap();
-        writeln!(s, "\tnumber of nodes: {}", self.invalid_node_id as usize).unwrap();
-        // writeln!(s, "\tnumber of arcs: {}", self.graph.num_arcs()).unwrap();
-
-        writeln!(s, "").unwrap();
-        writeln!(s, "Restriction: ").unwrap();
-
-        if self.restriction_short.max_driving_time < Weight::infinity() && self.restriction_long.max_driving_time < Weight::infinity() {
-            let num_reset_nodes = self.reset_flags.iter().filter(|b| *b).count();
-            writeln!(
-                s,
-                "\tShort break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
-                self.restriction_short.max_driving_time,
-                self.restriction_short.pause_time,
-                num_reset_nodes,
-                100.0 * num_reset_nodes as f32 / self.invalid_node_id as f32
-            )
-            .unwrap();
-            writeln!(
-                s,
-                "\tLong break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
-                self.restriction_long.max_driving_time,
-                self.restriction_long.pause_time,
-                num_reset_nodes,
-                100.0 * num_reset_nodes as f32 / self.invalid_node_id as f32
-            )
-            .unwrap();
-        } else {
-            writeln!(s, "no driving time restriction").unwrap();
-        }
-
-        writeln!(s, "").unwrap();
-        writeln!(s, "Potential:").unwrap();
-        writeln!(s, "\t{}", std::any::type_name::<P>()).unwrap();
-        writeln!(s, "").unwrap();
-        writeln!(s, "Query:").unwrap();
-        writeln!(s, "\ts: {} t: {}", self.s, self.last_t).unwrap();
-        writeln!(s, "\ttime elapsed: {:.3} ms", self.time_elapsed.as_secs_f64() * 1000.0).unwrap();
-        writeln!(s, "\tnumber of queue pushes: {}", self.num_queue_pushes).unwrap();
-        writeln!(s, "\tnumber of settled nodes: {}", self.num_settled).unwrap();
-        writeln!(s, "\tnumber of propagated labels: {}", self.num_labels_propagated).unwrap();
-        writeln!(s, "\tnumber of labels which were reset: {}", self.num_labels_reset).unwrap();
-
-        writeln!(s, "").unwrap();
-        writeln!(s, "Path:").unwrap();
-
-        if self.last_distance.is_some() {
-            writeln!(s, "\tdistance: {}", self.last_distance.unwrap()).unwrap();
-
-            let (node_path, weights) = self.current_best_path_to(self.last_t, true).unwrap();
-            writeln!(s, "\tnumber of nodes: {}", node_path.len()).unwrap();
-            let flagged_p = self.flagged_nodes_on_node_path(&node_path);
-            writeln!(s, "\t  -thereof number of flagged nodes: {}", flagged_p.len()).unwrap();
-
-            let (reset_p_short, reset_p_long) = self.reset_nodes_on_path(&(node_path, weights));
-            writeln!(s, "\t  -thereof number of flagged nodes actually used: {}", reset_p_short.len()).unwrap();
-            writeln!(s, "\t  -thereof long breaks: {}", reset_p_long.len()).unwrap();
-        } else {
-            writeln!(s, "\tno path found").unwrap();
-        }
-
-        let mut label_sizes_settled = Vec::with_capacity(self.per_node_labels.len());
-        let mut label_sizes_unsettled = Vec::with_capacity(self.per_node_labels.len());
-        let mut label_sizes = Vec::with_capacity(self.per_node_labels.len());
-
-        for i in 0..self.per_node_labels.len() {
-            let label = self.per_node_labels.get(i);
-            let number_of_unsettled = label.iter().count();
-            let number_of_settled = label.popped().count();
-
-            if number_of_settled != 0 {
-                label_sizes.push(number_of_unsettled + number_of_settled);
-                label_sizes_settled.push(number_of_settled);
-                label_sizes_unsettled.push(number_of_unsettled);
-            }
-        }
-
-        writeln!(s, "").unwrap();
-        writeln!(s, "Label Statistics:").unwrap();
-
-        if label_sizes.len() == 0 {
-            writeln!(s, "\t  -no labels were propagated").unwrap();
-        } else {
-            writeln!(
-                s,
-                "\tnumber of nodes with settled labels: {} ({:.2}%)",
-                label_sizes.len(),
-                100.0 * label_sizes.len() as f32 / self.invalid_node_id as f32
-            )
-            .unwrap();
-            writeln!(s, "\t  -thereof maximum number of labels: {}", label_sizes.iter().max().unwrap()).unwrap();
-            writeln!(
-                s,
-                "\t  -thereof avg number of labels: {:.2}",
-                label_sizes.iter().sum::<usize>() as f32 / label_sizes.len() as f32
-            )
-            .unwrap();
-            label_sizes.sort_unstable();
-            let mean = if label_sizes.len().is_odd() {
-                label_sizes[label_sizes.len() / 2] as f32
-            } else {
-                (label_sizes[(label_sizes.len() / 2) - 1] as f32 + label_sizes[label_sizes.len() / 2] as f32) / 2.0
-            };
-            writeln!(s, "\t  -thereof mean number of labels: {:.2}", mean).unwrap();
-        }
-
-        s
     }
 
     pub fn get_per_node_number_of_labels(&self) -> Vec<usize> {
@@ -445,11 +263,12 @@ where
 
 pub struct TwoRestrictionDijkstra<'a> {
     graph: BorrowedGraph<'a>,
+    reset_flags: &'a BitVec,
 }
 
 impl<'a> TwoRestrictionDijkstra<'a> {
-    pub fn new(graph: BorrowedGraph<'a>) -> Self {
-        Self { graph }
+    pub fn new(graph: BorrowedGraph<'a>, reset_flags: &'a BitVec) -> Self {
+        Self { graph, reset_flags }
     }
 
     pub fn settle_next_label<P: Potential>(&self, state: &mut TwoRestrictionDijkstraData<P>, t: NodeId) -> Option<State<Weight3>> {
@@ -493,7 +312,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     continue;
                 }
 
-                if state.reset_flags.get(neighbor_node as usize).unwrap() {
+                if self.reset_flags.get(neighbor_node as usize).unwrap() {
                     new_dist.push(new_dist[0]);
                     new_dist[1].reset_distance(1, state.restriction_short.pause_time);
 
@@ -514,9 +333,8 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                         state.num_labels_propagated += 1;
                         neighbor_label_set.push(Reverse(Label {
                             distance: current_new_dist,
-                            prev_node: node_id,
                             prev_label: Some(label_index),
-                            incoming_edge_weight: edge_weight,
+                            prev_node: node_id,
                         }));
 
                         let pot = state.potential.potential(neighbor_node);
@@ -614,7 +432,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                             continue;
                         }
 
-                        if state.reset_flags.get(neighbor_node as usize).unwrap() {
+                        if self.reset_flags.get(neighbor_node as usize).unwrap() {
                             new_dist.push(new_dist[0]);
                             new_dist[1].reset_distance(1, state.restriction_short.pause_time);
 
@@ -635,9 +453,8 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                                 state.num_labels_propagated += 1;
                                 neighbor_label_set.push(Reverse(Label {
                                     distance: current_new_dist,
-                                    prev_node: node_id,
                                     prev_label: Some(label_index),
-                                    incoming_edge_weight: edge_weight,
+                                    prev_node: node_id,
                                 }));
 
                                 let pot = state.potential.potential(neighbor_node);
@@ -717,7 +534,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     continue;
                 }
 
-                if state.reset_flags.get(neighbor_node as usize).unwrap() {
+                if self.reset_flags.get(neighbor_node as usize).unwrap() {
                     new_dist.push(new_dist[0]);
                     new_dist[1].reset_distance(1, state.restriction_short.pause_time);
 
@@ -748,9 +565,8 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                         state.num_labels_propagated += 1;
                         neighbor_label_set.push(Reverse(Label {
                             distance: current_new_dist,
-                            prev_node: node_id,
                             prev_label: Some(label_index),
-                            incoming_edge_weight: edge_weight,
+                            prev_node: node_id,
                         }));
 
                         let pot = state.potential.potential(neighbor_node);
@@ -779,5 +595,154 @@ impl<'a> TwoRestrictionDijkstra<'a> {
         }
 
         next
+    }
+
+    pub fn flagged_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight3>)) -> Vec<NodeId> {
+        self.flagged_nodes_on_node_path(&path.0)
+    }
+
+    pub fn flagged_nodes_on_node_path(&self, path: &[NodeId]) -> Vec<NodeId> {
+        let mut flagged_nodes = Vec::new();
+        for &node in path {
+            if self.reset_flags.get(node as usize).unwrap() {
+                flagged_nodes.push(node)
+            }
+        }
+
+        flagged_nodes
+    }
+
+    pub fn reset_nodes_on_path(&self, path: &(Vec<NodeId>, Vec<Weight3>)) -> (Vec<NodeId>, Vec<NodeId>) {
+        let mut reset_nodes_short = Vec::new();
+        let mut reset_nodes_long = Vec::new();
+
+        for (node, dist) in path.0.iter().zip(&path.1) {
+            if self.reset_flags.get(*node as usize).unwrap() && dist[1] == 0 && dist[0] != 0 {
+                reset_nodes_short.push(*node)
+            }
+
+            if self.reset_flags.get(*node as usize).unwrap() && dist[2] == 0 && dist[0] != 0 {
+                reset_nodes_long.push(*node)
+            }
+        }
+
+        (reset_nodes_short, reset_nodes_long)
+    }
+
+    pub fn summary<P: Potential>(&self, state: &TwoRestrictionDijkstraData<P>) -> String {
+        let mut s = "\n\nSummary for CSP2\n\n".to_string();
+
+        if state.num_settled == 0 {
+            writeln!(s, "No query").unwrap();
+            return s;
+        }
+
+        writeln!(s, "Graph: ").unwrap();
+        writeln!(s, "\tnumber of nodes: {}", state.invalid_node_id as usize).unwrap();
+        writeln!(s, "\tnumber of arcs: {}", self.graph.num_arcs()).unwrap();
+
+        writeln!(s).unwrap();
+        writeln!(s, "Restriction: ").unwrap();
+
+        if state.restriction_short.max_driving_time < Weight::infinity() && state.restriction_long.max_driving_time < Weight::infinity() {
+            let num_reset_nodes = self.reset_flags.iter().filter(|b| *b).count();
+            writeln!(
+                s,
+                "\tShort break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
+                state.restriction_short.max_driving_time,
+                state.restriction_short.pause_time,
+                num_reset_nodes,
+                100.0 * num_reset_nodes as f32 / state.invalid_node_id as f32
+            )
+            .unwrap();
+            writeln!(
+                s,
+                "\tLong break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
+                state.restriction_long.max_driving_time,
+                state.restriction_long.pause_time,
+                num_reset_nodes,
+                100.0 * num_reset_nodes as f32 / state.invalid_node_id as f32
+            )
+            .unwrap();
+        } else {
+            writeln!(s, "no driving time restriction").unwrap();
+        }
+
+        writeln!(s).unwrap();
+        writeln!(s, "Potential:").unwrap();
+        writeln!(s, "\t{}", std::any::type_name::<P>()).unwrap();
+        writeln!(s).unwrap();
+        writeln!(s, "Query:").unwrap();
+        writeln!(s, "\ts: {} t: {}", state.s, state.last_t).unwrap();
+        writeln!(s, "\ttime elapsed: {:.3} ms", state.time_elapsed.as_secs_f64() * 1000.0).unwrap();
+        writeln!(s, "\tnumber of queue pushes: {}", state.num_queue_pushes).unwrap();
+        writeln!(s, "\tnumber of settled nodes: {}", state.num_settled).unwrap();
+        writeln!(s, "\tnumber of propagated labels: {}", state.num_labels_propagated).unwrap();
+        writeln!(s, "\tnumber of labels which were reset: {}", state.num_labels_reset).unwrap();
+
+        writeln!(s).unwrap();
+        writeln!(s, "Path:").unwrap();
+
+        if state.last_distance.is_some() {
+            writeln!(s, "\tdistance: {}", state.last_distance.unwrap()).unwrap();
+
+            let (node_path, weights) = state.current_best_path_to(state.last_t, true).unwrap();
+            writeln!(s, "\tnumber of nodes: {}", node_path.len()).unwrap();
+            let flagged_p = self.flagged_nodes_on_node_path(&node_path);
+            writeln!(s, "\t  -thereof number of flagged nodes: {}", flagged_p.len()).unwrap();
+
+            let (reset_p_short, reset_p_long) = self.reset_nodes_on_path(&(node_path, weights));
+            writeln!(s, "\t  -thereof number of flagged nodes actually used: {}", reset_p_short.len()).unwrap();
+            writeln!(s, "\t  -thereof long breaks: {}", reset_p_long.len()).unwrap();
+        } else {
+            writeln!(s, "\tno path found").unwrap();
+        }
+
+        let mut label_sizes_settled = Vec::with_capacity(state.per_node_labels.len());
+        let mut label_sizes_unsettled = Vec::with_capacity(state.per_node_labels.len());
+        let mut label_sizes = Vec::with_capacity(state.per_node_labels.len());
+
+        for i in 0..state.per_node_labels.len() {
+            let label = state.per_node_labels.get(i);
+            let number_of_unsettled = label.iter().count();
+            let number_of_settled = label.popped().count();
+
+            if number_of_settled != 0 {
+                label_sizes.push(number_of_unsettled + number_of_settled);
+                label_sizes_settled.push(number_of_settled);
+                label_sizes_unsettled.push(number_of_unsettled);
+            }
+        }
+
+        writeln!(s).unwrap();
+        writeln!(s, "Label Statistics:").unwrap();
+
+        if label_sizes.is_empty() {
+            writeln!(s, "\t  -no labels were propagated").unwrap();
+        } else {
+            writeln!(
+                s,
+                "\tnumber of nodes with settled labels: {} ({:.2}%)",
+                label_sizes.len(),
+                100.0 * label_sizes.len() as f32 / state.invalid_node_id as f32
+            )
+            .unwrap();
+            writeln!(s, "\t  -thereof maximum number of labels: {}", label_sizes.iter().max().unwrap()).unwrap();
+            writeln!(
+                s,
+                "\t  -thereof avg number of labels: {:.2}",
+                label_sizes.iter().sum::<usize>() as f32 / label_sizes.len() as f32
+            )
+            .unwrap();
+            label_sizes.sort_unstable();
+            let mean = if label_sizes.len().is_odd() {
+                label_sizes[label_sizes.len() / 2] as f32
+            } else {
+                (label_sizes[(label_sizes.len() / 2) - 1] as f32 + label_sizes[label_sizes.len() / 2] as f32) / 2.0
+            };
+            writeln!(s, "\t  -thereof mean number of labels: {:.2}", mean).unwrap();
+        }
+
+        s
     }
 }

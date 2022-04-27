@@ -9,11 +9,11 @@
 //! let bv = BitVec::from_fn(5, |i| i == 1 || i == 2 || i == 4);
 //!
 //! for i in [1,2,4] {
-//! 	assert_eq!(bv.to_osm(bv.to_local(i).unwrap()),i);
+//!     assert_eq!(bv.to_osm(bv.to_local(i).unwrap()),i);
 //! }
 //!
 //! for i in [0,3] {
-//! 	assert_eq!(bv.to_local(i), None);
+//!     assert_eq!(bv.to_local(i), None);
 //! }
 //!
 //! ```

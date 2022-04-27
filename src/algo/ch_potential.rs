@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::{
     algo::astar::Potential,
     timestamped_vector::TimestampedVector,
@@ -47,12 +45,9 @@ impl<'a> CHPotential<'a> {
     }
 
     pub fn reset(&mut self) {
-        let time = Instant::now();
-
         self.potentials.reset();
         self.init_dijkstra_state.init_new_s(self.t);
         Dijkstra::new(self.ch.backward()).to_all(&mut self.init_dijkstra_state);
-        println!("Init took {} ms", time.elapsed().as_secs_f64() * 1000.0);
     }
 
     pub fn set_node_mapping(&mut self, node_mapping: Vec<NodeId>) {

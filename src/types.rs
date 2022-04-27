@@ -1,7 +1,6 @@
 //! This module contains a few basic type and constant definitions
-use std::path::Path;
-
-use crate::{index_heap::*, io::Load};
+use crate::{index_heap::*, io::Load, rrr_indexed_heap::AutoIndexedHeap};
+use std::{cmp::Reverse, path::Path};
 
 /// Node ids are unsigned 32 bit integers
 pub type NodeId = u32;
@@ -45,6 +44,7 @@ pub trait WeightOps: Ord + Clone + Copy + std::fmt::Debug {
     fn zero() -> Self;
     fn infinity() -> Self;
     fn reset_distance(&mut self, i: usize, pause_time: Weight);
+    #[must_use]
     fn add(&self, other: Self) -> Self;
 }
 
@@ -70,9 +70,7 @@ impl WeightOps for Weight {
     }
 
     #[inline(always)]
-    fn reset_distance(&mut self, _i: usize, _pause_time: Weight) {
-        ()
-    }
+    fn reset_distance(&mut self, _i: usize, _pause_time: Weight) {}
 
     #[inline(always)]
     fn add(&self, other: Self) -> Self {
@@ -217,7 +215,7 @@ where
         self.weights.as_ref()
     }
 
-    pub fn borrow(&self) -> FirstOutGraph<&[EdgeId], &[NodeId], &[<FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> as Graph>::WeightType]> {
+    pub fn borrow(&self) -> BorrowedGraph {
         FirstOutGraph {
             first_out: self.first_out(),
             head: self.head(),
@@ -274,6 +272,23 @@ where
     #[inline]
     fn outgoing_edge_iter(&self, node: NodeId) -> Self::Iter<'_> {
         let range = self.first_out()[node as usize] as usize..self.first_out()[node as usize + 1] as usize;
-        self.weights()[range.clone()].iter().zip(self.head()[range].iter())
+        self.weights()[range.clone()].iter().zip(self.head()[range.clone()].iter())
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
+pub struct Label<T> {
+    pub distance: T,
+    pub prev_node: NodeId,
+    pub prev_label: Option<usize>,
+}
+
+pub type MCDHeap<L> = AutoIndexedHeap<Reverse<Label<L>>>;
+
+impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap<L> {
+    const DEFAULT: MCDHeap<L> = MCDHeap::<L>::new();
+
+    fn reset(&mut self) {
+        self.reset();
     }
 }

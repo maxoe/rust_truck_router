@@ -1,5 +1,6 @@
 use std::{error::Error, path::Path};
 
+use bit_vec::BitVec;
 use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy,
@@ -31,7 +32,8 @@ fn some_ch_pot_queries() -> Result<(), Box<dyn Error>> {
     let mut dijkstra_pot_state = DijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     let dijkstra_pot = Dijkstra::new(graph.borrow());
     let mut instance_mcd_acc_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
-    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow());
+    let is_parking_node = BitVec::from_elem(graph.num_nodes(), false);
+    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
     for s in 0..5 {
         dijkstra_state.init_new_s(s);
@@ -69,7 +71,8 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     let mut dijkstra_pot_state = DijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     let dijkstra_pot = Dijkstra::new(graph.borrow());
     let mut instance_mcd_acc_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
-    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow());
+    let is_parking_node = BitVec::from_elem(graph.num_nodes(), false);
+    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
     let mut gen = rand::rngs::StdRng::seed_from_u64(1269803542290214824);
 

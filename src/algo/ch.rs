@@ -59,6 +59,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn inverted(self) -> Self {
         ContractionHierarchy {
             rank: self.rank,
@@ -190,28 +191,26 @@ impl<'a> ContractionHierarchyQuery<'a> {
                     }
                     fw_next = false;
                 }
-            } else {
-                if let Some(State { distance: _, node }) = bw_search.settle_next_node(&mut self.bw_state) {
-                    settled_bw.set(node as usize, true);
+            } else if let Some(State { distance: _, node }) = bw_search.settle_next_node(&mut self.bw_state) {
+                settled_bw.set(node as usize, true);
 
-                    if settled_fw.get(node as usize).unwrap() {
-                        tent_dist_at_v = self.fw_state.tentative_distance_at(node) + self.bw_state.tentative_distance_at(node);
+                if settled_fw.get(node as usize).unwrap() {
+                    tent_dist_at_v = self.fw_state.tentative_distance_at(node) + self.bw_state.tentative_distance_at(node);
 
-                        if tentative_distance > tent_dist_at_v {
-                            tentative_distance = tent_dist_at_v;
-                            _middle_node = node;
-                        }
+                    if tentative_distance > tent_dist_at_v {
+                        tentative_distance = tent_dist_at_v;
+                        _middle_node = node;
                     }
-                    bw_min_key = self.bw_state.min_key().unwrap_or_else(|| {
-                        bw_finished = true;
-                        bw_min_key
-                    });
-
-                    if bw_min_key >= tentative_distance {
-                        bw_finished = true;
-                    }
-                    fw_next = true;
                 }
+                bw_min_key = self.bw_state.min_key().unwrap_or_else(|| {
+                    bw_finished = true;
+                    bw_min_key
+                });
+
+                if bw_min_key >= tentative_distance {
+                    bw_finished = true;
+                }
+                fw_next = true;
             }
         }
 

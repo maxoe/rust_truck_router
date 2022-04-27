@@ -37,10 +37,8 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     core_ch.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
     let mut csp_pot_state = TwoRestrictionDijkstraData::new(graph.num_nodes());
-    let csp_pot = TwoRestrictionDijkstra::new(graph.borrow());
-    csp_pot_state
-        .set_reset_flags(is_parking_node.to_bytes())
-        .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
+    let csp_pot = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
+    csp_pot_state.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);

@@ -2,7 +2,7 @@ use rust_truck_router::{
     algo::{
         ch::*,
         ch_potential::CHPotential,
-        csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
+        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
     },
     io::*,
     types::*,
@@ -32,9 +32,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
-    //let s = 9504444;
-    //let t = 3438839;
-
     // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
     // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
@@ -43,22 +40,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
-    let mut instance_mcd_acc_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
-    instance_mcd_acc_state
-        .set_reset_flags(is_parking_node.to_bytes())
-        .set_restriction(16_200_000, 2_700_000);
-    // let mut instance_mcd_acc = TwoRestrictionDijkstra::new_with_potential(&graph_mcd, CHPotential::from_ch(ch));
-    // instance_mcd_acc
+    // let mut instance_mcd_acc_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    // instance_mcd_acc_state
     //     .set_reset_flags(is_parking_node.to_bytes())
-    //     .set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    //     .set_restriction(16_200_000, 2_700_000);
+    let mut instance_mcd_acc_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    instance_mcd_acc_state.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let timer = Instant::now();
     instance_mcd_acc_state.init_new_s(s);
 
-    let instance_mcd_acc = OneRestrictionDijkstra::new(graph.borrow());
+    let instance_mcd_acc = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     instance_mcd_acc.dist_query(&mut instance_mcd_acc_state, t);
     println!("Elapsed: {}ms", timer.elapsed().as_secs_f64() * 1000.0);
-    print!("{}", instance_mcd_acc_state.info());
+    print!("{}", instance_mcd_acc.summary(&instance_mcd_acc_state));
 
     // instance_mcd_acc.reset();
     // instance_mcd_acc.dist_query_propagate_all_labels(t);
@@ -82,15 +77,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         let file = File::create("path_flagged_acc.csv")?;
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude,osm_id,is_parking_used")?;
-        let used_p = instance_mcd_acc_state.reset_nodes_on_path(&(p, _d));
-        for &node_id in used_p.iter() {
+        let used_p = instance_mcd_acc.reset_nodes_on_path(&(p, _d));
+        for &node_id in used_p.0.iter() {
             writeln!(
                 file,
                 "{},{},{},{}",
                 latitude[node_id as usize],
                 longitude[node_id as usize],
                 osm_node_id[node_id as usize],
-                used_p.contains(&node_id)
+                used_p.0.contains(&node_id)
             )?;
         }
 

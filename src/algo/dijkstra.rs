@@ -122,7 +122,7 @@ impl<'a> Dijkstra<'a> {
             counter += 1;
 
             if counter == exp_counter {
-                exp_counter = 2 * exp_counter;
+                exp_counter *= 2;
                 rank_order.push(node);
 
                 if rank_order.len() == log_num_nodes {

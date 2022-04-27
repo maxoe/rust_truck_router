@@ -6,7 +6,6 @@ use super::{
 };
 use crate::{algo::ch_potential::CHPotential, types::*};
 use bit_vec::BitVec;
-use std::time::Instant;
 
 pub struct CSPAstarCoreCHQuery<'a> {
     core_ch: BorrowedCoreContractionHierarchy<'a>,
@@ -75,9 +74,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
     pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) {
         self.restriction = DrivingTimeRestriction { pause_time, max_driving_time };
 
-        self.fw_state.set_reset_flags(&self.core_ch.is_core().to_bytes());
         self.fw_state.set_restriction(max_driving_time, pause_time);
-        self.bw_state.set_reset_flags(&self.core_ch.is_core().to_bytes());
         self.bw_state.set_restriction(max_driving_time, pause_time);
     }
 
@@ -87,9 +84,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
             max_driving_time: Weight::infinity(),
         };
 
-        self.fw_state.clear_reset_flags();
         self.fw_state.clear_restriction();
-        self.bw_state.clear_reset_flags();
         self.bw_state.clear_restriction();
     }
 
@@ -202,10 +197,10 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
         let mut fw_search_reachable_from_core = false;
         let mut bw_search_reachable_from_core = false;
 
-        let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward());
-        let bw_search = OneRestrictionDijkstra::new(self.core_ch.backward());
+        let reset_flags = self.core_ch.is_core();
+        let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward(), reset_flags.as_ref());
+        let bw_search = OneRestrictionDijkstra::new(self.core_ch.backward(), reset_flags.as_ref());
 
-        let time = Instant::now();
         while (!self.fw_finished || !self.bw_finished)
             && !(self.fw_finished && !fw_search_reachable_from_core && bw_in_core)
             && !(self.bw_finished && !bw_search_reachable_from_core && fw_in_core)
@@ -229,7 +224,6 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
                     // fw search found t -> done here
                     if node == self.t {
-                        println!("Forward settled t");
                         tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
                         self.bw_finished = true;
@@ -265,82 +259,63 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                         fw_search_reachable_from_core = true;
                     }
 
-                    if self.fw_finished {
-                        println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.core_ch.is_core().get(node as usize).unwrap() && !fw_in_core {
-                        println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
                     fw_next = false;
                 }
+            } else if let Some(State {
+                distance: _dist_from_queue_at_v,
+                node,
+            }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
+                bw_search.settle_next_label_prune_bw_lower_bound(
+                    &mut self.bw_state,
+                    tentative_distance,
+                    self.fw_state.peek_queue().map(|s| s.distance).unwrap(),
+                    &mut self.fw_state.potential,
+                    self.s,
+                )
             } else {
-                if let Some(State {
-                    distance: _dist_from_queue_at_v,
-                    node,
-                }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
-                    bw_search.settle_next_label_prune_bw_lower_bound(
-                        &mut self.bw_state,
-                        tentative_distance,
-                        self.fw_state.peek_queue().map(|s| s.distance).unwrap(),
-                        &mut self.fw_state.potential,
-                        self.s,
-                    )
-                } else {
-                    bw_search.settle_next_label(&mut self.bw_state, self.s)
-                } {
-                    settled_bw.set(node as usize, true);
+                bw_search.settle_next_label(&mut self.bw_state, self.s)
+            } {
+                settled_bw.set(node as usize, true);
 
-                    // bw search found s -> done here
-                    if node == self.s {
-                        println!("Backward settled s");
-                        tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
+                // bw search found s -> done here
+                if node == self.s {
+                    tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
 
-                        self.fw_finished = true;
-                        self.bw_finished = true;
+                    self.fw_finished = true;
+                    self.bw_finished = true;
 
-                        break;
-                    }
-
-                    if settled_fw.get(node as usize).unwrap() {
-                        let tent_dist_at_v = Self::calculate_distance_with_break_at(
-                            node,
-                            &self.restriction,
-                            self.core_ch.is_core().as_ref(),
-                            &mut self.fw_state,
-                            &mut self.bw_state,
-                        );
-
-                        if tentative_distance > tent_dist_at_v {
-                            tentative_distance = tent_dist_at_v;
-                            _middle_node = node;
-                        }
-                    }
-
-                    if self.bw_state.min_key().is_none() || self.bw_state.min_key().unwrap() >= tentative_distance {
-                        self.bw_finished = true;
-                    }
-
-                    if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() {
-                        bw_search_reachable_from_core = true;
-                    }
-
-                    if self.core_ch.is_core().get(node as usize).unwrap() {
-                        bw_in_core = true;
-                        bw_search_reachable_from_core = true;
-                    }
-
-                    if self.bw_finished {
-                        println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.core_ch.is_core().get(node as usize).unwrap() && !bw_in_core {
-                        println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    fw_next = true;
+                    break;
                 }
+
+                if settled_fw.get(node as usize).unwrap() {
+                    let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                        node,
+                        &self.restriction,
+                        self.core_ch.is_core().as_ref(),
+                        &mut self.fw_state,
+                        &mut self.bw_state,
+                    );
+
+                    if tentative_distance > tent_dist_at_v {
+                        tentative_distance = tent_dist_at_v;
+                        _middle_node = node;
+                    }
+                }
+
+                if self.bw_state.min_key().is_none() || self.bw_state.min_key().unwrap() >= tentative_distance {
+                    self.bw_finished = true;
+                }
+
+                if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() {
+                    bw_search_reachable_from_core = true;
+                }
+
+                if self.core_ch.is_core().get(node as usize).unwrap() {
+                    bw_in_core = true;
+                    bw_search_reachable_from_core = true;
+                }
+
+                fw_next = true;
             }
         }
 
@@ -350,6 +325,6 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
         }
 
         self.last_dist = Some(tentative_distance);
-        return self.last_dist;
+        self.last_dist
     }
 }

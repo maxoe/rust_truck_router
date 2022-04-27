@@ -20,8 +20,8 @@ fn test_instance_queries() -> Result<(), Box<dyn Error>> {
     core_ch.check();
 
     let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-    let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
-    csp_pot_state.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes());
+    let is_parking = BitVec::from_fn(5, |i| i == 2 || i == 3);
+    let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking);
 
     let max_restriction = 10;
     let pause_time = 5;
@@ -56,8 +56,8 @@ fn test_needs_two_breaks_instance() -> Result<(), Box<dyn Error>> {
     core_ch.check();
 
     let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-    let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
-    csp_pot_state.set_reset_flags(BitVec::from_fn(5, |i| i == 2 || i == 3).to_bytes());
+    let is_parking = BitVec::from_fn(5, |i| i == 2 || i == 3);
+    let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking);
 
     let max_restriction = 10;
     let pause_time = 5;
@@ -105,10 +105,8 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     core_ch.set_restriction(max_driving_time, pause_time);
 
     let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-    let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
-    csp_pot_state
-        .set_reset_flags(is_parking_node.to_bytes())
-        .set_restriction(max_driving_time, pause_time);
+    let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
+    csp_pot_state.set_restriction(max_driving_time, pause_time);
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph_mcd.num_nodes() as NodeId);

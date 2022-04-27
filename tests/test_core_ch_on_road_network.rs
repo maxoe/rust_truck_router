@@ -1,3 +1,4 @@
+use bit_vec::BitVec;
 use rust_truck_router::{
     algo::{
         core_ch::{CoreContractionHierarchy, CoreContractionHierarchyQuery},
@@ -26,7 +27,8 @@ fn hundred_ka_queries() -> Result<(), Box<dyn Error>> {
     core_ch.check();
     let mut core_ch_query = CoreContractionHierarchyQuery::new(core_ch.borrow());
     let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-    let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+    let is_parking_node = BitVec::from_elem(graph.num_nodes(), false);
+    let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
     for i in 0..100 {
         let s = gen.gen_range(0..graph.num_nodes() as NodeId);

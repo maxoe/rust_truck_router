@@ -1,6 +1,6 @@
 use crate::{io::Load, types::*};
 use bit_vec::BitVec;
-use std::{path::Path, rc::Rc, time::Instant};
+use std::{path::Path, rc::Rc};
 
 use super::dijkstra::{Dijkstra, DijkstraData};
 
@@ -192,7 +192,6 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
         let fw_search = Dijkstra::new(self.core_ch.forward());
         let bw_search = Dijkstra::new(self.core_ch.backward());
 
-        let time = Instant::now();
         while !self.fw_finished || !self.bw_finished {
             let tent_dist_at_v;
 
@@ -225,64 +224,47 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
                         self.fw_finished = true;
                     }
 
-                    if self.fw_finished {
-                        println!("fw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.core_ch.is_core.get(node as usize).unwrap() && !self.needs_core {
-                        println!("fw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
                     if self.core_ch.is_core.get(node as usize).unwrap() {
                         self.needs_core = true;
                     }
 
                     fw_next = false;
                 }
-            } else {
-                if let Some(State { distance: _, node }) = bw_search.settle_next_node(&mut self.bw_state) {
-                    settled_bw.set(node as usize, true);
+            } else if let Some(State { distance: _, node }) = bw_search.settle_next_node(&mut self.bw_state) {
+                settled_bw.set(node as usize, true);
 
-                    // bw search found s -> done here
-                    if node == self.s {
-                        tentative_distance = self.bw_state.tentative_distance_at(self.s);
-                        self.fw_finished = true;
-                        self.bw_finished = true;
-                        self.needs_core = false;
+                // bw search found s -> done here
+                if node == self.s {
+                    tentative_distance = self.bw_state.tentative_distance_at(self.s);
+                    self.fw_finished = true;
+                    self.bw_finished = true;
+                    self.needs_core = false;
 
-                        break;
-                    }
-
-                    if settled_fw.get(node as usize).unwrap() {
-                        tent_dist_at_v = self.fw_state.tentative_distance_at(node) + self.bw_state.tentative_distance_at(node);
-
-                        if tentative_distance > tent_dist_at_v {
-                            tentative_distance = tent_dist_at_v;
-                            _middle_node = node;
-                        }
-                    }
-                    bw_min_key = self.bw_state.min_key().unwrap_or_else(|| {
-                        self.bw_finished = true;
-                        bw_min_key
-                    });
-
-                    if bw_min_key >= tentative_distance {
-                        self.bw_finished = true;
-                    }
-
-                    if self.bw_finished {
-                        println!("bw finished in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.core_ch.is_core.get(node as usize).unwrap() && !self.needs_core {
-                        println!("bw core reached in {} ms", time.elapsed().as_secs_f64() * 1000.0);
-                    }
-
-                    if self.core_ch.is_core.get(node as usize).unwrap() {
-                        self.needs_core = true;
-                    }
-
-                    fw_next = true;
+                    break;
                 }
+
+                if settled_fw.get(node as usize).unwrap() {
+                    tent_dist_at_v = self.fw_state.tentative_distance_at(node) + self.bw_state.tentative_distance_at(node);
+
+                    if tentative_distance > tent_dist_at_v {
+                        tentative_distance = tent_dist_at_v;
+                        _middle_node = node;
+                    }
+                }
+                bw_min_key = self.bw_state.min_key().unwrap_or_else(|| {
+                    self.bw_finished = true;
+                    bw_min_key
+                });
+
+                if bw_min_key >= tentative_distance {
+                    self.bw_finished = true;
+                }
+
+                if self.core_ch.is_core.get(node as usize).unwrap() {
+                    self.needs_core = true;
+                }
+
+                fw_next = true;
             }
         }
 
@@ -290,6 +272,6 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
             return None;
         }
 
-        return Some(tentative_distance);
+        Some(tentative_distance)
     }
 }

@@ -35,7 +35,7 @@
 
 use std;
 use std::cmp::min;
-use std::mem::swap;
+use std::mem::{size_of, swap};
 use std::ptr;
 
 /// A trait to map elements in a heap to a unique index.
@@ -78,6 +78,10 @@ impl<T: Ord + Indexing> IndexdMinHeap<T> {
     /// Checks if the binary heap is empty.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    pub fn memory_consumption(&self) -> usize {
+        self.positions.capacity() * size_of::<usize>() + self.data.capacity() * size_of::<T>()
     }
 
     /// Checks if the heap already contains an element mapped to the given index

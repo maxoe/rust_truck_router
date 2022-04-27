@@ -33,8 +33,7 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
         instance_state.init_new_s(s);
         let mut instance_mcd_state = OneRestrictionDijkstraData::new(graph.num_nodes());
         instance_mcd_state.init_new_s(s);
-        instance_mcd_state.set_reset_flags(is_parking_node.to_bytes());
-        let instance_mcd = OneRestrictionDijkstra::new(graph.borrow());
+        let instance_mcd = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
         assert_eq!(dijkstra.dist_query(&mut instance_state, t), instance_mcd.dist_query(&mut instance_mcd_state, t));
         assert_eq!(instance_state.current_node_path_to(t), instance_mcd_state.current_best_node_path_to(t));
     }

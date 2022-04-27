@@ -1,3 +1,4 @@
+use bit_vec::BitVec;
 use rust_truck_router::{
     algo::{
         core_ch::{CoreContractionHierarchy, CoreContractionHierarchyQuery},
@@ -31,7 +32,8 @@ fn query_does_not_reach_core() -> Result<(), Box<dyn Error>> {
         let dist = core_ch.run_query();
 
         let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-        let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let is_parking_node = BitVec::from_elem(graph.num_nodes(), false);
+        let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
         csp_pot_state.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
@@ -57,7 +59,8 @@ fn query_to_core_node() -> Result<(), Box<dyn Error>> {
         let dist = core_ch.run_query();
 
         let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-        let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let is_parking_node = BitVec::from_elem(graph.num_nodes(), false);
+        let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
         csp_pot_state.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
@@ -82,7 +85,8 @@ fn query_through_core() -> Result<(), Box<dyn Error>> {
         let dist = core_ch.run_query();
 
         let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-        let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let is_parking_node = BitVec::from_elem(graph.num_nodes(), false);
+        let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
         csp_pot_state.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
@@ -108,7 +112,8 @@ fn query_from_core_node() -> Result<(), Box<dyn Error>> {
         let dist = core_ch.run_query();
 
         let mut csp_pot_state = OneRestrictionDijkstraData::new(graph.num_nodes());
-        let csp_pot = OneRestrictionDijkstra::new(graph.borrow());
+        let is_parking_node = BitVec::from_elem(graph.num_nodes(), false);
+        let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
         csp_pot_state.init_new_s(s);
         let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
