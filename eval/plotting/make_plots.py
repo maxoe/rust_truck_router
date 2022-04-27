@@ -27,6 +27,7 @@ import math
 from pandas.core.base import DataError
 
 ggPlotColors = importlib.import_module("ggplot_colors").__dict__["ggColorSlice"]
+perfprof = importlib.import_module("perfprof").__dict__["perfprof"]
 style.use("ggplot")
 plt.rcParams["lines.linewidth"] = 1
 
@@ -305,6 +306,30 @@ def plot_rank_times_from_simple_meaurement(name, graph):
     write_plt(name + "-time_ms.png", graph)
 
 
+def plot_csp_rank_times_perf_profile(graph):
+    algos = ["astar_chpot", "core_ch_chpot"]
+    algo_times = np.ndarray([])
+    linespecs = ["r-", "b-"]  # , "g-"]
+
+    run_measurement_conditionally("measure_all_csp_1000_queries_rank_times", g)
+
+    algo_results = read_measurement(
+        "measure_all_csp_1000_queries_rank_times-" + g,
+    )
+
+    algo_results = algo_results.loc[algo_results["dijkstra_rank_exponent"] >= 10]
+
+    algo_times = []
+    for a in algos:
+        algo_times = algo_times + [
+            list(algo_results.loc[algo_results["algo"] == a]["time_ms"])
+        ]
+
+    algo_times = np.asarray(algo_times).T
+    perfprof(algo_times, linespecs=linespecs, legendnames=algos)
+    write_plt("measure_all_csp_1000_queries_rank_times-" + g + ".png")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -347,3 +372,4 @@ if __name__ == "__main__":
         )
         plot_rank_times("measure_chpot_core_ch_csp_1000_queries", g)
         plot_rank_times("measure_chpot_core_ch_csp_2_1000_queries", g)
+        plot_csp_rank_times_perf_profile(g)

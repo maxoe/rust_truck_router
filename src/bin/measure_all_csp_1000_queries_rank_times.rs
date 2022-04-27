@@ -234,7 +234,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     },
                 });
             }
-            println!("Time was {:.2}", astar_time.as_secs_f64() * 1000.0);
         }
     }
     println!("Progress {}/{}", n, n);
