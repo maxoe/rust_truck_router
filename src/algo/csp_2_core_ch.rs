@@ -131,13 +131,15 @@ impl<'a> CSP2CoreCHQuery<'a> {
         if current_fw.peek().is_none() || current_bw.peek().is_none() {
             return Weight::infinity();
         }
+
+        let mut best_distance = Weight::infinity();
         while let (Some(fw_label), Some(bw_label)) = (current_fw.peek(), current_bw.peek()) {
             let total_dist = fw_label.distance.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
             if total_dist[1] < restriction_short.max_driving_time && total_dist[2] < restriction_long.max_driving_time {
                 // subpaths can be connected without additional break
-                return total_dist[0];
+                best_distance = best_distance.min(total_dist[0]);
             }
 
             if fw_label.distance[0] < bw_label.distance[0] {
@@ -147,7 +149,7 @@ impl<'a> CSP2CoreCHQuery<'a> {
             }
         }
 
-        Weight::infinity()
+        best_distance
     }
 
     pub fn run_query(&mut self) -> Option<Weight> {

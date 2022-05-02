@@ -9,6 +9,7 @@ use super::{
     dijkstra::{Dijkstra, DijkstraData},
 };
 
+#[derive(Clone)]
 pub struct CHPotential<'a> {
     potentials: TimestampedVector<Option<Weight>>,
     ch: BorrowedContractionHierarchy<'a>,

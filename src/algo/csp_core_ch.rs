@@ -144,22 +144,15 @@ impl<'a> CSPCoreCHQuery<'a> {
             return Weight::infinity();
         }
 
+        let mut best_distance = Weight::infinity();
         while let (Some(fw_label), Some(bw_label)) = (current_fw.peek(), current_bw.peek()) {
             let total_dist = fw_label.distance.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
             if total_dist[1] < restriction.max_driving_time {
                 // subpaths can be connected without additional break
-                return total_dist[0];
+                best_distance = best_distance.min(total_dist[0]);
             }
-
-            // need parking at node
-            // if self.core_ch.is_core().get(node as usize).unwrap() {
-            // can park at node and connect subpaths
-            //     if fw_label.distance[1].max(bw_label.distance[1]) < self.restriction.max_driving_time {
-            //         return total_dist[0] + self.restriction.pause_time;
-            //     }
-            // }
 
             if fw_label.distance[0] < bw_label.distance[0] {
                 current_fw.next();
@@ -168,7 +161,7 @@ impl<'a> CSPCoreCHQuery<'a> {
             }
         }
 
-        Weight::infinity()
+        best_distance
     }
 
     pub fn run_query(&mut self) -> Option<Weight> {

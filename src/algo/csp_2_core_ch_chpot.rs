@@ -162,30 +162,30 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         let s_to_v = fw_state.get_settled_labels_at(node);
         let v_to_t = bw_state.get_settled_labels_at(node);
 
-        let mut current_fw = s_to_v.rev().map(|r| r.0).peekable();
-        let mut current_bw = v_to_t.rev().map(|r| r.0).peekable();
+        let mut current_fw = s_to_v.rev().map(|r| r.0.distance).peekable();
+        let mut current_bw = v_to_t.rev().map(|r| r.0.distance).peekable();
 
         if current_fw.peek().is_none() || current_bw.peek().is_none() {
             return Weight::infinity();
         }
-
+        let mut best_distance = Weight::infinity();
         while let (Some(fw_label), Some(bw_label)) = (current_fw.peek(), current_bw.peek()) {
-            let total_dist = fw_label.distance.add(bw_label.distance);
+            let total_dist = fw_label.add(*bw_label);
 
             // check if restrictions allows combination of those labels/subpaths
             if total_dist[1] < restriction_short.max_driving_time && total_dist[2] < restriction_long.max_driving_time {
                 // subpaths can be connected without additional break
-                return total_dist[0];
+                best_distance = best_distance.min(total_dist[0]);
             }
 
-            if fw_label.distance[0] < bw_label.distance[0] {
+            if fw_label[0] < bw_label[0] {
                 current_fw.next();
             } else {
                 current_bw.next();
             }
         }
 
-        Weight::infinity()
+        best_distance
     }
 
     pub fn run_query(&mut self) -> Option<Weight> {

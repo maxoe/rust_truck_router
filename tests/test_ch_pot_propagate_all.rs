@@ -1,6 +1,5 @@
-use std::{error::Error, path::Path};
-
 use bit_vec::BitVec;
+use rand::{Rng, SeedableRng};
 use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy,
@@ -11,8 +10,7 @@ use rust_truck_router::{
     io::*,
     types::{OwnedGraph, *},
 };
-
-use rand::{Rng, SeedableRng};
+use std::{error::Error, path::Path};
 
 #[test]
 fn some_ch_pot_queries() -> Result<(), Box<dyn Error>> {

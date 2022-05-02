@@ -195,6 +195,29 @@ where
         self.per_node_labels.get_mut(node as usize).popped_sorted()
     }
 
+    pub fn get_best_label_at(&self, node: NodeId) -> Option<Label<Weight2>> {
+        let best_settled = self.per_node_labels.get(node as usize).popped().max();
+        let best_unsettled = self.per_node_labels.get(node as usize).iter().max();
+
+        match (best_settled, best_unsettled) {
+            (None, Some(best)) => Some(best),
+            (Some(best), None) => Some(best),
+            (Some(best_left), Some(best_right)) => {
+                if best_left.0.distance < best_right.0.distance {
+                    Some(best_left)
+                } else {
+                    Some(best_right)
+                }
+            }
+            _ => None,
+        }
+        .map(|r| r.0)
+    }
+
+    pub fn get_tentative_dist_at(&self, node: NodeId) -> Weight2 {
+        self.get_best_label_at(node).map_or(Weight2::infinity(), |l| l.distance)
+    }
+
     pub fn peek_queue(&self) -> Option<&State<Weight2>> {
         self.queue.peek()
     }
@@ -336,11 +359,10 @@ impl<'a> OneRestrictionDijkstra<'a> {
     }
 
     pub fn dist_query<P: Potential>(&self, state: &mut OneRestrictionDijkstraData<P>, t: NodeId) -> Option<Weight> {
+        let start = Instant::now();
         state.reset();
         state.potential.init_new_t(t);
         state.last_t = t;
-
-        let start = Instant::now();
 
         while let Some(State { distance: _, node: node_id }) = self.settle_next_label(state, t) {
             if node_id == t {
@@ -353,11 +375,10 @@ impl<'a> OneRestrictionDijkstra<'a> {
     }
 
     pub fn dist_query_propagate_all_labels<P: Potential>(&self, state: &mut OneRestrictionDijkstraData<P>, t: NodeId) -> Option<Weight> {
+        let start = Instant::now();
         state.reset();
         state.potential.init_new_t(t);
         state.last_t = t;
-
-        let start = Instant::now();
 
         while let Some(State { distance: _, node: node_id }) = self.settle_next_label_propagate_all(state, t) {
             if node_id == t {
@@ -606,7 +627,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
 
         writeln!(s, "Graph: ").unwrap();
         writeln!(s, "\tnumber of nodes: {}", state.invalid_node_id).unwrap();
-        // writeln!(s, "\tnumber of arcs: {}", state.graph.num_arcs()).unwrap();
+        writeln!(s, "\tnumber of arcs: {}", self.graph.num_arcs()).unwrap();
 
         writeln!(s).unwrap();
         writeln!(s, "Restriction: ").unwrap();

@@ -1,7 +1,7 @@
 use super::{
     astar::Potential,
     ch::BorrowedContractionHierarchy,
-    csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
+    csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
 };
 use crate::{algo::ch_potential::CHPotential, types::*};
 use bit_vec::BitVec;
@@ -11,32 +11,37 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub struct CSPBidirAstarCHPotQuery<'a> {
+pub struct CSP2BidirAstarCHPotQuery<'a> {
     fw_graph: BorrowedGraph<'a>,
     bw_graph: BorrowedGraph<'a>,
     is_reset_node: &'a BitVec,
-    fw_state: OneRestrictionDijkstraData<CHPotential<'a>>,
-    bw_state: OneRestrictionDijkstraData<CHPotential<'a>>,
-    restriction: DrivingTimeRestriction,
+    fw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
+    bw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
+    restriction_long: DrivingTimeRestriction,
+    restriction_short: DrivingTimeRestriction,
     fw_finished: bool,
     bw_finished: bool,
     s: NodeId,
     t: NodeId,
     pub last_dist: Option<Weight>,
-    pub last_middle_node: Option<NodeId>,
+    last_middle_node: Option<NodeId>,
     last_time_elapsed: Duration,
 }
 
-impl<'a> CSPBidirAstarCHPotQuery<'a> {
+impl<'a> CSP2BidirAstarCHPotQuery<'a> {
     pub fn new(fw_graph: BorrowedGraph<'a>, bw_graph: BorrowedGraph<'a>, is_reset_node: &'a BitVec, ch: BorrowedContractionHierarchy<'a>) -> Self {
         let node_count = fw_graph.num_nodes();
-        CSPBidirAstarCHPotQuery {
+        CSP2BidirAstarCHPotQuery {
             fw_graph,
             bw_graph,
             is_reset_node,
-            fw_state: OneRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch(ch)),
-            bw_state: OneRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_backwards(ch)),
-            restriction: DrivingTimeRestriction {
+            fw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch(ch)),
+            bw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_backwards(ch)),
+            restriction_long: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            restriction_short: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
@@ -58,15 +63,28 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
         self.t = t;
     }
 
-    pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) {
-        self.restriction = DrivingTimeRestriction { pause_time, max_driving_time };
+    pub fn set_restriction(&mut self, max_driving_time_long: Weight, pause_time_long: Weight, max_driving_time_short: Weight, pause_time_short: Weight) {
+        self.restriction_short = DrivingTimeRestriction {
+            pause_time: pause_time_short,
+            max_driving_time: max_driving_time_short,
+        };
+        self.restriction_long = DrivingTimeRestriction {
+            pause_time: pause_time_long,
+            max_driving_time: max_driving_time_long,
+        };
 
-        self.fw_state.set_restriction(max_driving_time, pause_time);
-        self.bw_state.set_restriction(max_driving_time, pause_time);
+        self.fw_state
+            .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
+        self.bw_state
+            .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
     }
 
     pub fn clear_restriction(&mut self) {
-        self.restriction = DrivingTimeRestriction {
+        self.restriction_short = DrivingTimeRestriction {
+            pause_time: 0,
+            max_driving_time: Weight::infinity(),
+        };
+        self.restriction_long = DrivingTimeRestriction {
             pause_time: 0,
             max_driving_time: Weight::infinity(),
         };
@@ -74,7 +92,6 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
         self.fw_state.clear_restriction();
         self.bw_state.clear_restriction();
     }
-
     pub fn reset(&mut self) {
         if self.s != self.fw_graph.num_nodes() as NodeId {
             self.fw_state.init_new_s(self.s);
@@ -95,9 +112,10 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
 
     fn calculate_distance_with_break_at(
         node: NodeId,
-        restriction: &DrivingTimeRestriction,
-        fw_state: &mut OneRestrictionDijkstraData<CHPotential>,
-        bw_state: &mut OneRestrictionDijkstraData<CHPotential>,
+        restriction_short: &DrivingTimeRestriction,
+        restriction_long: &DrivingTimeRestriction,
+        fw_state: &mut TwoRestrictionDijkstraData<CHPotential>,
+        bw_state: &mut TwoRestrictionDijkstraData<CHPotential>,
     ) -> Weight {
         let s_to_v = fw_state.get_settled_labels_at(node);
         let v_to_t = bw_state.get_settled_labels_at(node);
@@ -114,7 +132,7 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
             let total_dist = fw_label.distance.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
-            if total_dist[1] < restriction.max_driving_time {
+            if total_dist[1] < restriction_short.max_driving_time && total_dist[2] < restriction_long.max_driving_time {
                 // subpaths can be connected without additional break
                 best_distance = best_distance.min(total_dist[0]);
             }
@@ -141,10 +159,11 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
 
         let mut settled_fw = BitVec::from_elem(self.fw_graph.num_nodes(), false);
         let mut settled_bw = BitVec::from_elem(self.fw_graph.num_nodes(), false);
+        self.last_middle_node = None;
         let mut fw_next = true;
 
-        let fw_search = OneRestrictionDijkstra::new(self.fw_graph, &self.is_reset_node);
-        let bw_search = OneRestrictionDijkstra::new(self.bw_graph, &self.is_reset_node);
+        let fw_search = TwoRestrictionDijkstra::new(self.fw_graph, &self.is_reset_node);
+        let bw_search = TwoRestrictionDijkstra::new(self.bw_graph, &self.is_reset_node);
 
         while !self.fw_finished || !self.bw_finished {
             if !self.fw_finished && (self.bw_finished || fw_next) {
@@ -170,11 +189,18 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
                         self.fw_finished = true;
                         self.bw_finished = true;
                         self.last_middle_node = None;
+
                         break;
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
-                        let tent_dist_at_v = Self::calculate_distance_with_break_at(node, &self.restriction, &mut self.fw_state, &mut self.bw_state);
+                        let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                            node,
+                            &self.restriction_short,
+                            &self.restriction_long,
+                            &mut self.fw_state,
+                            &mut self.bw_state,
+                        );
 
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
@@ -219,7 +245,9 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
                 }
 
                 if settled_fw.get(node as usize).unwrap() {
-                    let tent_dist_at_v = Self::calculate_distance_with_break_at(node, &self.restriction, &mut self.fw_state, &mut self.bw_state);
+                    let tent_dist_at_v =
+                        Self::calculate_distance_with_break_at(node, &self.restriction_short, &self.restriction_long, &mut self.fw_state, &mut self.bw_state);
+
                     if tentative_distance > tent_dist_at_v {
                         tentative_distance = tent_dist_at_v;
                         self.last_middle_node = Some(node);
@@ -245,7 +273,6 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
         }
 
         self.last_dist = Some(tentative_distance);
-        println!("{}", self.summary());
         self.last_dist
     }
 
@@ -268,13 +295,22 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
         writeln!(s).unwrap();
         writeln!(s, "Restriction: ").unwrap();
 
-        if self.restriction.max_driving_time < Weight::infinity() {
+        if self.restriction_short.max_driving_time < Weight::infinity() && self.restriction_long.max_driving_time < Weight::infinity() {
             let num_reset_nodes = self.is_reset_node.iter().filter(|b| *b).count();
             writeln!(
                 s,
-                "\tmax. driving time: {}\n\tpause time: {}\n\tnumber of flagged reset nodes: {} ({:.2}%)",
-                self.restriction.max_driving_time,
-                self.restriction.pause_time,
+                "\tShort break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
+                self.restriction_short.max_driving_time,
+                self.restriction_short.pause_time,
+                num_reset_nodes,
+                100.0 * num_reset_nodes as f32 / self.fw_graph.num_nodes() as f32
+            )
+            .unwrap();
+            writeln!(
+                s,
+                "\tLong break with\n\t\tmax. driving time: {}\n\t\tpause time: {}\n\t\tnumber of flagged reset nodes: {} ({:.2}%)",
+                self.restriction_long.max_driving_time,
+                self.restriction_long.pause_time,
                 num_reset_nodes,
                 100.0 * num_reset_nodes as f32 / self.fw_graph.num_nodes() as f32
             )
@@ -324,7 +360,6 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
                 let dist_m_t = self.bw_state.get_tentative_dist_at(m)[0];
                 writeln!(s, "\t  - distance s -> m: {}", dist_s_m).unwrap();
                 writeln!(s, "\t  - distance m -> t: {}", dist_m_t).unwrap();
-
                 self.fw_state.current_best_path_to(m, true).unwrap()
             } else {
                 self.fw_state.current_best_path_to(self.t, true).unwrap_or((vec![], vec![]))
@@ -342,6 +377,7 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
             path.1.append(&mut bw_path.1);
 
             let (node_path, weights) = path;
+
             writeln!(
                 s,
                 "\tnumber of nodes (total/fw/bw): {}/{}/{}",
@@ -351,12 +387,13 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
             )
             .unwrap();
 
-            let fw_search = OneRestrictionDijkstra::new(self.fw_graph, &self.is_reset_node);
+            let fw_search = TwoRestrictionDijkstra::new(self.fw_graph, &self.is_reset_node);
             let flagged_p = fw_search.flagged_nodes_on_node_path(&node_path);
             writeln!(s, "\t  -thereof number of flagged nodes: {}", flagged_p.len()).unwrap();
 
-            let reset_p = fw_search.reset_nodes_on_path(&(node_path, weights));
-            writeln!(s, "\t  -thereof number of flagged nodes actually used: {}", reset_p.len()).unwrap();
+            let (reset_p_short, reset_p_long) = fw_search.reset_nodes_on_path(&(node_path, weights));
+            writeln!(s, "\t  -thereof number of flagged nodes actually used: {}", reset_p_short.len()).unwrap();
+            writeln!(s, "\t  -thereof long breaks: {}", reset_p_long.len()).unwrap();
         } else {
             writeln!(s, "\tno path found").unwrap();
         }
