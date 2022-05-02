@@ -6,6 +6,7 @@ pub mod csp;
 pub mod csp_2;
 pub mod csp_2_core_ch;
 pub mod csp_2_core_ch_chpot;
+pub mod csp_bidir;
 pub mod csp_core_ch;
 pub mod csp_core_ch_chpot;
 pub mod dijkstra;

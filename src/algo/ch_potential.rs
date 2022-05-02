@@ -29,6 +29,10 @@ impl<'a> CHPotential<'a> {
         }
     }
 
+    pub fn from_ch_backwards(ch: BorrowedContractionHierarchy<'a>) -> Self {
+        Self::from_ch(ch.inverted())
+    }
+
     pub fn from_ch_with_node_mapping(ch: BorrowedContractionHierarchy<'a>, node_mapping: Vec<NodeId>) -> Self {
         let n = ch.forward().num_nodes();
         Self {

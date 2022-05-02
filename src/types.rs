@@ -185,7 +185,7 @@ pub trait Graph {
 }
 
 pub trait OutgoingEdgeIterable: Graph {
-    type Iter<'a>: Iterator<Item = (&'a Self::WeightType, &'a NodeId)>
+    type Iter<'a>: Iterator<Item = (&'a Weight, &'a NodeId)>
     where
         Self: 'a;
 
@@ -254,6 +254,41 @@ impl OwnedGraph {
             weights: Vec::<Weight>::load_from(path.as_ref().join("travel_time"))?,
         })
     }
+
+    pub fn reverse<G: Graph + OutgoingEdgeIterable>(graph: G) -> Self {
+        let mut reversed_first_out = vec![0u32; graph.num_nodes() + 1];
+        for node in 0..(graph.num_nodes() as NodeId) {
+            for (_, &neighbor) in graph.outgoing_edge_iter(node) {
+                reversed_first_out[neighbor as usize + 1] += 1;
+            }
+        }
+
+        let mut prefix_sum = 0;
+        for deg in &mut reversed_first_out {
+            prefix_sum += *deg;
+            *deg = prefix_sum;
+        }
+
+        let mut head = vec![0; graph.num_arcs()];
+        let mut weights = vec![0; graph.num_arcs()];
+
+        // iterate over all edges and insert them in the reversed structure
+        for node in 0..(graph.num_nodes() as NodeId) {
+            for (&weight, &neighbor) in graph.outgoing_edge_iter(node) {
+                let idx = reversed_first_out[neighbor as usize] as usize;
+                reversed_first_out[neighbor as usize] += 1;
+                head[idx] = node;
+                weights[idx] = weight;
+            }
+        }
+
+        for node in (1..graph.num_nodes()).rev() {
+            reversed_first_out[node] = reversed_first_out[node - 1];
+        }
+        reversed_first_out[0] = 0;
+
+        OwnedGraph::new(reversed_first_out, head, weights)
+    }
 }
 
 impl<'a> Copy for BorrowedGraph<'a> {}
@@ -267,7 +302,7 @@ where
     type Iter<'a>
     where
         Self: 'a,
-    = impl Iterator<Item = (&'a Self::WeightType, &'a NodeId)> + 'a;
+    = impl Iterator<Item = (&'a Weight, &'a NodeId)> + 'a;
 
     #[inline]
     fn outgoing_edge_iter(&self, node: NodeId) -> Self::Iter<'_> {

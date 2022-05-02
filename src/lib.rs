@@ -7,7 +7,6 @@
 #![feature(int_log)]
 
 pub mod algo;
-pub mod clearing_vector;
 pub mod cli;
 pub mod experiments;
 pub mod index_heap;
