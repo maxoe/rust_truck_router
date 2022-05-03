@@ -242,7 +242,7 @@ def plot_all_rank_times(problem, graph):
         ("time_ms", "log"),
     ]
 
-    algos = ["astar_chpot", "core_ch", "core_ch_chpot"]
+    algos = ["astar_chpot", "astar_bidir_chpot", "core_ch", "core_ch_chpot"]
 
     for algo in algos:
         queries = queries_all.loc[queries_all["algo"] == algo]

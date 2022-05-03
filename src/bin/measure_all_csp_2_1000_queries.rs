@@ -5,6 +5,7 @@ use rust_truck_router::{
         ch_potential::CHPotential,
         core_ch::CoreContractionHierarchy,
         csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
+        csp_2_bidir::CSP2BidirAstarCHPotQuery,
         csp_core_ch::CSPCoreCHQuery,
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
     },
@@ -30,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
+    let bw_graph = OwnedGraph::reverse(graph.borrow());
 
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
@@ -39,6 +41,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut astar_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     astar_state.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
     let astar = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
+
+    let mut bidir_astar_query = CSP2BidirAstarCHPotQuery::new(graph.borrow(), bw_graph.borrow(), &is_parking_node, ch.borrow());
+    bidir_astar_query.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
 
     let mut core_ch_query = CSPCoreCHQuery::new(core_ch.borrow());
     core_ch_query.set_restriction(16_200_000, 2_700_000);
@@ -80,6 +85,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         let astar_time = start.elapsed();
 
         let start = Instant::now();
+        bidir_astar_query.init_new_s(s);
+        bidir_astar_query.init_new_t(t);
+        bidir_astar_query.run_query();
+        let bidir_astar_time = start.elapsed();
+
+        let start = Instant::now();
         core_ch_query.init_new_s(s);
         core_ch_query.init_new_t(t);
         let core_ch_dist = core_ch_query.run_query();
@@ -111,6 +122,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                         num_labels_reset: astar_state.num_labels_reset,
                         num_nodes_searched: astar_state.get_number_of_visited_nodes(),
                         time: astar_time,
+                        path_distance: astar_dist,
+                        path_number_nodes: Some(path.0.len()),
+                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                    },
+                    path_number_short_pauses: Some(number_pauses.0.len()),
+                    path_number_long_pauses: Some(number_pauses.1.len()),
+                },
+            });
+
+            stat_logs.push(LocalMeasurementResult {
+                algo: String::from("astar_bidir_chpot"),
+                standard: CSP2MeasurementResult {
+                    standard: CSPMeasurementResult {
+                        graph_num_nodes: graph.num_nodes(),
+                        graph_num_edges: graph.num_arcs(),
+                        num_queue_pushes: astar_state.num_queue_pushes,
+                        num_settled: astar_state.num_settled,
+                        num_labels_propagated: astar_state.num_labels_propagated,
+                        num_labels_reset: astar_state.num_labels_reset,
+                        num_nodes_searched: astar_state.get_number_of_visited_nodes(),
+                        time: bidir_astar_time,
                         path_distance: astar_dist,
                         path_number_nodes: Some(path.0.len()),
                         path_number_flagged_nodes: Some(number_flagged_nodes.len()),
@@ -182,6 +214,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                     path_number_long_pauses: None,
                 },
             });
+
+            stat_logs.push(LocalMeasurementResult {
+                algo: String::from("astar_bidir_chpot"),
+                standard: CSP2MeasurementResult {
+                    standard: CSPMeasurementResult {
+                        graph_num_nodes: graph.num_nodes(),
+                        graph_num_edges: graph.num_arcs(),
+                        num_queue_pushes: astar_state.num_queue_pushes,
+                        num_settled: astar_state.num_settled,
+                        num_labels_propagated: astar_state.num_labels_propagated,
+                        num_labels_reset: astar_state.num_labels_reset,
+                        num_nodes_searched: astar_state.get_number_of_visited_nodes(),
+                        time: bidir_astar_time,
+                        path_distance: None,
+                        path_number_nodes: None,
+                        path_number_flagged_nodes: None,
+                    },
+                    path_number_short_pauses: None,
+                    path_number_long_pauses: None,
+                },
+            });
+
             stat_logs.push(LocalMeasurementResult {
                 algo: String::from("core_ch"),
                 standard: CSP2MeasurementResult {
