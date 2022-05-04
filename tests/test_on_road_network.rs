@@ -57,11 +57,10 @@ fn hundred_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
     let csp_2_pot = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     let dijkstra = Dijkstra::new(graph.borrow());
 
-    for i in 0..100 {
+    for i in 0..1000 {
         let s = gen.gen_range(0..graph.num_nodes() as NodeId);
         let t = gen.gen_range(0..graph.num_nodes() as NodeId);
         println!("Query #{} from {} to {} without constraints", i, s, t);
-
         dijkstra_state.init_new_s(s);
         csp_pot_state.init_new_s(s);
         csp_2_pot_state.init_new_s(s);
@@ -166,11 +165,12 @@ fn hundred_ka_queries_csp() -> Result<(), Box<dyn Error>> {
 
     let csp = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
-    for i in 0..100 {
+    for i in 0..1000 {
         let s = gen.gen_range(0..graph.num_nodes() as NodeId);
         let t = gen.gen_range(0..graph.num_nodes() as NodeId);
-        println!("Query #{} from {} to {} without constraints", i, s, t);
-
+        println!("CSP Query #{} from {} to {}", i, s, t);
+        // let s = 48226;
+        // let t = 380306;
         csp_state.init_new_s(s);
         csp_pot_state.init_new_s(s);
         csp_pot_prop_all_state.init_new_s(s);
@@ -251,10 +251,10 @@ fn hundred_ka_queries_csp_2() -> Result<(), Box<dyn Error>> {
 
     let csp_2 = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
-    for i in 0..100 {
+    for i in 0..1000 {
         let s = gen.gen_range(0..graph.num_nodes() as NodeId);
         let t = gen.gen_range(0..graph.num_nodes() as NodeId);
-        println!("Query #{} from {} to {} without constraints", i, s, t);
+        println!("CSP2 Query #{} from {} to {} ", i, s, t);
 
         csp_2_state.init_new_s(s);
         csp_2_pot_state.init_new_s(s);

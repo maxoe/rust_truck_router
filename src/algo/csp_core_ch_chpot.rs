@@ -133,36 +133,24 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
         self.bw_finished = false;
     }
 
-    fn calculate_distance_with_break_at<P: Potential>(
+    fn calculate_distance_with_break_at(
         node: NodeId,
         restriction: &DrivingTimeRestriction,
-        fw_state: &mut OneRestrictionDijkstraData<P>,
-        bw_state: &mut OneRestrictionDijkstraData<P>,
+        fw_label_dist: &Weight2,
+        bw_state: &mut OneRestrictionDijkstraData<CHPotential>,
     ) -> Weight {
-        let s_to_v = fw_state.get_settled_labels_at(node);
         let v_to_t = bw_state.get_settled_labels_at(node);
 
-        let mut current_fw = s_to_v.rev().map(|r| r.0).peekable();
-        let mut current_bw = v_to_t.rev().map(|r| r.0).peekable();
-
-        if current_fw.peek().is_none() || current_bw.peek().is_none() {
-            return Weight::infinity();
-        }
+        let mut current_bw = v_to_t.rev().map(|r| r.0);
 
         let mut best_distance = Weight::infinity();
-        while let (Some(fw_label), Some(bw_label)) = (current_fw.peek(), current_bw.peek()) {
-            let total_dist = fw_label.distance.add(bw_label.distance);
+        while let Some(bw_label) = current_bw.next() {
+            let total_dist = fw_label_dist.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
             if total_dist[1] < restriction.max_driving_time {
                 // subpaths can be connected without additional break
                 best_distance = best_distance.min(total_dist[0]);
-            }
-
-            if fw_label.distance[0] < bw_label.distance[0] {
-                current_fw.next();
-            } else {
-                current_bw.next();
             }
         }
 
@@ -202,13 +190,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                     distance: _dist_from_queue_at_v,
                     node,
                 }) = if tentative_distance < Weight::infinity() && self.bw_state.min_key().is_some() {
-                    fw_search.settle_next_label_prune_bw_lower_bound(
-                        &mut self.fw_state,
-                        tentative_distance,
-                        self.bw_state.peek_queue().map(|s| s.distance).unwrap(),
-                        &mut self.bw_state.potential,
-                        self.t,
-                    )
+                    fw_search.settle_next_label_prune_bw_lower_bound(&mut self.fw_state, &mut self.bw_state, tentative_distance, self.t)
                 } else {
                     fw_search.settle_next_label(&mut self.fw_state, self.t)
                 } {
@@ -224,7 +206,12 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
-                        let tent_dist_at_v = Self::calculate_distance_with_break_at(node, &self.restriction, &mut self.fw_state, &mut self.bw_state);
+                        let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                            node,
+                            &self.restriction,
+                            &self.fw_state.get_best_label_at(node).unwrap().distance,
+                            &mut self.bw_state,
+                        );
 
                         if tentative_distance > tent_dist_at_v {
                             tentative_distance = tent_dist_at_v;
@@ -251,13 +238,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                 distance: _dist_from_queue_at_v,
                 node,
             }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
-                bw_search.settle_next_label_prune_bw_lower_bound(
-                    &mut self.bw_state,
-                    tentative_distance,
-                    self.fw_state.peek_queue().map(|s| s.distance).unwrap(),
-                    &mut self.fw_state.potential,
-                    self.s,
-                )
+                bw_search.settle_next_label_prune_bw_lower_bound(&mut self.bw_state, &mut self.fw_state, tentative_distance, self.s)
             } else {
                 bw_search.settle_next_label(&mut self.bw_state, self.s)
             } {
@@ -274,7 +255,12 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                 }
 
                 if settled_fw.get(node as usize).unwrap() {
-                    let tent_dist_at_v = Self::calculate_distance_with_break_at(node, &self.restriction, &mut self.fw_state, &mut self.bw_state);
+                    let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                        node,
+                        &self.restriction,
+                        &self.bw_state.get_best_label_at(node).unwrap().distance,
+                        &mut self.fw_state,
+                    );
 
                     if tentative_distance > tent_dist_at_v {
                         tentative_distance = tent_dist_at_v;

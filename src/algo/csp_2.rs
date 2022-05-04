@@ -1,36 +1,16 @@
-use std::{
-    cmp::Reverse,
-    fmt::Write,
-    time::{Duration, Instant},
-};
-
 use crate::{
     algo::astar::{NoPotential, Potential},
     index_heap::*,
-    rrr_indexed_heap::AutoIndexedHeap,
     timestamped_vector::TimestampedVector,
     types::*,
 };
 use bit_vec::BitVec;
 use num::Integer;
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
-pub struct Label<T> {
-    pub distance_with_potential: T,
-    pub distance: T,
-    pub prev_node: NodeId,
-    pub prev_label: Option<usize>,
-}
-
-pub type MCDHeap<L> = AutoIndexedHeap<Reverse<Label<L>>>;
-
-impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap<L> {
-    const DEFAULT: MCDHeap<L> = MCDHeap::<L>::new();
-
-    fn reset(&mut self) {
-        self.reset();
-    }
-}
+use std::{
+    cmp::Reverse,
+    fmt::Write,
+    time::{Duration, Instant},
+};
 
 pub struct TwoRestrictionDijkstraData<P = NoPotential>
 where
@@ -385,6 +365,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                 for current_new_dist in new_dist {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
                     neighbor_label_set.retain(|&neighbor_label| {
@@ -555,9 +536,8 @@ impl<'a> TwoRestrictionDijkstra<'a> {
     pub fn settle_next_label_prune_bw_lower_bound<P: Potential>(
         &self,
         state: &mut TwoRestrictionDijkstraData<P>,
+        bw_state: &mut TwoRestrictionDijkstraData<P>,
         tentative_distance: Weight,
-        bw_min_key: Weight3,
-        bw_potential: &mut P,
         t: NodeId,
     ) -> Option<State<Weight3>> {
         let next = state.queue.pop();
@@ -574,18 +554,18 @@ impl<'a> TwoRestrictionDijkstra<'a> {
             }
 
             let label_index = state.per_node_labels.get_mut(node_id as usize).peek_index().unwrap();
-            let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
-            let tentative_dist_without_pot = label.0.distance;
-            let mut dist_list = vec![tentative_dist_without_pot];
+            // let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
+            let tentative_dist_without_pot = state.per_node_labels.get_mut(node_id as usize).pop().unwrap().0.distance;
+            // let mut dist_list = vec![tentative_dist_without_pot];
 
             // add all labels with equal dist[0] to list since those may be in invalid order
-            while let Some(next_best_label) = state.per_node_labels.get_mut(node_id as usize).pop() {
-                if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
-                    dist_list.push(next_best_label.0.distance);
-                } else {
-                    break;
-                }
-            }
+            // while let Some(next_best_label) = state.per_node_labels.get_mut(node_id as usize).pop() {
+            //     if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
+            //         dist_list.push(next_best_label.0.distance);
+            //     } else {
+            //         break;
+            //     }
+            // }
 
             // check if next unsettled lable exists for node and push to queue
             if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
@@ -595,81 +575,97 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     node: node_id,
                 });
             }
-            for current_tent_dist in dist_list {
-                // with hopping reduction
-                for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
-                    // [new_dist without, new_dist with parking]
-                    let mut new_dist = Vec::with_capacity(3);
-                    // new_dist.push(tentative_dist_without_pot.link(edge_weight));
-                    new_dist.push(current_tent_dist.link(edge_weight));
+            // for current_tent_dist in dist_list {
+            // with hopping reduction
+            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
+                // [new_dist without, new_dist with parking]
+                let mut new_dist = Vec::with_capacity(3);
+                new_dist.push(tentative_dist_without_pot.link(edge_weight));
+                // new_dist.push(current_tent_dist.link(edge_weight));
 
-                    // constraint and target pruning
-                    if new_dist[0][1] >= state.restriction_short.max_driving_time
-                        || new_dist[0][2] >= state.restriction_long.max_driving_time
-                        || state.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
-                    {
-                        continue;
-                    }
+                // constraint and target pruning
+                if new_dist[0][1] >= state.restriction_short.max_driving_time
+                    || new_dist[0][2] >= state.restriction_long.max_driving_time
+                    || state.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
+                {
+                    continue;
+                }
 
-                    if self.reset_flags.get(neighbor_node as usize).unwrap() {
-                        new_dist.push(new_dist[0]);
-                        new_dist[1].reset_distance(1, state.restriction_short.pause_time);
+                if self.reset_flags.get(neighbor_node as usize).unwrap() {
+                    new_dist.push(new_dist[0]);
+                    new_dist[1].reset_distance(1, state.restriction_short.pause_time);
 
-                        new_dist.push(new_dist[0]);
-                        new_dist[2].reset_distance(2, state.restriction_long.pause_time);
-                        state.num_labels_reset += 1;
-                    }
+                    new_dist.push(new_dist[0]);
+                    new_dist[2].reset_distance(2, state.restriction_long.pause_time);
+                    state.num_labels_reset += 1;
+                }
 
-                    for current_new_dist in new_dist {
-                        let pot = state.potential.potential(neighbor_node);
-                        let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
-                        // pruning with bw lower bound
-                        // current_new_dist + bw_min_key - bw_potential(neighbor_node) >= tentative_distance
-                        // tentative_distance + bw_potential(neighbor_node) <= current_new_dist + bw_min_key
-                        if tentative_distance
-                            .link(bw_potential.potential(neighbor_node))
-                            .dominates(&(current_new_dist.add(bw_min_key)[0]))
-                        {
+                for current_new_dist in new_dist {
+                    let pot = state.potential.potential(neighbor_node);
+                    let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+                    // pruning with bw lower bound
+                    // current_new_dist + bw_min_key - bw_potential(neighbor_node) >= tentative_distance
+                    // tentative_distance + bw_potential(neighbor_node) <= current_new_dist + bw_min_key
+                    // if tentative_distance
+                    //     .link(bw_potential.potential(neighbor_node))
+                    //     .dominates(&(current_new_dist.add(bw_min_key)[0]))
+                    // {
+                    //     continue;
+                    // }
+
+                    // let bw_pot_at_neighbor = bw_state.potential.potential(neighbor_node);
+                    // let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                    // if bw_state.get_best_label_at(neighbor_node).is_none() && current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
+                    //     continue;
+                    // }
+
+                    if bw_state.queue.contains_index(neighbor_node as usize) && bw_state.get_settled_labels_at(neighbor_node).count() == 0 {
+                        // if bw_state.queue.contains_index(neighbor_node as usize) {
+                        let bw_pot_at_neighbor =
+                            bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
+                        let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                        if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
                             continue;
                         }
+                    }
 
-                        let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
-                        let mut dominated = false;
-                        neighbor_label_set.retain(|&neighbor_label| {
-                            dominated |= neighbor_label.0.distance.dominates(&current_new_dist);
-                            dominated || !current_new_dist.dominates(&neighbor_label.0.distance)
-                        });
+                    let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
+                    let mut dominated = false;
+                    neighbor_label_set.retain(|&neighbor_label| {
+                        dominated |= neighbor_label.0.distance.dominates(&current_new_dist);
+                        dominated || !current_new_dist.dominates(&neighbor_label.0.distance)
+                    });
 
-                        if !dominated {
-                            state.num_labels_propagated += 1;
-                            neighbor_label_set.push(Reverse(Label {
-                                distance_with_potential,
-                                distance: current_new_dist,
-                                prev_label: Some(label_index),
-                                prev_node: node_id,
-                            }));
+                    if !dominated {
+                        state.num_labels_propagated += 1;
+                        neighbor_label_set.push(Reverse(Label {
+                            distance_with_potential,
+                            distance: current_new_dist,
+                            prev_label: Some(label_index),
+                            prev_node: node_id,
+                        }));
 
-                            let pot = state.potential.potential(neighbor_node);
-                            let dist_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+                        let pot = state.potential.potential(neighbor_node);
+                        let dist_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
-                            if state.queue.contains_index(neighbor_node as usize) {
-                                // decrease key seems to increase key if given a larger key than existing
-                                if state.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {
-                                    state.queue.decrease_key(State {
-                                        distance: dist_with_potential,
-                                        node: neighbor_node,
-                                    });
-                                }
-                            } else {
-                                state.num_queue_pushes += 1;
-                                state.queue.push(State {
+                        if state.queue.contains_index(neighbor_node as usize) {
+                            // decrease key seems to increase key if given a larger key than existing
+                            if state.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {
+                                state.queue.decrease_key(State {
                                     distance: dist_with_potential,
                                     node: neighbor_node,
                                 });
                             }
+                        } else {
+                            state.num_queue_pushes += 1;
+                            state.queue.push(State {
+                                distance: dist_with_potential,
+                                node: neighbor_node,
+                            });
                         }
                     }
                 }
+                // }
             }
         } else {
             state.last_distance = None;

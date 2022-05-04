@@ -75,9 +75,11 @@ where
                 node: self.s,
                 distance: self.estimated_dist_with_restriction([0, 0], pot),
             });
+            let distance_with_potential = self.estimated_dist_with_restriction([0, 0], pot);
             self.per_node_labels.get_mut(self.s as usize).push(Reverse(Label {
-                prev_node: self.invalid_node_id,
+                distance_with_potential,
                 distance: [0, 0],
+                prev_node: self.invalid_node_id,
                 prev_label: None,
             }));
         }
@@ -308,14 +310,10 @@ impl<'a> OneRestrictionDijkstra<'a> {
                 }
 
                 for current_new_dist in new_dist {
-                    let is_set = state.per_node_labels.is_set(neighbor_node as usize);
+                    let pot = state.potential.potential(neighbor_node);
+                    let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+
                     state.per_node_labels.get_mut(neighbor_node as usize);
-                    assert!(
-                        is_set
-                            || (state.per_node_labels.get(neighbor_node as usize).iter().count()
-                                + state.per_node_labels.get(neighbor_node as usize).popped().count())
-                                == 0
-                    );
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
                     neighbor_label_set.retain(|&neighbor_label| {
@@ -326,6 +324,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     if !dominated {
                         state.num_labels_propagated += 1;
                         neighbor_label_set.push(Reverse(Label {
+                            distance_with_potential,
                             distance: current_new_dist,
                             prev_node: node_id,
                             prev_label: Some(label_index),
@@ -428,6 +427,9 @@ impl<'a> OneRestrictionDijkstra<'a> {
                         }
 
                         for current_new_dist in new_dist {
+                            let pot = state.potential.potential(neighbor_node);
+                            let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+
                             let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                             let mut dominated = false;
                             neighbor_label_set.retain(|&neighbor_label| {
@@ -438,6 +440,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                             if !dominated {
                                 state.num_labels_propagated += 1;
                                 neighbor_label_set.push(Reverse(Label {
+                                    distance_with_potential,
                                     distance: current_new_dist,
                                     prev_node: node_id,
                                     prev_label: Some(label_index),
@@ -480,9 +483,8 @@ impl<'a> OneRestrictionDijkstra<'a> {
     pub fn settle_next_label_prune_bw_lower_bound<P: Potential>(
         &self,
         state: &mut OneRestrictionDijkstraData<P>,
+        bw_state: &mut OneRestrictionDijkstraData<P>,
         tentative_distance: Weight,
-        bw_min_key: Weight2,
-        bw_potential: &mut P,
         t: NodeId,
     ) -> Option<State<Weight2>> {
         let next = state.queue.pop();
@@ -531,24 +533,31 @@ impl<'a> OneRestrictionDijkstra<'a> {
                 }
 
                 for current_new_dist in new_dist {
+                    let pot = state.potential.potential(neighbor_node);
+                    let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+
                     // pruning with bw lower bound
-                    // current_new_dist + bw_min_key - bw_potential(neighbor_node) >= tentative_distance
-                    // tentative_distance + bw_potential(neighbor_node) <= current_new_dist + bw_min_key
-                    if tentative_distance
-                        .link(bw_potential.potential(neighbor_node))
-                        .dominates(&(current_new_dist.add(bw_min_key)[0]))
+                    let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
+                    if let Some(Reverse(Label {
+                        distance: best_label_distance, ..
+                    })) = best_label
                     {
-                        continue;
+                        // best settled label as lower bound for D(neighbor_node,t)
+                        if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
+                            continue;
+                        }
+                    } else if bw_state.queue.contains_index(neighbor_node as usize) {
+                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                        let bw_pot_at_neighbor =
+                            bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
+                        let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                        if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
+                            continue;
+                        }
                     }
 
-                    let is_set = state.per_node_labels.is_set(neighbor_node as usize);
                     state.per_node_labels.get_mut(neighbor_node as usize);
-                    assert!(
-                        is_set
-                            || (state.per_node_labels.get(neighbor_node as usize).iter().count()
-                                + state.per_node_labels.get(neighbor_node as usize).popped().count())
-                                == 0
-                    );
+
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
                     neighbor_label_set.retain(|&neighbor_label| {
@@ -559,6 +568,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     if !dominated {
                         state.num_labels_propagated += 1;
                         neighbor_label_set.push(Reverse(Label {
+                            distance_with_potential,
                             distance: current_new_dist,
                             prev_node: node_id,
                             prev_label: Some(label_index),

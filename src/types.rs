@@ -313,6 +313,7 @@ where
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
 pub struct Label<T> {
+    pub distance_with_potential: T,
     pub distance: T,
     pub prev_node: NodeId,
     pub prev_label: Option<usize>,

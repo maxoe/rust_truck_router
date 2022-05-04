@@ -113,39 +113,28 @@ impl<'a> CSP2CoreCHQuery<'a> {
 
         self.fw_finished = false;
         self.bw_finished = false;
+        self.last_dist = None;
     }
 
     fn calculate_distance_with_break_at(
         node: NodeId,
         restriction_short: &DrivingTimeRestriction,
         restriction_long: &DrivingTimeRestriction,
-        fw_state: &mut TwoRestrictionDijkstraData,
+        fw_label_dist: &Weight3,
         bw_state: &mut TwoRestrictionDijkstraData,
     ) -> Weight {
-        let s_to_v = fw_state.get_settled_labels_at(node);
         let v_to_t = bw_state.get_settled_labels_at(node);
 
-        let mut current_fw = s_to_v.rev().map(|r| r.0).peekable();
-        let mut current_bw = v_to_t.rev().map(|r| r.0).peekable();
-
-        if current_fw.peek().is_none() || current_bw.peek().is_none() {
-            return Weight::infinity();
-        }
+        let mut current_bw = v_to_t.rev().map(|r| r.0);
 
         let mut best_distance = Weight::infinity();
-        while let (Some(fw_label), Some(bw_label)) = (current_fw.peek(), current_bw.peek()) {
-            let total_dist = fw_label.distance.add(bw_label.distance);
+        while let Some(bw_label) = current_bw.next() {
+            let total_dist = fw_label_dist.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
             if total_dist[1] < restriction_short.max_driving_time && total_dist[2] < restriction_long.max_driving_time {
                 // subpaths can be connected without additional break
                 best_distance = best_distance.min(total_dist[0]);
-            }
-
-            if fw_label.distance[0] < bw_label.distance[0] {
-                current_fw.next();
-            } else {
-                current_bw.next();
             }
         }
 
@@ -158,19 +147,7 @@ impl<'a> CSP2CoreCHQuery<'a> {
         }
         let mut tentative_distance = Weight::infinity();
 
-        let mut fw_min_key = 0;
-        let mut bw_min_key = 0;
-
         self.reset();
-        if !self.fw_finished {
-            // safe after init
-            fw_min_key = self.fw_state.min_key().unwrap();
-        }
-
-        if !self.bw_finished {
-            // safe after init
-            bw_min_key = self.bw_state.min_key().unwrap();
-        }
 
         let mut settled_fw = BitVec::from_elem(self.core_ch.forward().num_nodes(), false);
         let mut settled_bw = BitVec::from_elem(self.core_ch.backward().num_nodes(), false);
@@ -206,7 +183,7 @@ impl<'a> CSP2CoreCHQuery<'a> {
                             node,
                             &self.restriction_short,
                             &self.restriction_long,
-                            &mut self.fw_state,
+                            &self.fw_state.get_best_label_at(node).unwrap().distance,
                             &mut self.bw_state,
                         );
 
@@ -216,12 +193,7 @@ impl<'a> CSP2CoreCHQuery<'a> {
                         }
                     }
 
-                    fw_min_key = self.fw_state.min_key().unwrap_or_else(|| {
-                        self.fw_finished = true;
-                        fw_min_key
-                    });
-
-                    if fw_min_key >= tentative_distance {
+                    if self.fw_state.min_key().is_none() || self.fw_state.min_key().unwrap() >= tentative_distance {
                         self.fw_finished = true;
                     }
 
@@ -250,8 +222,13 @@ impl<'a> CSP2CoreCHQuery<'a> {
                 }
 
                 if settled_fw.get(node as usize).unwrap() {
-                    let tent_dist_at_v =
-                        Self::calculate_distance_with_break_at(node, &self.restriction_short, &self.restriction_long, &mut self.fw_state, &mut self.bw_state);
+                    let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                        node,
+                        &self.restriction_short,
+                        &self.restriction_long,
+                        &self.bw_state.get_best_label_at(node).unwrap().distance,
+                        &mut self.fw_state,
+                    );
 
                     if tentative_distance > tent_dist_at_v {
                         tentative_distance = tent_dist_at_v;
@@ -259,12 +236,7 @@ impl<'a> CSP2CoreCHQuery<'a> {
                     }
                 }
 
-                bw_min_key = self.bw_state.min_key().unwrap_or_else(|| {
-                    self.bw_finished = true;
-                    bw_min_key
-                });
-
-                if bw_min_key >= tentative_distance {
+                if self.bw_state.min_key().is_none() || self.bw_state.min_key().unwrap() >= tentative_distance {
                     self.bw_finished = true;
                 }
 
