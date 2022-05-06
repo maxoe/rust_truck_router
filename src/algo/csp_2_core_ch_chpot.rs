@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{algo::ch_potential::CHPotential, types::*};
 use bit_vec::BitVec;
 
@@ -20,6 +22,7 @@ pub struct CSP2AstarCoreCHQuery<'a> {
     t: NodeId,
     pub restriction_short: DrivingTimeRestriction,
     pub restriction_long: DrivingTimeRestriction,
+    is_reset_node: Rc<BitVec>,
     pub last_dist: Option<Weight>,
 }
 
@@ -54,6 +57,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         );
 
         let node_mapping = core_ch.order().to_owned();
+        let is_reset_node = core_ch.is_core().clone();
 
         CSP2AstarCoreCHQuery {
             core_ch,
@@ -73,8 +77,17 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
+            is_reset_node,
             last_dist: None,
         }
+    }
+
+    pub fn set_custom_reset_nodes(&mut self, is_reset_node: Rc<BitVec>) {
+        self.is_reset_node = is_reset_node;
+    }
+
+    pub fn clear_custom_reset_nodes(&mut self) {
+        self.is_reset_node = self.core_ch.is_core().clone();
     }
 
     pub fn set_restriction(&mut self, max_driving_time_long: Weight, pause_time_long: Weight, max_driving_time_short: Weight, pause_time_short: Weight) {
@@ -198,9 +211,8 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         let mut fw_search_reachable_from_core = false;
         let mut bw_search_reachable_from_core = false;
 
-        let reset_flags = self.core_ch.is_core();
-        let fw_search = TwoRestrictionDijkstra::new(self.core_ch.forward(), reset_flags.as_ref());
-        let bw_search = TwoRestrictionDijkstra::new(self.core_ch.backward(), reset_flags.as_ref());
+        let fw_search = TwoRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
+        let bw_search = TwoRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
 
         while (!self.fw_finished || !self.bw_finished)
             && !(self.fw_finished && !fw_search_reachable_from_core && bw_in_core)

@@ -13,6 +13,8 @@ use crate::{
 use bit_vec::BitVec;
 use num::Integer;
 
+use super::dijkstra::{Dijkstra, DijkstraQuery};
+
 pub struct OneRestrictionDijkstraData<P = NoPotential>
 where
     P: Potential,
@@ -734,3 +736,30 @@ impl<'a> OneRestrictionDijkstra<'a> {
         s
     }
 }
+
+pub trait OneRestrictionDijkstraQuery<'a, P> {
+    fn one_restriction_dijkstra_query(q: STQuery, graph: BorrowedGraph<'a>, reset_flags: &'a BitVec, p: P) -> Option<NodeId>;
+}
+
+impl<'a, P: Potential> OneRestrictionDijkstraQuery<'a, P> for OneRestrictionDijkstra<'a> {
+    fn one_restriction_dijkstra_query(q: STQuery, graph: BorrowedGraph<'a>, reset_flags: &'a BitVec, p: P) -> Option<NodeId> {
+        let mut state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), p);
+        state.init_new_s(q.s);
+        let restriction_dijkstra = Self::new(graph, reset_flags);
+        restriction_dijkstra.dist_query(&mut state, q.t)
+    }
+}
+
+// impl<'a> DijkstraQuery<'a> for OneRestrictionDijkstra<'_> {
+//     fn dijkstra_query<'b>(q: STQuery, graph: BorrowedGraph<'b>) -> Option<NodeId> {
+//         let mut state = OneRestrictionDijkstraData::new(graph.num_nodes());
+//         state.init_new_s(q.s);
+
+//         let reset_flags = BitVec::from_elem(graph.num_nodes(), false);
+//         let mut restriction_dijkstra = Some(Self::new(graph, &reset_flags));
+//         let res = restriction_dijkstra.unwrap().dist_query(&mut state, q.t);
+//         restriction_dijkstra = None;
+
+//         res
+//     }
+// }

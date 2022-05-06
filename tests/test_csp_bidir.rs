@@ -3,7 +3,7 @@ use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy,
         csp_bidir::CSPBidirAstarCHPotQuery,
-        dijkstra::{Dijkstra, DijkstraData},
+        dijkstra::{DijkstraData, Dijkstra},
     },
     types::{OwnedGraph, *},
 };

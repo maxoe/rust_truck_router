@@ -178,7 +178,6 @@ pub struct FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer> {
 }
 
 pub trait Graph {
-    type WeightType: WeightOps;
     fn num_nodes(&self) -> usize;
     fn num_arcs(&self) -> usize;
     fn degree(&self, node: NodeId) -> usize;
@@ -230,8 +229,6 @@ where
     HeadContainer: AsRef<[NodeId]>,
     WeightsContainer: AsRef<[Weight]>,
 {
-    type WeightType = Weight;
-
     fn num_nodes(&self) -> usize {
         self.first_out().len() - 1
     }
@@ -327,4 +324,9 @@ impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap<L> {
     fn reset(&mut self) {
         self.reset();
     }
+}
+
+pub struct STQuery {
+    pub s: NodeId,
+    pub t: NodeId,
 }

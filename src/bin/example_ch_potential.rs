@@ -33,12 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
-    // let s = 61540650;
-    // let t = 41065895;
-    // let s = 6487683;
-    // let t = 59591589;
-    // let s = 182314;
-    // let t = 62973;
+
     // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
     // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id

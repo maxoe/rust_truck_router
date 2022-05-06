@@ -242,7 +242,8 @@ def plot_all_rank_times(problem, graph):
         ("time_ms", "log"),
     ]
 
-    algos = ["astar_chpot", "astar_bidir_chpot", "core_ch", "core_ch_chpot"]
+    # algos = ["astar_chpot", "astar_bidir_chpot", "core_ch", "core_ch_chpot"]
+    algos = ["astar_chpot", "core_ch", "core_ch_chpot"]
 
     for algo in algos:
         queries = queries_all.loc[queries_all["algo"] == algo]
@@ -301,6 +302,44 @@ def plot_rank_times_perf_profile(problem, graph):
     write_plt("measure_all_" + problem + "_1000_queries_rank_times-perfprofile.png", g)
 
 
+def plot_core_size_experiments(problem, graph):
+    name = "measure_" + problem + "_core_sizes"
+
+    run_measurement_conditionally(name, graph)
+
+    queries = read_measurement(
+        name + "-" + graph,
+    )
+
+    # plot only 2^10 and larger
+    # queries_all = queries_all.loc[queries_all["dijkstra_rank_exponent"] >= 10]
+
+    colors = ggPlotColors(4)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    bp = queries.boxplot(ax=ax, by="core_size", column="time_ms")
+
+    bp.get_figure().gca().set_title("")
+    fig.suptitle("")
+
+    ax.set_xlabel("relative core size")
+    ax.set_ylabel("time [ms]")
+    ax.set_yscale("log")
+
+    # if plot_scale == "linear":
+    #     ax.set_ylim(bottom=-0.1)
+    #     ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+
+    # make_dijkstra_rank_tick_labels_from_exponent(
+    #     ax.xaxis, queries["dijkstra_rank_exponent"].unique()
+    # )
+
+    plt.title("Core CH A* with CH Potentials for " + problem + ": " + graph)
+    fig.tight_layout()
+
+    write_plt(name, graph)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -334,5 +373,6 @@ if __name__ == "__main__":
 
     for g in args.graph:
         for p in ["csp", "csp_2"]:
-            plot_all_rank_times(p, g)
-            plot_rank_times_perf_profile(p, g)
+            # plot_all_rank_times(p, g)
+            # plot_rank_times_perf_profile(p, g)
+            plot_core_size_experiments(p, g)

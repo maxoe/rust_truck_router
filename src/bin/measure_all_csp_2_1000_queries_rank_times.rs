@@ -95,11 +95,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let astar_dist = astar.dist_query(&mut astar_state, current_t);
             let astar_time = start.elapsed();
 
-            let start = Instant::now();
-            bidir_astar_query.init_new_s(s);
-            bidir_astar_query.init_new_t(current_t);
-            bidir_astar_query.run_query();
-            let bidir_astar_time = start.elapsed();
+            // let start = Instant::now();
+            // bidir_astar_query.init_new_s(s);
+            // bidir_astar_query.init_new_t(current_t);
+            // bidir_astar_query.run_query();
+            // let bidir_astar_time = start.elapsed();
 
             let start = Instant::now();
             core_ch_query.init_new_s(s);
@@ -143,27 +143,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                     },
                 });
 
-                stat_logs.push(LocalMeasurementResult {
-                    dijkstra_rank_exponent: i,
-                    algo: String::from("astar_bidir_chpot"),
-                    standard: CSP2MeasurementResult {
-                        standard: CSPMeasurementResult {
-                            graph_num_nodes: graph.num_nodes(),
-                            graph_num_edges: graph.num_arcs(),
-                            num_queue_pushes: astar_state.num_queue_pushes,
-                            num_settled: astar_state.num_settled,
-                            num_labels_propagated: astar_state.num_labels_propagated,
-                            num_labels_reset: astar_state.num_labels_reset,
-                            num_nodes_searched: astar_state.get_number_of_visited_nodes(),
-                            time: bidir_astar_time,
-                            path_distance: astar_dist,
-                            path_number_nodes: Some(path.0.len()),
-                            path_number_flagged_nodes: Some(number_flagged_nodes.len()),
-                        },
-                        path_number_short_pauses: Some(number_pauses.0.len()),
-                        path_number_long_pauses: Some(number_pauses.1.len()),
-                    },
-                });
+                // stat_logs.push(LocalMeasurementResult {
+                //     dijkstra_rank_exponent: i,
+                //     algo: String::from("astar_bidir_chpot"),
+                //     standard: CSP2MeasurementResult {
+                //         standard: CSPMeasurementResult {
+                //             graph_num_nodes: graph.num_nodes(),
+                //             graph_num_edges: graph.num_arcs(),
+                //             num_queue_pushes: astar_state.num_queue_pushes,
+                //             num_settled: astar_state.num_settled,
+                //             num_labels_propagated: astar_state.num_labels_propagated,
+                //             num_labels_reset: astar_state.num_labels_reset,
+                //             num_nodes_searched: astar_state.get_number_of_visited_nodes(),
+                //             time: bidir_astar_time,
+                //             path_distance: astar_dist,
+                //             path_number_nodes: Some(path.0.len()),
+                //             path_number_flagged_nodes: Some(number_flagged_nodes.len()),
+                //         },
+                //         path_number_short_pauses: Some(number_pauses.0.len()),
+                //         path_number_long_pauses: Some(number_pauses.1.len()),
+                //     },
+                // });
 
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,
@@ -231,27 +231,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                     },
                 });
 
-                stat_logs.push(LocalMeasurementResult {
-                    dijkstra_rank_exponent: i,
-                    algo: String::from("astar_bidir_chpot"),
-                    standard: CSP2MeasurementResult {
-                        standard: CSPMeasurementResult {
-                            graph_num_nodes: graph.num_nodes(),
-                            graph_num_edges: graph.num_arcs(),
-                            num_queue_pushes: astar_state.num_queue_pushes,
-                            num_settled: astar_state.num_settled,
-                            num_labels_propagated: astar_state.num_labels_propagated,
-                            num_labels_reset: astar_state.num_labels_reset,
-                            num_nodes_searched: astar_state.get_number_of_visited_nodes(),
-                            time: bidir_astar_time,
-                            path_distance: None,
-                            path_number_nodes: None,
-                            path_number_flagged_nodes: None,
-                        },
-                        path_number_short_pauses: None,
-                        path_number_long_pauses: None,
-                    },
-                });
+                // stat_logs.push(LocalMeasurementResult {
+                //     dijkstra_rank_exponent: i,
+                //     algo: String::from("astar_bidir_chpot"),
+                //     standard: CSP2MeasurementResult {
+                //         standard: CSPMeasurementResult {
+                //             graph_num_nodes: graph.num_nodes(),
+                //             graph_num_edges: graph.num_arcs(),
+                //             num_queue_pushes: astar_state.num_queue_pushes,
+                //             num_settled: astar_state.num_settled,
+                //             num_labels_propagated: astar_state.num_labels_propagated,
+                //             num_labels_reset: astar_state.num_labels_reset,
+                //             num_nodes_searched: astar_state.get_number_of_visited_nodes(),
+                //             time: bidir_astar_time,
+                //             path_distance: None,
+                //             path_number_nodes: None,
+                //             path_number_flagged_nodes: None,
+                //         },
+                //         path_number_short_pauses: None,
+                //         path_number_long_pauses: None,
+                //     },
+                // });
 
                 stat_logs.push(LocalMeasurementResult {
                     dijkstra_rank_exponent: i,

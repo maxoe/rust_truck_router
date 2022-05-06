@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::types::*;
 use bit_vec::BitVec;
 
@@ -17,6 +19,7 @@ pub struct CSPCoreCHQuery<'a> {
     s: NodeId,
     t: NodeId,
     pub restriction: DrivingTimeRestriction,
+    is_reset_node: Rc<BitVec>,
     pub last_dist: Option<Weight>,
 }
 
@@ -50,6 +53,8 @@ impl<'a> CSPCoreCHQuery<'a> {
             core_node_count as f32 * 100.0 / node_count as f32
         );
 
+        let is_reset_node = core_ch.is_core().clone();
+
         CSPCoreCHQuery {
             core_ch,
             is_reachable_from_core_in_fw,
@@ -64,8 +69,18 @@ impl<'a> CSPCoreCHQuery<'a> {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
+
+            is_reset_node,
             last_dist: None,
         }
+    }
+
+    pub fn set_custom_reset_nodes(&mut self, is_reset_node: Rc<BitVec>) {
+        self.is_reset_node = is_reset_node;
+    }
+
+    pub fn clear_custom_reset_nodes(&mut self) {
+        self.is_reset_node = self.core_ch.is_core().clone();
     }
 
     pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) {
@@ -183,9 +198,8 @@ impl<'a> CSPCoreCHQuery<'a> {
         let mut fw_state_reachable_from_core = false;
         let mut bw_state_reachable_from_core = false;
 
-        let reset_flags = self.core_ch.is_core();
-        let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward(), reset_flags.as_ref());
-        let bw_search = OneRestrictionDijkstra::new(self.core_ch.backward(), reset_flags.as_ref());
+        let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
+        let bw_search = OneRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
 
         while (!self.fw_finished || !self.bw_finished)
             && !(self.fw_finished && !fw_state_reachable_from_core && bw_in_core)
