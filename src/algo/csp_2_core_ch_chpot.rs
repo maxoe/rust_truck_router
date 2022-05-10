@@ -206,8 +206,9 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         let mut fw_next = true;
 
         // to cancel no path found queries early
-        let mut fw_in_core = false;
-        let mut bw_in_core = false;
+        // 1 because start node is in queue
+        let mut fw_non_core_nodes_in_queue = 1;
+        let mut bw_non_core_nodes_in_queue = 1;
         let mut fw_search_reachable_from_core = false;
         let mut bw_search_reachable_from_core = false;
 
@@ -215,17 +216,29 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         let bw_search = TwoRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
 
         while (!self.fw_finished || !self.bw_finished)
-            && !(self.fw_finished && !fw_search_reachable_from_core && bw_in_core)
-            && !(self.bw_finished && !bw_search_reachable_from_core && fw_in_core)
+            && !(self.fw_finished && !fw_search_reachable_from_core && bw_non_core_nodes_in_queue == 0)
+            && !(self.bw_finished && !bw_search_reachable_from_core && fw_non_core_nodes_in_queue == 0)
         {
             if !self.fw_finished && (self.bw_finished || fw_next) {
                 if let Some(State {
                     distance: dist_from_queue_at_v,
                     node,
                 }) = if tentative_distance < Weight::infinity() && self.bw_state.min_key().is_some() {
-                    fw_search.settle_next_label_prune_bw_lower_bound(&mut self.fw_state, &mut self.bw_state, tentative_distance, self.t)
+                    fw_search.settle_next_label_prune_bw_lower_bound_report_pushed_non_core_nodes(
+                        &mut self.fw_state,
+                        &mut self.bw_state,
+                        tentative_distance,
+                        self.core_ch.is_core().as_ref(),
+                        &mut fw_non_core_nodes_in_queue,
+                        self.t,
+                    )
                 } else {
-                    fw_search.settle_next_label(&mut self.fw_state, self.t)
+                    fw_search.settle_next_label_report_pushed_non_core_nodes(
+                        &mut self.fw_state,
+                        self.core_ch.is_core().as_ref(),
+                        &mut fw_non_core_nodes_in_queue,
+                        self.t,
+                    )
                 } {
                     settled_fw.set(node as usize, true);
 
@@ -258,12 +271,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                         self.fw_finished = true;
                     }
 
-                    if self.is_reachable_from_core_in_bw.get(node as usize).unwrap() {
-                        fw_search_reachable_from_core = true;
-                    }
-
-                    if self.core_ch.is_core().get(node as usize).unwrap() {
-                        fw_in_core = true;
+                    if self.is_reachable_from_core_in_bw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
                         fw_search_reachable_from_core = true;
                     }
 
@@ -273,9 +281,21 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                 distance: dist_from_queue_at_v,
                 node,
             }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
-                bw_search.settle_next_label_prune_bw_lower_bound(&mut self.bw_state, &mut self.fw_state, tentative_distance, self.s)
+                bw_search.settle_next_label_prune_bw_lower_bound_report_pushed_non_core_nodes(
+                    &mut self.bw_state,
+                    &mut self.fw_state,
+                    tentative_distance,
+                    self.core_ch.is_core().as_ref(),
+                    &mut bw_non_core_nodes_in_queue,
+                    self.s,
+                )
             } else {
-                bw_search.settle_next_label(&mut self.bw_state, self.s)
+                bw_search.settle_next_label_report_pushed_non_core_nodes(
+                    &mut self.bw_state,
+                    self.core_ch.is_core().as_ref(),
+                    &mut bw_non_core_nodes_in_queue,
+                    self.s,
+                )
             } {
                 settled_bw.set(node as usize, true);
 
@@ -308,12 +328,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                     self.bw_finished = true;
                 }
 
-                if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() {
-                    bw_search_reachable_from_core = true;
-                }
-
-                if self.core_ch.is_core().get(node as usize).unwrap() {
-                    bw_in_core = true;
+                if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
                     bw_search_reachable_from_core = true;
                 }
 
