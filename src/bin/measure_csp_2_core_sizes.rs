@@ -12,12 +12,13 @@ use std::{
     fs::File,
     io::{stdout, LineWriter, Write},
     path::Path,
-    time::{Duration, Instant}, rc::Rc,
+    rc::Rc,
+    time::{Duration, Instant},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
     let n = 100;
-    let rel_core_sizes = vec![0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001];
+    let degree_limits = vec![100u32, 200, 300, 400, 500];
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
     let first_out = Vec::<EdgeId>::load_from(path.join("first_out"))?;
@@ -32,13 +33,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {
-        pub core_size: f32,
+        pub degree_limit: u32,
         pub dist: Option<Weight>,
         pub time_ms: Duration,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
-        const OWN_HEADER: &'static str = "core_size,path_distance,time_ms";
+        const OWN_HEADER: &'static str = "degree_limit,path_distance,time_ms";
 
         fn get_header() -> String {
             format!("{}", Self::OWN_HEADER)
@@ -46,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         fn as_csv(&self) -> String {
             format!(
                 "{},{},{}",
-                self.core_size,
+                self.degree_limit,
                 self.dist.map_or("NaN".to_owned(), |d| { d.to_string() }),
                 self.time_ms.as_secs_f64() * 1000.0
             )
@@ -54,8 +55,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let mut stat_logs = Vec::with_capacity(n);
 
-    for current_core_size in rel_core_sizes {
-        let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch_".to_owned() + &current_core_size.to_string()))?;
+    for current_degree_limit in degree_limits {
+        let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch_".to_owned() + &current_degree_limit.to_string()))?;
         ch.check();
         core_ch.check();
 
@@ -80,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // assert_eq!(core_ch_dist, core_ch_chpot_dist);
 
             stat_logs.push(LocalMeasurementResult {
-                core_size: current_core_size,
+                degree_limit: current_degree_limit,
                 dist: core_ch_chpot_dist,
                 time_ms: core_ch_chpot_time,
             });

@@ -317,7 +317,7 @@ def plot_core_size_experiments(problem, graph):
     colors = ggPlotColors(4)
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    bp = queries.boxplot(ax=ax, by="core_size", column="time_ms")
+    bp = queries.boxplot(ax=ax, by="degree_limit", column="time_ms")
 
     bp.get_figure().gca().set_title("")
     fig.suptitle("")

@@ -753,7 +753,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                             bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
                         let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
                         if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
-                            continue;
+                            // continue;
                         }
                     }
 
@@ -904,7 +904,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                             bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
                         let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
                         if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
-                            continue;
+                            // continue;
                         }
                     }
 
