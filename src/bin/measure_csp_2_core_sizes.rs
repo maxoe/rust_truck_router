@@ -1,7 +1,6 @@
-use bit_vec::BitVec;
 use rand::Rng;
 use rust_truck_router::{
-    algo::{ch::*, core_ch::CoreContractionHierarchy, csp_2::TwoRestrictionDijkstra, csp_2_core_ch_chpot::CSP2AstarCoreCHQuery},
+    algo::{ch::*, core_ch::CoreContractionHierarchy, csp_2_core_ch_chpot::CSP2AstarCoreCHQuery},
     experiments::measurement::MeasurementResult,
     io::*,
     types::*,

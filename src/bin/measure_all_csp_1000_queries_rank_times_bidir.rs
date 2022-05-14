@@ -6,8 +6,6 @@ use rust_truck_router::{
         core_ch::CoreContractionHierarchy,
         csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
         csp_bidir::CSPBidirAstarCHPotQuery,
-        csp_core_ch::CSPCoreCHQuery,
-        csp_core_ch_chpot::CSPAstarCoreCHQuery,
         dijkstra::{Dijkstra, DijkstraData},
     },
     experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
@@ -84,10 +82,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let rank_order = dijkstra.ranks_only_exponentials(&mut dijkstra_state);
 
         for (i, current_t) in rank_order.into_iter().enumerate() {
-            let start = Instant::now();
             astar_state.init_new_s(s);
             let astar_dist = astar.dist_query(&mut astar_state, current_t);
-            let astar_time = start.elapsed();
 
             let start = Instant::now();
             bidir_astar_query.init_new_s(s);

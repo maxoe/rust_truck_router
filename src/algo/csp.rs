@@ -283,7 +283,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
 
             // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
 
-            // add all labels with equal dist[0] to list since those may be in invalid order
+            // // add all labels with equal dist[0] to list since those may be in invalid order
             // while let (Some(next_best_label_index), Some(next_best_label)) = (
             //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
             //     state.per_node_labels.get_mut(node_id as usize).pop(),
@@ -404,7 +404,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
 
             // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
 
-            // add all labels with equal dist[0] to list since those may be in invalid order
+            // // add all labels with equal dist[0] to list since those may be in invalid order
             // while let (Some(next_best_label_index), Some(next_best_label)) = (
             //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
             //     state.per_node_labels.get_mut(node_id as usize).pop(),
@@ -454,6 +454,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
+                    state.per_node_labels.get_mut(neighbor_node as usize);
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
                     neighbor_label_set.retain(|&neighbor_label| {
@@ -650,6 +651,20 @@ impl<'a> OneRestrictionDijkstra<'a> {
             let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
             let tentative_dist_without_pot = label.0.distance;
 
+            // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
+
+            // // add all labels with equal dist[0] to list since those may be in invalid order
+            // while let (Some(next_best_label_index), Some(next_best_label)) = (
+            //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
+            //     state.per_node_labels.get_mut(node_id as usize).pop(),
+            // ) {
+            //     if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
+            //         dist_list.push((next_best_label_index, next_best_label.0.distance));
+            //     } else {
+            //         break;
+            //     }
+            // }
+
             // check if next unsettled lable exists for node and push to queue
             if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
                 let pot = state.potential.potential(node_id);
@@ -659,11 +674,13 @@ impl<'a> OneRestrictionDijkstra<'a> {
                 });
             }
 
+            // for (current_label_index, current_tent_dist_without_pot) in dist_list {
             // with hopping reduction
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
                 // [new_dist without, new_dist with parking]
                 let mut new_dist = Vec::with_capacity(2);
                 new_dist.push(tentative_dist_without_pot.link(edge_weight));
+                // new_dist.push((current_tent_dist_without_pot).link(edge_weight));
 
                 // constraint and target pruning
                 if new_dist[0][1] >= state.restriction.max_driving_time
@@ -683,26 +700,24 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
                     // pruning with bw lower bound
-                    let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
-                    if let Some(Reverse(Label {
-                        distance: best_label_distance, ..
-                    })) = best_label
-                    {
-                        // best settled label as lower bound for D(neighbor_node,t)
-                        if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
-                            continue;
-                        }
-                    } else if bw_state.queue.contains_index(neighbor_node as usize) {
-                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
-                        let bw_pot_at_neighbor =
-                            bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
-                        let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                        if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
-                            // continue;
-                        }
-                    }
-
-                    state.per_node_labels.get_mut(neighbor_node as usize);
+                    // let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
+                    // if let Some(Reverse(Label {
+                    //     distance: best_label_distance, ..
+                    // })) = best_label
+                    // {
+                    //     // best settled label as lower bound for D(neighbor_node,t)
+                    //     if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
+                    //         continue;
+                    //     }
+                    // } else if bw_state.queue.contains_index(neighbor_node as usize) {
+                    // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                    // let bw_pot_at_neighbor =
+                    //     bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
+                    // let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                    // if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
+                    // continue;
+                    // }
+                    // }
 
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
@@ -718,6 +733,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                             distance: current_new_dist,
                             prev_node: node_id,
                             prev_label: Some(label_index),
+                            // prev_label: Some(current_label_index),
                         }));
 
                         let pot = state.potential.potential(neighbor_node);
@@ -740,6 +756,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     }
                 }
             }
+            // }
         } else {
             state.last_distance = None;
         }
@@ -777,6 +794,20 @@ impl<'a> OneRestrictionDijkstra<'a> {
             let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
             let tentative_dist_without_pot = label.0.distance;
 
+            // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
+
+            // // add all labels with equal dist[0] to list since those may be in invalid order
+            // while let (Some(next_best_label_index), Some(next_best_label)) = (
+            //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
+            //     state.per_node_labels.get_mut(node_id as usize).pop(),
+            // ) {
+            //     if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
+            //         dist_list.push((next_best_label_index, next_best_label.0.distance));
+            //     } else {
+            //         break;
+            //     }
+            // }
+
             // check if next unsettled lable exists for node and push to queue
             if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
                 let pot = state.potential.potential(node_id);
@@ -790,11 +821,13 @@ impl<'a> OneRestrictionDijkstra<'a> {
                 }
             }
 
+            // for (current_label_index, current_tent_dist_without_pot) in dist_list {
             // with hopping reduction
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
                 // [new_dist without, new_dist with parking]
                 let mut new_dist = Vec::with_capacity(2);
                 new_dist.push(tentative_dist_without_pot.link(edge_weight));
+                // new_dist.push(current_tent_dist_without_pot.link(edge_weight));
 
                 // constraint and target pruning
                 if new_dist[0][1] >= state.restriction.max_driving_time
@@ -814,26 +847,24 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
                     // pruning with bw lower bound
-                    let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
-                    if let Some(Reverse(Label {
-                        distance: best_label_distance, ..
-                    })) = best_label
-                    {
-                        // best settled label as lower bound for D(neighbor_node,t)
-                        if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
-                            continue;
-                        }
-                    } else if bw_state.queue.contains_index(neighbor_node as usize) {
-                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
-                        let bw_pot_at_neighbor =
-                            bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
-                        let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                        if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
-                            // continue;
-                        }
-                    }
-
-                    // state.per_node_labels.get_mut(neighbor_node as usize);
+                    // let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
+                    // if let Some(Reverse(Label {
+                    //     distance: best_label_distance, ..
+                    // })) = best_label
+                    // {
+                    //     // best settled label as lower bound for D(neighbor_node,t)
+                    //     if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
+                    //         continue;
+                    //     }
+                    // } else if bw_state.queue.contains_index(neighbor_node as usize) {
+                    // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                    // let bw_pot_at_neighbor =
+                    //     bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
+                    // let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                    // if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
+                    // continue;
+                    // }
+                    // }
 
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
@@ -848,6 +879,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                             distance_with_potential,
                             distance: current_new_dist,
                             prev_node: node_id,
+                            // prev_label: Some(current_label_index),
                             prev_label: Some(label_index),
                         }));
 
@@ -875,6 +907,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     }
                 }
             }
+            // }
         } else {
             state.last_distance = None;
         }

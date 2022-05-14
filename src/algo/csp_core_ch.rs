@@ -191,6 +191,22 @@ impl<'a> CSPCoreCHQuery<'a> {
         let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
         let bw_search = OneRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
 
+        if self.core_ch.is_core().get(self.s as usize).unwrap() {
+            println!("s is core node");
+        }
+
+        if self.is_reachable_from_core_in_bw.get(self.s as usize).unwrap() {
+            println!("s reachable from core in bw");
+        }
+
+        if self.core_ch.is_core().get(self.t as usize).unwrap() {
+            println!("t is core node");
+        }
+
+        if self.is_reachable_from_core_in_bw.get(self.t as usize).unwrap() {
+            println!("s reachable from core in fw");
+        }
+
         while (!self.fw_finished || !self.bw_finished)
             && !(self.fw_finished && !fw_search_reachable_from_core && bw_non_core_nodes_in_queue == 0)
             && !(self.bw_finished && !bw_search_reachable_from_core && fw_non_core_nodes_in_queue == 0)
@@ -209,11 +225,13 @@ impl<'a> CSPCoreCHQuery<'a> {
 
                     // fw search found t -> done here
                     if node == self.t {
-                        tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
+                        // println!("fw settled t");
+                        tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0];
+                        // dist_from_queue_at_v[0];
                         self.fw_finished = true;
-                        self.bw_finished = true;
+                        // self.bw_finished = true;
 
-                        break;
+                        // break;
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
@@ -229,11 +247,21 @@ impl<'a> CSPCoreCHQuery<'a> {
                         }
                     }
 
+                    // if self.fw_state.min_key().is_none() {
+                    //     println!("fw queue ran out");
+                    // }
+
+                    // if self.fw_state.min_key().is_some() && self.fw_state.min_key().unwrap() >= tentative_distance {
+                    //     println!("fw min key > µ");
+                    // }
+
                     if self.fw_state.min_key().is_none() || self.fw_state.min_key().unwrap() >= tentative_distance {
                         self.fw_finished = true;
                     }
 
                     if self.is_reachable_from_core_in_bw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
+                        // println!("fw reachable from core");
+
                         fw_search_reachable_from_core = true;
                     }
 
@@ -252,12 +280,13 @@ impl<'a> CSPCoreCHQuery<'a> {
 
                 // bw search found s -> done here
                 if node == self.s {
-                    tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
+                    // println!("bw settled s");
+                    tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0];
+                    // dist_from_queue_at_v[0];
 
-                    self.fw_finished = true;
                     self.bw_finished = true;
 
-                    break;
+                    // break;
                 }
 
                 if settled_fw.get(node as usize).unwrap() {
@@ -274,11 +303,20 @@ impl<'a> CSPCoreCHQuery<'a> {
                     }
                 }
 
+                // if self.bw_state.min_key().is_none() {
+                //     println!("bw queue ran out");
+                // }
+
+                // if self.bw_state.min_key().is_some() && self.bw_state.min_key().unwrap() >= tentative_distance {
+                //     println!("bw min key > µ");
+                // }
+
                 if self.bw_state.min_key().is_none() || self.bw_state.min_key().unwrap() >= tentative_distance {
                     self.bw_finished = true;
                 }
 
                 if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
+                    // println!("bw reachable from core");
                     bw_search_reachable_from_core = true;
                 }
 

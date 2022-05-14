@@ -5,7 +5,6 @@ use rust_truck_router::{
         ch_potential::CHPotential,
         core_ch::CoreContractionHierarchy,
         csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
-        csp_bidir::CSPBidirAstarCHPotQuery,
         csp_core_ch::CSPCoreCHQuery,
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
         dijkstra::{Dijkstra, DijkstraData},
@@ -32,7 +31,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
-    let bw_graph = OwnedGraph::reverse(graph.borrow());
 
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;

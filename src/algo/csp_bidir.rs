@@ -232,7 +232,7 @@ impl<'a> CSPBidirAstarCHPotQuery<'a> {
         }
 
         self.last_dist = Some(tentative_distance);
-        println!("{}", self.summary());
+
         self.last_dist
     }
 

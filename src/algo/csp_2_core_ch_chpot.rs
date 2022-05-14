@@ -247,9 +247,9 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                         println!("Forward settled t");
                         tentative_distance = dist_from_queue_at_v[0];
                         self.fw_finished = true;
-                        self.bw_finished = true;
+                        // self.bw_finished = true;
 
-                        break;
+                        // break;
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
@@ -303,10 +303,10 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                 if node == self.s {
                     tentative_distance = dist_from_queue_at_v[0];
 
-                    self.fw_finished = true;
+                    // self.fw_finished = true;
                     self.bw_finished = true;
 
-                    break;
+                    // break;
                 }
 
                 if settled_fw.get(node as usize).unwrap() {

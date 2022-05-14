@@ -125,7 +125,6 @@ pub struct CoreContractionHierarchyQuery<'a> {
     bw_state: DijkstraData,
     fw_finished: bool,
     bw_finished: bool,
-    needs_core: bool,
     s: NodeId,
     t: NodeId,
 }
@@ -138,7 +137,6 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
             bw_state: DijkstraData::new(n),
             fw_finished: false,
             bw_finished: false,
-            needs_core: false,
             s: n as NodeId,
             t: n as NodeId,
         }
@@ -203,10 +201,9 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
                     if node == self.t {
                         tentative_distance = self.fw_state.tentative_distance_at(self.t);
                         self.fw_finished = true;
-                        self.bw_finished = true;
-                        self.needs_core = false;
+                        // self.bw_finished = true;
 
-                        break;
+                        // break;
                     }
                     if settled_bw.get(node as usize).unwrap() {
                         tent_dist_at_v = self.fw_state.tentative_distance_at(node) + self.bw_state.tentative_distance_at(node);
@@ -224,10 +221,6 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
                         self.fw_finished = true;
                     }
 
-                    if self.core_ch.is_core.get(node as usize).unwrap() {
-                        self.needs_core = true;
-                    }
-
                     fw_next = false;
                 }
             } else if let Some(State { distance: _, node }) = bw_search.settle_next_node(&mut self.bw_state) {
@@ -236,11 +229,11 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
                 // bw search found s -> done here
                 if node == self.s {
                     tentative_distance = self.bw_state.tentative_distance_at(self.s);
-                    self.fw_finished = true;
+                    // self.fw_finished = true;
                     self.bw_finished = true;
-                    self.needs_core = false;
+                    // self.needs_core = false;
 
-                    break;
+                    // break;
                 }
 
                 if settled_fw.get(node as usize).unwrap() {
@@ -258,10 +251,6 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
 
                 if bw_min_key >= tentative_distance {
                     self.bw_finished = true;
-                }
-
-                if self.core_ch.is_core.get(node as usize).unwrap() {
-                    self.needs_core = true;
                 }
 
                 fw_next = true;

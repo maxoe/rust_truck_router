@@ -19,6 +19,16 @@ use rust_truck_router::{
 };
 use std::{error::Error, path::Path};
 
+fn critical_queries() -> Vec<(NodeId, NodeId)> {
+    vec![
+        (131578, 386915),
+        (170777, 226781),
+        (339025, 125566),
+        (366705, 330856),
+        (321615, 220642),
+        (3542, 261248),
+    ]
+}
 #[test]
 #[ignore]
 fn thousand_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
@@ -57,11 +67,7 @@ fn thousand_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
     let csp_2_pot = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     let dijkstra = Dijkstra::new(graph.borrow());
 
-    for i in 0..100000 {
-        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
-        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
-
-        println!("Query #{} from {} to {} without constraints", i, s, t);
+    let mut run = |s, t| {
         dijkstra_state.init_new_s(s);
         csp_pot_state.init_new_s(s);
         csp_2_pot_state.init_new_s(s);
@@ -120,6 +126,18 @@ fn thousand_ka_queries_without_constraints() -> Result<(), Box<dyn Error>> {
 
         // assert_eq!(dijkstra_path, csp_path);
         // assert_eq!(dijkstra_path, csp_2_path);
+    };
+
+    for (s, t) in critical_queries() {
+        println!("Critical Query without constraints from {} to {} ", s, t);
+        run(s, t);
+    }
+
+    for i in 0..1000 {
+        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
+        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
+        println!("Query without constraints #{} from {} to {} ", i, s, t);
+        run(s, t);
     }
 
     Ok(())
@@ -166,13 +184,7 @@ fn thousand_ka_queries_csp() -> Result<(), Box<dyn Error>> {
 
     let csp = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
-    for i in 0..100000 {
-        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
-        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
-        // let s = 339025;
-        // let t = 125566;
-        println!("CSP Query #{} from {} to {}", i, s, t);
-
+    let mut run = |s, t| {
         csp_state.init_new_s(s);
         csp_pot_state.init_new_s(s);
         csp_pot_prop_all_state.init_new_s(s);
@@ -205,6 +217,18 @@ fn thousand_ka_queries_csp() -> Result<(), Box<dyn Error>> {
         // let csp_prop_all_path = csp_pot_prop_all_state.current_best_node_path_to(t);
 
         // assert_eq!(csp_path, csp_prop_all_path);
+    };
+
+    for (s, t) in critical_queries() {
+        println!("Critical CSP Query from {} to {} ", s, t);
+        run(s, t);
+    }
+
+    for i in 0..1000 {
+        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
+        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
+        println!("CSP Query #{} from {} to {} ", i, s, t);
+        run(s, t);
     }
 
     Ok(())
@@ -253,11 +277,7 @@ fn thousand_ka_queries_csp_2() -> Result<(), Box<dyn Error>> {
 
     let csp_2 = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
 
-    for i in 0..100000 {
-        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
-        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
-        println!("CSP2 Query #{} from {} to {} ", i, s, t);
-
+    let mut run = |s, t| {
         csp_2_state.init_new_s(s);
         csp_2_pot_state.init_new_s(s);
         csp_2_pot_prop_all_state.init_new_s(s);
@@ -289,7 +309,19 @@ fn thousand_ka_queries_csp_2() -> Result<(), Box<dyn Error>> {
         // let csp_2_path = csp_2_pot_state.current_best_node_path_to(t);
         // let csp_2_prop_all_path = csp_2_pot_prop_all_state.current_best_node_path_to(t);
 
-        // assert_eq!(csp_2_path, csp_2_prop_all_path);
+        // assert_eq!(csp_2_path, csp_2_prop_all_path);;
+    };
+
+    for (s, t) in critical_queries() {
+        println!("Critical CSP2 Query from {} to {} ", s, t);
+        run(s, t);
+    }
+
+    for i in 0..1000 {
+        let s = gen.gen_range(0..graph.num_nodes() as NodeId);
+        let t = gen.gen_range(0..graph.num_nodes() as NodeId);
+        println!("CSP2 Query #{} from {} to {} ", i, s, t);
+        run(s, t);
     }
 
     Ok(())

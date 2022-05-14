@@ -224,9 +224,9 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                     if node == self.t {
                         tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
-                        self.bw_finished = true;
+                        // self.bw_finished = true;
 
-                        break;
+                        // break;
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
@@ -279,10 +279,10 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                 if node == self.s {
                     tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
 
-                    self.fw_finished = true;
+                    // self.fw_finished = true;
                     self.bw_finished = true;
 
-                    break;
+                    // break;
                 }
 
                 if settled_fw.get(node as usize).unwrap() {
