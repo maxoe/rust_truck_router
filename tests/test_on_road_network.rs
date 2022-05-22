@@ -19,6 +19,7 @@ use rust_truck_router::{
 };
 use std::{error::Error, path::Path};
 
+// queries that like to fail
 fn critical_queries() -> Vec<(NodeId, NodeId)> {
     vec![
         (131578, 386915),
