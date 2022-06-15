@@ -373,6 +373,6 @@ if __name__ == "__main__":
 
     for g in args.graph:
         for p in ["csp", "csp_2"]:
-            # plot_all_rank_times(p, g)
-            # plot_rank_times_perf_profile(p, g)
+            plot_all_rank_times(p, g)
+            plot_rank_times_perf_profile(p, g)
             plot_core_size_experiments(p, g)
