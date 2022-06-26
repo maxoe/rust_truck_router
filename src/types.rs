@@ -14,6 +14,11 @@ pub const INFINITY: Weight = std::u32::MAX / 2;
 pub type Weight2 = [Weight; 2];
 pub type Weight3 = [Weight; 3];
 
+pub const EU_SHORT_PAUSE_TIME: Weight = 2_700_000; // 45 minutes
+pub const EU_LONG_PAUSE_TIME: Weight = 32_400_000; // 9 hours
+pub const EU_SHORT_DRIVING_TIME: Weight = 16_200_000; // 4.5 hours
+pub const EU_LONG_DRIVING_TIME: Weight = 32_400_000; // 9 hours
+
 pub trait DefaultReset: Clone {
     const DEFAULT: Self;
     fn reset(&mut self) {

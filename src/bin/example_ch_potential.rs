@@ -3,7 +3,7 @@ use rust_truck_router::{
         ch::*,
         ch_potential::CHPotential,
         csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
-        csp_2_bidir::CSP2BidirAstarCHPotQuery,
+        csp_2_bidir_chpot::CSP2BidirAstarCHPotQuery,
     },
     io::*,
     types::*,

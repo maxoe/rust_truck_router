@@ -1,5 +1,9 @@
-use super::csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData};
-use crate::types::*;
+use super::{
+    astar::Potential,
+    ch::BorrowedContractionHierarchy,
+    csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
+};
+use crate::{algo::ch_potential::CHPotential, types::*};
 use bit_vec::BitVec;
 use num::Integer;
 use std::{
@@ -7,12 +11,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub struct CSPBidirQuery<'a> {
+pub struct CSPBidirAstarCHPotQuery<'a> {
     fw_graph: BorrowedGraph<'a>,
     bw_graph: BorrowedGraph<'a>,
     is_reset_node: &'a BitVec,
-    fw_state: OneRestrictionDijkstraData,
-    bw_state: OneRestrictionDijkstraData,
+    fw_state: OneRestrictionDijkstraData<CHPotential<'a>>,
+    bw_state: OneRestrictionDijkstraData<CHPotential<'a>>,
     restriction: DrivingTimeRestriction,
     fw_finished: bool,
     bw_finished: bool,
@@ -23,15 +27,15 @@ pub struct CSPBidirQuery<'a> {
     last_time_elapsed: Duration,
 }
 
-impl<'a> CSPBidirQuery<'a> {
-    pub fn new(fw_graph: BorrowedGraph<'a>, bw_graph: BorrowedGraph<'a>, is_reset_node: &'a BitVec) -> Self {
+impl<'a> CSPBidirAstarCHPotQuery<'a> {
+    pub fn new(fw_graph: BorrowedGraph<'a>, bw_graph: BorrowedGraph<'a>, is_reset_node: &'a BitVec, ch: BorrowedContractionHierarchy<'a>) -> Self {
         let node_count = fw_graph.num_nodes();
-        CSPBidirQuery {
+        CSPBidirAstarCHPotQuery {
             fw_graph,
             bw_graph,
             is_reset_node,
-            fw_state: OneRestrictionDijkstraData::new(node_count),
-            bw_state: OneRestrictionDijkstraData::new(node_count),
+            fw_state: OneRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch(ch)),
+            bw_state: OneRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_backwards(ch)),
             restriction: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
@@ -74,10 +78,12 @@ impl<'a> CSPBidirQuery<'a> {
     pub fn reset(&mut self) {
         if self.s != self.fw_graph.num_nodes() as NodeId {
             self.fw_state.init_new_s(self.s);
+            self.bw_state.potential.init_new_t(self.s);
         }
 
         if self.t != self.fw_graph.num_nodes() as NodeId {
             self.bw_state.init_new_s(self.t);
+            self.fw_state.potential.init_new_t(self.t);
         }
 
         self.fw_finished = false;
@@ -91,7 +97,7 @@ impl<'a> CSPBidirQuery<'a> {
         node: NodeId,
         restriction: &DrivingTimeRestriction,
         fw_label_dist: &Weight2,
-        bw_state: &mut OneRestrictionDijkstraData,
+        bw_state: &mut OneRestrictionDijkstraData<CHPotential>,
     ) -> Weight {
         let v_to_t = bw_state.get_settled_labels_at(node);
 

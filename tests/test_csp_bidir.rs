@@ -2,8 +2,8 @@ use bit_vec::BitVec;
 use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy,
-        csp_bidir::CSPBidirAstarCHPotQuery,
-        dijkstra::{DijkstraData, Dijkstra},
+        csp_bidir_chpot::CSPBidirAstarCHPotQuery,
+        dijkstra::{Dijkstra, DijkstraData},
     },
     types::{OwnedGraph, *},
 };

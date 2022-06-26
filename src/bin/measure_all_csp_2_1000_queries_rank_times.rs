@@ -5,7 +5,7 @@ use rust_truck_router::{
         ch_potential::CHPotential,
         core_ch::CoreContractionHierarchy,
         csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
-        csp_2_bidir::CSP2BidirAstarCHPotQuery,
+        csp_2_bidir_chpot::CSP2BidirAstarCHPotQuery,
         csp_core_ch::CSPCoreCHQuery,
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
         dijkstra::{Dijkstra, DijkstraData},

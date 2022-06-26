@@ -1,9 +1,5 @@
-use super::{
-    astar::Potential,
-    ch::BorrowedContractionHierarchy,
-    csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
-};
-use crate::{algo::ch_potential::CHPotential, types::*};
+use super::csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData};
+use crate::types::*;
 use bit_vec::BitVec;
 use num::Integer;
 use std::{
@@ -11,12 +7,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub struct CSP2BidirAstarCHPotQuery<'a> {
+pub struct CSP2BidirQuery<'a> {
     fw_graph: BorrowedGraph<'a>,
     bw_graph: BorrowedGraph<'a>,
     is_reset_node: &'a BitVec,
-    fw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
-    bw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
+    fw_state: TwoRestrictionDijkstraData,
+    bw_state: TwoRestrictionDijkstraData,
     restriction_long: DrivingTimeRestriction,
     restriction_short: DrivingTimeRestriction,
     fw_finished: bool,
@@ -28,15 +24,15 @@ pub struct CSP2BidirAstarCHPotQuery<'a> {
     last_time_elapsed: Duration,
 }
 
-impl<'a> CSP2BidirAstarCHPotQuery<'a> {
-    pub fn new(fw_graph: BorrowedGraph<'a>, bw_graph: BorrowedGraph<'a>, is_reset_node: &'a BitVec, ch: BorrowedContractionHierarchy<'a>) -> Self {
+impl<'a> CSP2BidirQuery<'a> {
+    pub fn new(fw_graph: BorrowedGraph<'a>, bw_graph: BorrowedGraph<'a>, is_reset_node: &'a BitVec) -> Self {
         let node_count = fw_graph.num_nodes();
-        CSP2BidirAstarCHPotQuery {
+        CSP2BidirQuery {
             fw_graph,
             bw_graph,
             is_reset_node,
-            fw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch(ch)),
-            bw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_backwards(ch)),
+            fw_state: TwoRestrictionDijkstraData::new(node_count),
+            bw_state: TwoRestrictionDijkstraData::new(node_count),
             restriction_long: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
@@ -95,12 +91,10 @@ impl<'a> CSP2BidirAstarCHPotQuery<'a> {
     pub fn reset(&mut self) {
         if self.s != self.fw_graph.num_nodes() as NodeId {
             self.fw_state.init_new_s(self.s);
-            self.bw_state.potential.init_new_t(self.s);
         }
 
         if self.t != self.fw_graph.num_nodes() as NodeId {
             self.bw_state.init_new_s(self.t);
-            self.fw_state.potential.init_new_t(self.t);
         }
 
         self.fw_finished = false;
@@ -115,7 +109,7 @@ impl<'a> CSP2BidirAstarCHPotQuery<'a> {
         restriction_short: &DrivingTimeRestriction,
         restriction_long: &DrivingTimeRestriction,
         fw_label_dist: &Weight3,
-        bw_state: &mut TwoRestrictionDijkstraData<CHPotential>,
+        bw_state: &mut TwoRestrictionDijkstraData,
     ) -> Weight {
         let v_to_t = bw_state.get_settled_labels_at(node);
 
