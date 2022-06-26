@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut core_ch_chpot_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch_chpot_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-    let n = 1_000;
+    let n = 100;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {
@@ -52,17 +52,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut stat_logs = Vec::with_capacity(n);
 
     for _i in 0..n {
-        print!("Progress {}/{}\r", _i, n);
-        stdout().flush()?;
-
         let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
         let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
+
+        print!("Progress {}/{} from {} to {} - Core CH        \r", _i, n, s, t);
+        stdout().flush()?;
 
         let start = Instant::now();
         core_ch_query.init_new_s(s);
         core_ch_query.init_new_t(t);
         let _core_ch_dist = core_ch_query.run_query();
         let core_ch_time = start.elapsed();
+
+        print!("Progress {}/{} from {} to {} - A* Core CH\t\t\t\t\t\t\t\r", _i, n, s, t);
+        stdout().flush()?;
 
         let start = Instant::now();
         core_ch_chpot_query.init_new_s(s);

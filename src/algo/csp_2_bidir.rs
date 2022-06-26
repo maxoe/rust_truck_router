@@ -186,8 +186,9 @@ impl<'a> CSP2BidirQuery<'a> {
                     if self.fw_state.min_key().is_none() {
                         self.fw_finished = true;
                         self.bw_finished = true;
-                    } else if self.fw_state.min_key().unwrap() >= tentative_distance {
+                    } else if self.fw_state.min_key().unwrap() + self.bw_state.min_key().unwrap() >= tentative_distance {
                         self.fw_finished = true;
+                        self.bw_finished = true;
                     }
 
                     fw_next = false;
@@ -231,7 +232,8 @@ impl<'a> CSP2BidirQuery<'a> {
                 if self.bw_state.min_key().is_none() {
                     self.fw_finished = true;
                     self.bw_finished = true;
-                } else if self.bw_state.min_key().unwrap() >= tentative_distance {
+                } else if self.fw_state.min_key().unwrap() + self.bw_state.min_key().unwrap() >= tentative_distance {
+                    self.fw_finished = true;
                     self.bw_finished = true;
                 }
 

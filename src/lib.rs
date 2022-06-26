@@ -1,7 +1,6 @@
 #![feature(generic_associated_types)]
 #![feature(type_alias_impl_trait)]
 #![feature(binary_heap_retain)]
-#![feature(vec_retain_mut)]
 #![feature(is_sorted)]
 #![feature(iter_advance_by)]
 #![feature(int_log)]

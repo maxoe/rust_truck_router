@@ -34,10 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let mut core_ch_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
-    core_ch_query.set_restriction(16_200_000, 2_700_000);
+    core_ch_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
     // let mut core_ch_query = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
-    // core_ch_query.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    // core_ch_query.set_restriction(32_400_000, 32_400_000, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     core_ch_query.check();
 
     core_ch_query.init_new_s(s);
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let csp_pot = TwoRestrictionDijkstra::new(graph.borrow());
     let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     csp_pot_state.init_new_s(s);
-    csp_pot_state.set_restriction(16_200_000, 2_700_000); //.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    csp_pot_state.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME); //.set_restriction(32_400_000, 32_400_000, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
     let csp_pot_num_breaks = csp_pot_state.current_best_path_to(t, true).map(|path| csp_pot.reset_nodes_on_path(&path).len());

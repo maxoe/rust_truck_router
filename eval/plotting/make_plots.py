@@ -340,16 +340,26 @@ def plot_core_size_experiments(problem, graph):
     write_plt(name, graph)
 
 
+def run_avg_all_times(problem, graph):
+    name = "thesis_avg_all-" + problem
+    run_measurement_conditionally(name, graph)
+
+
+def run_avg_fast_times(problem, graph):
+    name = "thesis_avg_fast-" + problem
+    run_measurement_conditionally(name, graph)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-g",
-        "--graph",
-        nargs="+",
-        required=True,
-        dest="graph",
-        help="the graph directory in GRAPH_PATH",
-    )
+    # parser.add_argument(
+    #     "-g",
+    #     "--graph",
+    #     nargs="+",
+    #     required=True,
+    #     dest="graph",
+    #     help="the graph directory in GRAPH_PATH",
+    # )
     parser.add_argument(
         "-f",
         "--force",
@@ -371,8 +381,13 @@ if __name__ == "__main__":
         print("Cannot force and prohibit measurements and the same time")
         exit(0)
 
-    for g in args.graph:
-        for p in ["csp", "csp_2"]:
-            plot_all_rank_times(p, g)
-            plot_rank_times_perf_profile(p, g)
-            plot_core_size_experiments(p, g)
+    # for g in args.graph:
+    #     for p in ["csp", "csp_2"]:
+    #         plot_all_rank_times(p, g)
+    #         plot_rank_times_perf_profile(p, g)
+    #         plot_core_size_experiments(p, g)
+
+    run_avg_all_times("csp", "parking_ger_hgv")
+    run_avg_all_times("csp_2", "parking_ger_hgv")
+    run_avg_fast_times("csp", "parking_europe_hgv")
+    run_avg_fast_times("csp_2", "parking_europe_hgv")

@@ -2,6 +2,8 @@ use std::time::Duration;
 
 use crate::types::Weight;
 
+pub static LONG_QUERY_TIMEOUT_SECS: u64 = 60 * 3;
+
 #[derive(Debug, Clone, Copy)]
 pub struct CSPMeasurementResult {
     pub graph_num_nodes: usize,

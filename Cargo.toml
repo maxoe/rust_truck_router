@@ -1,7 +1,7 @@
 [package]
 name = "rust_truck_router"
 version = "0.1.0"
-authors = ["Max Oesterle <max_oesterle@web.de>", "Tim Zeitz <tim.zeitz@kit.edu>"]
+authors = ["Max Oesterle <max_oesterle@web.de>"]
 edition = "2021"
 
 [dependencies]
@@ -9,6 +9,7 @@ time = "^0.1.40"
 rand = "0.8.4"
 num = "0.4.0"
 bit-vec = "0.6.3"
+tokio = {version ="1.19.2",features= ["time","rt","rt-multi-thread","macros","sync"]}
 
 [profile.dev]
 opt-level = 3

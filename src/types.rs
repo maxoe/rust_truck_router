@@ -302,9 +302,8 @@ where
     WeightsContainer: AsRef<[Weight]>,
 {
     type Iter<'a>
-    where
-        Self: 'a,
-    = impl Iterator<Item = (&'a Weight, &'a NodeId)> + 'a;
+    
+    = impl Iterator<Item = (&'a Weight, &'a NodeId)> + 'a where Self: 'a;
 
     #[inline]
     fn outgoing_edge_iter(&self, node: NodeId) -> Self::Iter<'_> {

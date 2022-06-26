@@ -4,7 +4,7 @@ use std::{
     fs::File,
     io::{stdout, LineWriter, Write},
     path::Path,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use rand::Rng;
@@ -19,12 +19,13 @@ use rust_truck_router::{
         csp_core_ch::CSPCoreCHQuery,
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
     },
-    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult},
+    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult, LONG_QUERY_TIMEOUT_SECS},
     io::load_routingkit_bitvector,
     types::{Graph, NodeId, OwnedGraph, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
 };
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
 
@@ -54,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut core_ch_chpot_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch_chpot_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-    let n = 1_000;
+    let mut n = 100;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {
@@ -75,40 +76,102 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut stat_logs = Vec::with_capacity(n);
 
-    for _i in 0..n {
-        print!("Progress {}/{}\r", _i, n);
-        stdout().flush()?;
+    let mut timeouts = 0;
 
+    for _i in 0..n {
         let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
         let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
+        print!("Progress {}/{} from {} to {} - Dijkstra       \r", _i, n, s, t);
+        stdout().flush()?;
+
         let start = Instant::now();
         dijkstra_state.init_new_s(s);
-        let dijkstra_dist = dijkstra.dist_query(&mut dijkstra_state, t);
+        let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async {
+            dijkstra.dist_query(&mut dijkstra_state, t)
+        })
+        .await;
+
+        if res.is_err() {
+            println!("A* timed out, skipping query                  ");
+            timeouts += 1;
+            n += 1;
+            continue;
+        }
+
+        let dijkstra_dist = res.unwrap();
         let dijkstra_time = start.elapsed();
+
+        print!("Progress {}/{} from {} to {} - A*             \r", _i, n, s, t);
+        stdout().flush()?;
 
         let start = Instant::now();
         astar_state.init_new_s(s);
-        let astar_dist = astar.dist_query(&mut astar_state, t);
+        let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async { astar.dist_query(&mut astar_state, t) }).await;
+
+        if res.is_err() {
+            println!("A* timed out, skipping query                  ");
+            timeouts += 1;
+            n += 1;
+            continue;
+        }
+
+        let astar_dist = res.unwrap();
         let astar_time = start.elapsed();
+
+        print!("Progress {}/{} from {} to {} - Bidir. Dijkstra\r", _i, n, s, t);
+        stdout().flush()?;
 
         let start = Instant::now();
         bidir_dijkstra_query.init_new_s(s);
         bidir_dijkstra_query.init_new_t(t);
-        bidir_dijkstra_query.run_query();
+        let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async {
+            bidir_dijkstra_query.run_query();
+        })
+        .await;
+
+        if res.is_err() {
+            println!("Bidirectional A* timed out, skipping query    ");
+            timeouts += 1;
+            n += 1;
+            continue;
+        }
+
+        let _bidir_dijkstra_dist = res.unwrap();
         let bidir_dijkstra_time = start.elapsed();
+
+        print!("Progress {}/{} from {} to {} - Bidir A*       \r", _i, n, s, t);
+        stdout().flush()?;
 
         let start = Instant::now();
         bidir_astar_query.init_new_s(s);
         bidir_astar_query.init_new_t(t);
-        bidir_astar_query.run_query();
+        let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async {
+            bidir_astar_query.run_query();
+        })
+        .await;
+
+        if res.is_err() {
+            println!("Bidirectional A* timed out, skipping query    ");
+            timeouts += 1;
+            n += 1;
+            continue;
+        }
+
+        let _bidir_astar_dist = res.unwrap();
         let bidir_astar_time = start.elapsed();
+
+        print!("Progress {}/{} from {} to {} - Core CH        \r", _i, n, s, t);
+        stdout().flush()?;
 
         let start = Instant::now();
         core_ch_query.init_new_s(s);
         core_ch_query.init_new_t(t);
         let core_ch_dist = core_ch_query.run_query();
         let core_ch_time = start.elapsed();
+
+        print!("Progress {}/{} from {} to {} - A* Core CH\t\t\t\t\t\t\t\r", _i, n, s, t);
+        stdout().flush()?;
 
         let start = Instant::now();
         core_ch_chpot_query.init_new_s(s);
@@ -162,7 +225,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             });
 
             stat_logs.push(LocalMeasurementResult {
-                algo: String::from("dijkstra_bidir_chpot"),
+                algo: String::from("dijkstra_bidir"),
                 standard: CSP1MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
@@ -242,7 +305,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             });
         } else {
             stat_logs.push(LocalMeasurementResult {
-                algo: String::from("dijkstra_chpot"),
+                algo: String::from("dijkstra"),
                 standard: CSP1MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
@@ -282,7 +345,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             });
 
             stat_logs.push(LocalMeasurementResult {
-                algo: String::from("dijkstra_bidir_chpot"),
+                algo: String::from("dijkstra_bidir"),
                 standard: CSP1MeasurementResult {
                     standard: CSPMeasurementResult {
                         graph_num_nodes: graph.num_nodes(),
@@ -362,6 +425,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     println!("Progress {}/{}", n, n);
+    println!("Timeouts: {}", timeouts);
 
     let file = File::create("thesis_avg_all-csp-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);

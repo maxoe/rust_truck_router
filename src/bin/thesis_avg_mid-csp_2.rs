@@ -14,7 +14,6 @@ use rust_truck_router::{
         ch_potential::CHPotential,
         core_ch::CoreContractionHierarchy,
         csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
-        csp_2_bidir::CSP2BidirQuery,
         csp_2_bidir_chpot::CSP2BidirAstarCHPotQuery,
         csp_2_core_ch::CSP2CoreCHQuery,
         csp_2_core_ch_chpot::CSP2AstarCoreCHQuery,
@@ -35,16 +34,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
 
-    let mut dijkstra_state = TwoRestrictionDijkstraData::new(graph.num_nodes());
-    dijkstra_state.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
-    let dijkstra = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
-
     let mut astar_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     astar_state.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     let astar = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
-
-    let mut bidir_dijkstra_query = CSP2BidirQuery::new(graph.borrow(), bw_graph.borrow(), &is_parking_node);
-    bidir_dijkstra_query.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
     let mut bidir_astar_query = CSP2BidirAstarCHPotQuery::new(graph.borrow(), bw_graph.borrow(), &is_parking_node, ch.borrow());
     bidir_astar_query.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
@@ -82,31 +74,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
         let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
-        print!("Progress {}/{} from {} to {} - Dijkstra       \r", _i, n, s, t);
-        stdout().flush()?;
-
-        let start = Instant::now();
-        dijkstra_state.init_new_s(s);
-        let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async {
-            dijkstra.dist_query(&mut dijkstra_state, t)
-        })
-        .await;
-
-        if res.is_err() {
-            println!("A* timed out, skipping query                  ");
-            timeouts += 1;
-            n += 1;
-            continue;
-        }
-
-        let dijkstra_dist = res.unwrap();
-        let dijkstra_time = start.elapsed();
-
         print!("Progress {}/{} from {} to {} - A*             \r", _i, n, s, t);
         stdout().flush()?;
 
         let start = Instant::now();
         astar_state.init_new_s(s);
+
         let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async { astar.dist_query(&mut astar_state, t) }).await;
 
         if res.is_err() {
@@ -119,33 +92,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let astar_dist = res.unwrap();
         let astar_time = start.elapsed();
 
-        print!("Progress {}/{} from {} to {} - Bidir. Dijkstra\r", _i, n, s, t);
-        stdout().flush()?;
-
-        let start = Instant::now();
-        bidir_dijkstra_query.init_new_s(s);
-        bidir_dijkstra_query.init_new_t(t);
-        let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async {
-            bidir_dijkstra_query.run_query();
-        })
-        .await;
-
-        if res.is_err() {
-            println!("Bidirectional A* timed out, skipping query    ");
-            timeouts += 1;
-            n += 1;
-            continue;
-        }
-
-        let _bidir_dijkstra_dist = res.unwrap();
-        let bidir_dijkstra_time = start.elapsed();
-
         print!("Progress {}/{} from {} to {} - Bidir A*       \r", _i, n, s, t);
         stdout().flush()?;
 
         let start = Instant::now();
         bidir_astar_query.init_new_s(s);
         bidir_astar_query.init_new_t(t);
+
         let res = tokio::time::timeout(Duration::from_secs(LONG_QUERY_TIMEOUT_SECS), async {
             bidir_astar_query.run_query();
         })
@@ -185,27 +138,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let number_pauses = astar.reset_nodes_on_path(&path);
 
             stat_logs.push(LocalMeasurementResult {
-                algo: String::from("dijkstra"),
-                standard: CSP2MeasurementResult {
-                    standard: CSPMeasurementResult {
-                        graph_num_nodes: graph.num_nodes(),
-                        graph_num_edges: graph.num_arcs(),
-                        num_queue_pushes: dijkstra_state.num_queue_pushes,
-                        num_settled: dijkstra_state.num_settled,
-                        num_labels_propagated: dijkstra_state.num_labels_propagated,
-                        num_labels_reset: dijkstra_state.num_labels_reset,
-                        num_nodes_searched: dijkstra_state.get_number_of_visited_nodes(),
-                        time: dijkstra_time,
-                        path_distance: dijkstra_dist,
-                        path_number_nodes: Some(path.0.len()),
-                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
-                    },
-                    path_number_short_pauses: Some(number_pauses.0.len()),
-                    path_number_long_pauses: Some(number_pauses.1.len()),
-                },
-            });
-
-            stat_logs.push(LocalMeasurementResult {
                 algo: String::from("astar_chpot"),
                 standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
@@ -218,27 +150,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         num_nodes_searched: astar_state.get_number_of_visited_nodes(),
                         time: astar_time,
                         path_distance: astar_dist,
-                        path_number_nodes: Some(path.0.len()),
-                        path_number_flagged_nodes: Some(number_flagged_nodes.len()),
-                    },
-                    path_number_short_pauses: Some(number_pauses.0.len()),
-                    path_number_long_pauses: Some(number_pauses.1.len()),
-                },
-            });
-
-            stat_logs.push(LocalMeasurementResult {
-                algo: String::from("dijkstra_bidir_chpot"),
-                standard: CSP2MeasurementResult {
-                    standard: CSPMeasurementResult {
-                        graph_num_nodes: graph.num_nodes(),
-                        graph_num_edges: graph.num_arcs(),
-                        num_queue_pushes: dijkstra_state.num_queue_pushes,
-                        num_settled: dijkstra_state.num_settled,
-                        num_labels_propagated: dijkstra_state.num_labels_propagated,
-                        num_labels_reset: dijkstra_state.num_labels_reset,
-                        num_nodes_searched: dijkstra_state.get_number_of_visited_nodes(),
-                        time: bidir_dijkstra_time,
-                        path_distance: dijkstra_dist,
                         path_number_nodes: Some(path.0.len()),
                         path_number_flagged_nodes: Some(number_flagged_nodes.len()),
                     },
@@ -311,27 +222,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             });
         } else {
             stat_logs.push(LocalMeasurementResult {
-                algo: String::from("dijkstra_chpot"),
-                standard: CSP2MeasurementResult {
-                    standard: CSPMeasurementResult {
-                        graph_num_nodes: graph.num_nodes(),
-                        graph_num_edges: graph.num_arcs(),
-                        num_queue_pushes: dijkstra_state.num_queue_pushes,
-                        num_settled: dijkstra_state.num_settled,
-                        num_labels_propagated: dijkstra_state.num_labels_propagated,
-                        num_labels_reset: dijkstra_state.num_labels_reset,
-                        num_nodes_searched: dijkstra_state.get_number_of_visited_nodes(),
-                        time: dijkstra_time,
-                        path_distance: None,
-                        path_number_nodes: None,
-                        path_number_flagged_nodes: None,
-                    },
-                    path_number_short_pauses: None,
-                    path_number_long_pauses: None,
-                },
-            });
-
-            stat_logs.push(LocalMeasurementResult {
                 algo: String::from("astar_chpot"),
                 standard: CSP2MeasurementResult {
                     standard: CSPMeasurementResult {
@@ -343,27 +233,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         num_labels_reset: astar_state.num_labels_reset,
                         num_nodes_searched: astar_state.get_number_of_visited_nodes(),
                         time: astar_time,
-                        path_distance: None,
-                        path_number_nodes: None,
-                        path_number_flagged_nodes: None,
-                    },
-                    path_number_short_pauses: None,
-                    path_number_long_pauses: None,
-                },
-            });
-
-            stat_logs.push(LocalMeasurementResult {
-                algo: String::from("dijkstra_bidir_chpot"),
-                standard: CSP2MeasurementResult {
-                    standard: CSPMeasurementResult {
-                        graph_num_nodes: graph.num_nodes(),
-                        graph_num_edges: graph.num_arcs(),
-                        num_queue_pushes: dijkstra_state.num_queue_pushes,
-                        num_settled: dijkstra_state.num_settled,
-                        num_labels_propagated: dijkstra_state.num_labels_propagated,
-                        num_labels_reset: dijkstra_state.num_labels_reset,
-                        num_nodes_searched: dijkstra_state.get_number_of_visited_nodes(),
-                        time: bidir_dijkstra_time,
                         path_distance: None,
                         path_number_nodes: None,
                         path_number_flagged_nodes: None,
