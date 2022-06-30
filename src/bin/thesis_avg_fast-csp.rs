@@ -10,7 +10,7 @@ use std::{
 use rand::Rng;
 use rust_truck_router::{
     algo::{ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_core_ch::CSPCoreCHQuery, csp_core_ch_chpot::CSPAstarCoreCHQuery},
-    experiments::measurement::MeasurementResult,
+    experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
     types::{Graph, NodeId, OwnedGraph, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
 };
 
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut core_ch_chpot_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch_chpot_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-    let n = 100;
+    let n = EXPERIMENTS_N;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
         let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
-        print!("Progress {}/{} from {} to {} - Core CH        \r", _i, n, s, t);
+        print!("\rProgress {}/{} from {} to {} - Core CH        ", _i, n, s, t);
         stdout().flush()?;
 
         let start = Instant::now();
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let _core_ch_dist = core_ch_query.run_query();
         let core_ch_time = start.elapsed();
 
-        print!("Progress {}/{} from {} to {} - A* Core CH\t\t\t\t\t\t\t\r", _i, n, s, t);
+        print!("\rProgress {}/{} from {} to {} - A* Core CH\t\t\t\t\t\t\t", _i, n, s, t);
         stdout().flush()?;
 
         let start = Instant::now();
@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     }
 
-    println!("Progress {}/{}", n, n);
+    println!("\rProgress {}/{}", n, n);
 
     let file = File::create("thesis_avg_fast-csp-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);

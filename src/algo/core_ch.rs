@@ -164,6 +164,19 @@ impl<'a> CoreContractionHierarchyQuery<'a> {
         }
     }
 
+    pub fn reset(&mut self) {
+        if self.s != self.core_ch.rank().len() as NodeId {
+            self.fw_state.init_new_s(self.s);
+        }
+
+        if self.t != self.core_ch.rank().len() as NodeId {
+            self.bw_state.init_new_s(self.t);
+        }
+
+        self.fw_finished = false;
+        self.bw_finished = false;
+    }
+
     pub fn run_query(&mut self) -> Option<Weight> {
         let mut tentative_distance = Weight::infinity();
 

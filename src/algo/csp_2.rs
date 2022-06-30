@@ -89,6 +89,11 @@ where
         }
     }
 
+    pub fn clean(&mut self) {
+        self.per_node_labels.clean();
+        self.reset();
+    }
+
     pub fn new_with_potential(num_nodes: usize, potential: P) -> Self {
         Self {
             queue: IndexdMinHeap::new(num_nodes),
@@ -553,6 +558,31 @@ impl<'a> TwoRestrictionDijkstra<'a> {
         }
         state.time_elapsed = start.elapsed();
         None
+    }
+
+    pub fn timeout_dist_query<P: Potential>(
+        &self,
+        state: &mut TwoRestrictionDijkstraData<P>,
+        t: NodeId,
+        timeout: Duration,
+    ) -> Result<Option<Weight>, QueryTimeoutError> {
+        let start = Instant::now();
+        state.reset();
+        state.potential.init_new_t(t);
+        state.last_t = t;
+
+        while let Some(State { distance: _, node: node_id }) = self.settle_next_label(state, t) {
+            if node_id == t {
+                state.time_elapsed = start.elapsed();
+                return Ok(state.last_distance);
+            }
+
+            if start.elapsed() > timeout {
+                return Err(QueryTimeoutError);
+            };
+        }
+        state.time_elapsed = start.elapsed();
+        Ok(None)
     }
 
     pub fn dist_query_propagate_all_labels<P: Potential>(&self, state: &mut TwoRestrictionDijkstraData<P>, t: NodeId) -> Option<Weight> {

@@ -87,6 +87,12 @@ impl<'a> CSPBidirQuery<'a> {
         self.last_middle_node = None;
     }
 
+    pub fn clean(&mut self) {
+        self.fw_state.clean();
+        self.bw_state.clean();
+        self.reset();
+    }
+
     fn calculate_distance_with_break_at(
         node: NodeId,
         restriction: &DrivingTimeRestriction,
@@ -228,6 +234,129 @@ impl<'a> CSPBidirQuery<'a> {
         self.last_dist = Some(tentative_distance);
 
         self.last_dist
+    }
+
+    pub fn timeout_run_query(&mut self, timeout: Duration) -> Result<Option<Weight>, QueryTimeoutError> {
+        let start = Instant::now();
+        if self.s == self.fw_graph.num_nodes() as NodeId || self.t == self.fw_graph.num_nodes() as NodeId {
+            return Ok(None);
+        }
+
+        self.reset();
+
+        let mut tentative_distance = Weight::infinity();
+
+        let mut settled_fw = BitVec::from_elem(self.fw_graph.num_nodes(), false);
+        let mut settled_bw = BitVec::from_elem(self.fw_graph.num_nodes(), false);
+        let mut fw_next = true;
+
+        let fw_search = OneRestrictionDijkstra::new(self.fw_graph, &self.is_reset_node);
+        let bw_search = OneRestrictionDijkstra::new(self.bw_graph, &self.is_reset_node);
+
+        while !self.fw_finished || !self.bw_finished {
+            if start.elapsed() > timeout {
+                return Err(QueryTimeoutError);
+            }
+
+            if !self.fw_finished && (self.bw_finished || fw_next) {
+                if let Some(State {
+                    distance: _dist_from_queue_at_v,
+                    node,
+                }) = if tentative_distance < Weight::infinity() && self.bw_state.min_key().is_some() {
+                    fw_search.settle_next_label_prune_bw_lower_bound(&mut self.fw_state, &mut self.bw_state, tentative_distance, self.t)
+                } else {
+                    fw_search.settle_next_label(&mut self.fw_state, self.t)
+                } {
+                    settled_fw.set(node as usize, true);
+
+                    // fw search found t -> done here
+                    if node == self.t {
+                        tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
+                        self.fw_finished = true;
+                        self.bw_finished = true;
+                        self.last_middle_node = None;
+                        break;
+                    }
+
+                    if settled_bw.get(node as usize).unwrap() {
+                        let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                            node,
+                            &self.restriction,
+                            &self.fw_state.get_best_label_at(node).unwrap().distance,
+                            &mut self.bw_state,
+                        );
+
+                        if tentative_distance > tent_dist_at_v {
+                            tentative_distance = tent_dist_at_v;
+                            self.last_middle_node = Some(node);
+                        }
+                    }
+
+                    if self.fw_state.min_key().is_none() {
+                        self.fw_finished = true;
+                        self.bw_finished = true;
+                    } else if self.fw_state.min_key().unwrap() >= tentative_distance {
+                        self.fw_finished = true;
+                    }
+
+                    fw_next = false;
+                }
+            } else if let Some(State {
+                distance: _dist_from_queue_at_v,
+                node,
+            }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
+                bw_search.settle_next_label_prune_bw_lower_bound(&mut self.bw_state, &mut self.fw_state, tentative_distance, self.s)
+            } else {
+                bw_search.settle_next_label(&mut self.bw_state, self.s)
+            } {
+                settled_bw.set(node as usize, true);
+
+                // bw search found s -> done here
+                if node == self.s {
+                    tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
+
+                    self.fw_finished = true;
+                    self.bw_finished = true;
+                    self.last_middle_node = None;
+
+                    break;
+                }
+
+                if settled_fw.get(node as usize).unwrap() {
+                    let tent_dist_at_v = Self::calculate_distance_with_break_at(
+                        node,
+                        &self.restriction,
+                        &self.bw_state.get_best_label_at(node).unwrap().distance,
+                        &mut self.fw_state,
+                    );
+
+                    if tentative_distance > tent_dist_at_v {
+                        tentative_distance = tent_dist_at_v;
+                        self.last_middle_node = Some(node);
+                    }
+                }
+
+                if self.bw_state.min_key().is_none() {
+                    self.fw_finished = true;
+                    self.bw_finished = true;
+                } else if self.bw_state.min_key().unwrap() >= tentative_distance {
+                    self.bw_finished = true;
+                }
+
+                fw_next = true;
+            }
+        }
+
+        self.last_time_elapsed = start.elapsed();
+
+        if tentative_distance == Weight::infinity() {
+            self.last_dist = None;
+            return Ok(None);
+        }
+
+        self.last_dist = Some(tentative_distance);
+
+        Ok(self.last_dist)
     }
 
     pub fn summary(&self) -> String {

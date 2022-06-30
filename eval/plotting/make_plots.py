@@ -345,8 +345,18 @@ def run_avg_all_times(problem, graph):
     run_measurement_conditionally(name, graph)
 
 
+def run_avg_mid_times(problem, graph):
+    name = "thesis_avg_mid-" + problem
+    run_measurement_conditionally(name, graph)
+
+
 def run_avg_fast_times(problem, graph):
     name = "thesis_avg_fast-" + problem
+    run_measurement_conditionally(name, graph)
+
+
+def run_avg_opt(problem, graph):
+    name = "thesis_avg_opt-" + problem
     run_measurement_conditionally(name, graph)
 
 
@@ -389,5 +399,8 @@ if __name__ == "__main__":
 
     run_avg_all_times("csp", "parking_ger_hgv")
     run_avg_all_times("csp_2", "parking_ger_hgv")
-    run_avg_fast_times("csp", "parking_europe_hgv")
+    run_avg_mid_times("csp", "parking_europe_hgv")
     run_avg_fast_times("csp_2", "parking_europe_hgv")
+
+    run_avg_opt("csp", "parking_europe_hgv")
+    run_avg_opt("csp_2", "parking_europe_hgv")

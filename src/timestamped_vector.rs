@@ -88,11 +88,15 @@ impl<T: DefaultReset, U: Unsigned + Integer + OverflowingAdd + Clone + Copy> Tim
         let (new_count, overflowed) = self.run_count.overflowing_add(&U::one());
 
         if overflowed {
-            for e in &mut self.vector {
-                e.reset();
-            }
+            self.clean();
         }
         self.run_count = new_count;
+    }
+
+    pub fn clean(&mut self) {
+        for e in &mut self.vector {
+            e.reset();
+        }
     }
 
     pub fn get(&self, i: usize) -> &T {

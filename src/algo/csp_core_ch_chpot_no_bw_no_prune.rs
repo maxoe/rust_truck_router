@@ -9,7 +9,7 @@ use super::{
 use crate::{algo::ch_potential::CHPotential, types::*};
 use bit_vec::BitVec;
 
-pub struct CSPAstarCoreCHQuery<'a> {
+pub struct CSPAstarCoreCHQueryNoBwNoPrune<'a> {
     core_ch: BorrowedCoreContractionHierarchy<'a>,
     pub is_reachable_from_core_in_fw: BitVec,
     pub is_reachable_from_core_in_bw: BitVec,
@@ -24,7 +24,7 @@ pub struct CSPAstarCoreCHQuery<'a> {
     pub last_dist: Option<Weight>,
 }
 
-impl<'a> CSPAstarCoreCHQuery<'a> {
+impl<'a> CSPAstarCoreCHQueryNoBwNoPrune<'a> {
     pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>, ch: BorrowedContractionHierarchy<'a>) -> Self {
         let node_count = core_ch.rank().len();
 
@@ -56,7 +56,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
         let node_mapping = core_ch.order().to_owned();
         let is_reset_node = core_ch.is_core().clone();
-        CSPAstarCoreCHQuery {
+        CSPAstarCoreCHQueryNoBwNoPrune {
             core_ch,
             is_reachable_from_core_in_fw,
             is_reachable_from_core_in_bw,
@@ -189,41 +189,16 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
         let mut _middle_node = self.core_ch.forward().num_nodes() as NodeId;
         let mut fw_next = true;
 
-        // to cancel no path found queries early
-        // 1 because start node already in queue
-        let mut fw_non_core_nodes_in_queue = 1;
-        let mut bw_non_core_nodes_in_queue = 1;
-        let mut fw_search_reachable_from_core = false;
-        let mut bw_search_reachable_from_core = false;
-
         let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
         let bw_search = OneRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
 
-        while (!self.fw_finished || !self.bw_finished)
-            && !(self.fw_finished && !fw_search_reachable_from_core && bw_non_core_nodes_in_queue == 0)
-            && !(self.bw_finished && !bw_search_reachable_from_core && fw_non_core_nodes_in_queue == 0)
-        {
+        while !self.fw_finished || !self.bw_finished {
             if !self.fw_finished && (self.bw_finished || fw_next) {
                 if let Some(State {
                     distance: _dist_from_queue_at_v,
                     node,
-                }) = if tentative_distance < Weight::infinity() && self.bw_state.min_key().is_some() {
-                    fw_search.settle_next_label_prune_bw_lower_bound_report_pushed_non_core_nodes(
-                        &mut self.fw_state,
-                        &mut self.bw_state,
-                        tentative_distance,
-                        self.core_ch.is_core().as_ref(),
-                        &mut fw_non_core_nodes_in_queue,
-                        self.t,
-                    )
-                } else {
-                    fw_search.settle_next_label_report_pushed_non_core_nodes(
-                        &mut self.fw_state,
-                        self.core_ch.is_core().as_ref(),
-                        &mut fw_non_core_nodes_in_queue,
-                        self.t,
-                    )
-                } {
+                }) = fw_search.settle_next_label(&mut self.fw_state, self.t)
+                {
                     settled_fw.set(node as usize, true);
 
                     // fw search found t -> done here
@@ -253,32 +228,13 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                         self.fw_finished = true;
                     }
 
-                    if self.is_reachable_from_core_in_bw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
-                        fw_search_reachable_from_core = true;
-                    }
-
                     fw_next = false;
                 }
             } else if let Some(State {
                 distance: _dist_from_queue_at_v,
                 node,
-            }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
-                bw_search.settle_next_label_prune_bw_lower_bound_report_pushed_non_core_nodes(
-                    &mut self.bw_state,
-                    &mut self.fw_state,
-                    tentative_distance,
-                    self.core_ch.is_core().as_ref(),
-                    &mut bw_non_core_nodes_in_queue,
-                    self.s,
-                )
-            } else {
-                bw_search.settle_next_label_report_pushed_non_core_nodes(
-                    &mut self.bw_state,
-                    self.core_ch.is_core().as_ref(),
-                    &mut bw_non_core_nodes_in_queue,
-                    self.s,
-                )
-            } {
+            }) = bw_search.settle_next_label(&mut self.bw_state, self.s)
+            {
                 settled_bw.set(node as usize, true);
 
                 // bw search found s -> done here
@@ -307,10 +263,6 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
                 if self.bw_state.min_key().is_none() || self.bw_state.min_key().unwrap() >= tentative_distance {
                     self.bw_finished = true;
-                }
-
-                if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
-                    bw_search_reachable_from_core = true;
                 }
 
                 fw_next = true;

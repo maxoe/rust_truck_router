@@ -161,6 +161,12 @@ impl<'a> CSP2CoreCHQuery<'a> {
         self.last_dist = None;
     }
 
+    pub fn clean(&mut self) {
+        self.fw_state.clean();
+        self.bw_state.clean();
+        self.reset();
+    }
+
     fn calculate_distance_with_break_at(
         node: NodeId,
         restriction_short: &DrivingTimeRestriction,

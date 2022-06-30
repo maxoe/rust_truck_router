@@ -1,30 +1,32 @@
 use std::rc::Rc;
 
+use crate::{algo::ch_potential::CHPotential, types::*};
+use bit_vec::BitVec;
+
 use super::{
     astar::Potential,
     ch::BorrowedContractionHierarchy,
     core_ch::BorrowedCoreContractionHierarchy,
-    csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
+    csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
 };
-use crate::{algo::ch_potential::CHPotential, types::*};
-use bit_vec::BitVec;
 
-pub struct CSPAstarCoreCHQuery<'a> {
+pub struct CSP2AstarCoreCHQueryNoPrune<'a> {
     core_ch: BorrowedCoreContractionHierarchy<'a>,
     pub is_reachable_from_core_in_fw: BitVec,
     pub is_reachable_from_core_in_bw: BitVec,
-    pub fw_state: OneRestrictionDijkstraData<CHPotential<'a>>,
-    pub bw_state: OneRestrictionDijkstraData<CHPotential<'a>>,
+    pub fw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
+    pub bw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
     fw_finished: bool,
     bw_finished: bool,
     s: NodeId,
     t: NodeId,
-    pub restriction: DrivingTimeRestriction,
+    pub restriction_short: DrivingTimeRestriction,
+    pub restriction_long: DrivingTimeRestriction,
     is_reset_node: Rc<BitVec>,
     pub last_dist: Option<Weight>,
 }
 
-impl<'a> CSPAstarCoreCHQuery<'a> {
+impl<'a> CSP2AstarCoreCHQueryNoPrune<'a> {
     pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>, ch: BorrowedContractionHierarchy<'a>) -> Self {
         let node_count = core_ch.rank().len();
 
@@ -56,17 +58,22 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
         let node_mapping = core_ch.order().to_owned();
         let is_reset_node = core_ch.is_core().clone();
-        CSPAstarCoreCHQuery {
+
+        CSP2AstarCoreCHQueryNoPrune {
             core_ch,
             is_reachable_from_core_in_fw,
             is_reachable_from_core_in_bw,
-            fw_state: OneRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_with_node_mapping(ch, node_mapping.clone())),
-            bw_state: OneRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_with_node_mapping_backwards(ch, node_mapping)),
+            fw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_with_node_mapping(ch, node_mapping.clone())),
+            bw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_with_node_mapping_backwards(ch, node_mapping)),
             fw_finished: false,
             bw_finished: false,
             s: node_count as NodeId,
             t: node_count as NodeId,
-            restriction: DrivingTimeRestriction {
+            restriction_short: DrivingTimeRestriction {
+                pause_time: 0,
+                max_driving_time: Weight::infinity(),
+            },
+            restriction_long: DrivingTimeRestriction {
                 pause_time: 0,
                 max_driving_time: Weight::infinity(),
             },
@@ -83,15 +90,28 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
         self.is_reset_node = self.core_ch.is_core().clone();
     }
 
-    pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) {
-        self.restriction = DrivingTimeRestriction { pause_time, max_driving_time };
+    pub fn set_restriction(&mut self, max_driving_time_long: Weight, pause_time_long: Weight, max_driving_time_short: Weight, pause_time_short: Weight) {
+        self.restriction_short = DrivingTimeRestriction {
+            pause_time: pause_time_short,
+            max_driving_time: max_driving_time_short,
+        };
+        self.restriction_long = DrivingTimeRestriction {
+            pause_time: pause_time_long,
+            max_driving_time: max_driving_time_long,
+        };
 
-        self.fw_state.set_restriction(max_driving_time, pause_time);
-        self.bw_state.set_restriction(max_driving_time, pause_time);
+        self.fw_state
+            .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
+        self.bw_state
+            .set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
     }
 
     pub fn clear_restriction(&mut self) {
-        self.restriction = DrivingTimeRestriction {
+        self.restriction_short = DrivingTimeRestriction {
+            pause_time: 0,
+            max_driving_time: Weight::infinity(),
+        };
+        self.restriction_long = DrivingTimeRestriction {
             pause_time: 0,
             max_driving_time: Weight::infinity(),
         };
@@ -143,6 +163,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
         self.fw_finished = false;
         self.bw_finished = false;
+        self.last_dist = None;
     }
 
     pub fn clean(&mut self) {
@@ -153,9 +174,10 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
     fn calculate_distance_with_break_at(
         node: NodeId,
-        restriction: &DrivingTimeRestriction,
-        fw_label_dist: &Weight2,
-        bw_state: &mut OneRestrictionDijkstraData<CHPotential>,
+        restriction_short: &DrivingTimeRestriction,
+        restriction_long: &DrivingTimeRestriction,
+        fw_label_dist: &Weight3,
+        bw_state: &mut TwoRestrictionDijkstraData<CHPotential>,
     ) -> Weight {
         let v_to_t = bw_state.get_settled_labels_at(node);
 
@@ -166,7 +188,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
             let total_dist = fw_label_dist.add(bw_label.distance);
 
             // check if restrictions allows combination of those labels/subpaths
-            if total_dist[1] < restriction.max_driving_time {
+            if total_dist[1] < restriction_short.max_driving_time && total_dist[2] < restriction_long.max_driving_time {
                 // subpaths can be connected without additional break
                 best_distance = best_distance.min(total_dist[0]);
             }
@@ -189,46 +211,25 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
         let mut _middle_node = self.core_ch.forward().num_nodes() as NodeId;
         let mut fw_next = true;
 
-        // to cancel no path found queries early
-        // 1 because start node already in queue
-        let mut fw_non_core_nodes_in_queue = 1;
-        let mut bw_non_core_nodes_in_queue = 1;
-        let mut fw_search_reachable_from_core = false;
-        let mut bw_search_reachable_from_core = false;
+        let fw_search = TwoRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
+        let bw_search = TwoRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
 
-        let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
-        let bw_search = OneRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
-
-        while (!self.fw_finished || !self.bw_finished)
-            && !(self.fw_finished && !fw_search_reachable_from_core && bw_non_core_nodes_in_queue == 0)
-            && !(self.bw_finished && !bw_search_reachable_from_core && fw_non_core_nodes_in_queue == 0)
-        {
+        while !self.fw_finished || !self.bw_finished {
             if !self.fw_finished && (self.bw_finished || fw_next) {
                 if let Some(State {
-                    distance: _dist_from_queue_at_v,
+                    distance: dist_from_queue_at_v,
                     node,
                 }) = if tentative_distance < Weight::infinity() && self.bw_state.min_key().is_some() {
-                    fw_search.settle_next_label_prune_bw_lower_bound_report_pushed_non_core_nodes(
-                        &mut self.fw_state,
-                        &mut self.bw_state,
-                        tentative_distance,
-                        self.core_ch.is_core().as_ref(),
-                        &mut fw_non_core_nodes_in_queue,
-                        self.t,
-                    )
+                    fw_search.settle_next_label_prune_bw_lower_bound(&mut self.fw_state, &mut self.bw_state, tentative_distance, self.t)
                 } else {
-                    fw_search.settle_next_label_report_pushed_non_core_nodes(
-                        &mut self.fw_state,
-                        self.core_ch.is_core().as_ref(),
-                        &mut fw_non_core_nodes_in_queue,
-                        self.t,
-                    )
+                    fw_search.settle_next_label(&mut self.fw_state, self.t)
                 } {
                     settled_fw.set(node as usize, true);
 
                     // fw search found t -> done here
                     if node == self.t {
-                        tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
+                        println!("Forward settled t");
+                        tentative_distance = dist_from_queue_at_v[0];
                         self.fw_finished = true;
                         // self.bw_finished = true;
 
@@ -238,7 +239,8 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                     if settled_bw.get(node as usize).unwrap() {
                         let tent_dist_at_v = Self::calculate_distance_with_break_at(
                             node,
-                            &self.restriction,
+                            &self.restriction_short,
+                            &self.restriction_long,
                             &self.fw_state.get_best_label_at(node).unwrap().distance,
                             &mut self.bw_state,
                         );
@@ -253,37 +255,21 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                         self.fw_finished = true;
                     }
 
-                    if self.is_reachable_from_core_in_bw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
-                        fw_search_reachable_from_core = true;
-                    }
-
                     fw_next = false;
                 }
             } else if let Some(State {
-                distance: _dist_from_queue_at_v,
+                distance: dist_from_queue_at_v,
                 node,
             }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
-                bw_search.settle_next_label_prune_bw_lower_bound_report_pushed_non_core_nodes(
-                    &mut self.bw_state,
-                    &mut self.fw_state,
-                    tentative_distance,
-                    self.core_ch.is_core().as_ref(),
-                    &mut bw_non_core_nodes_in_queue,
-                    self.s,
-                )
+                bw_search.settle_next_label_prune_bw_lower_bound(&mut self.bw_state, &mut self.fw_state, tentative_distance, self.s)
             } else {
-                bw_search.settle_next_label_report_pushed_non_core_nodes(
-                    &mut self.bw_state,
-                    self.core_ch.is_core().as_ref(),
-                    &mut bw_non_core_nodes_in_queue,
-                    self.s,
-                )
+                bw_search.settle_next_label(&mut self.bw_state, self.s)
             } {
                 settled_bw.set(node as usize, true);
 
                 // bw search found s -> done here
                 if node == self.s {
-                    tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
+                    tentative_distance = dist_from_queue_at_v[0];
 
                     // self.fw_finished = true;
                     self.bw_finished = true;
@@ -294,7 +280,8 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                 if settled_fw.get(node as usize).unwrap() {
                     let tent_dist_at_v = Self::calculate_distance_with_break_at(
                         node,
-                        &self.restriction,
+                        &self.restriction_short,
+                        &self.restriction_long,
                         &self.bw_state.get_best_label_at(node).unwrap().distance,
                         &mut self.fw_state,
                     );
@@ -307,10 +294,6 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
                 if self.bw_state.min_key().is_none() || self.bw_state.min_key().unwrap() >= tentative_distance {
                     self.bw_finished = true;
-                }
-
-                if self.is_reachable_from_core_in_fw.get(node as usize).unwrap() || self.core_ch.is_core().get(node as usize).unwrap() {
-                    bw_search_reachable_from_core = true;
                 }
 
                 fw_next = true;

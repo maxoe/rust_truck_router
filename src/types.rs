@@ -334,3 +334,6 @@ pub struct STQuery {
     pub s: NodeId,
     pub t: NodeId,
 }
+
+#[derive(Debug, Clone)]
+pub struct QueryTimeoutError;

@@ -108,9 +108,9 @@ impl<T: Ord + Copy> AutoIndexedHeap<T> {
     }
 
     pub fn reset(&mut self) {
-        self.data.clear();
-        self.positions.clear();
-        self.removed_without_pop.clear();
+        self.data = vec![];
+        self.positions = vec![];
+        self.removed_without_pop = vec![];
         self.split = 0;
     }
 
