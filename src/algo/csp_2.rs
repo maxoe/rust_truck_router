@@ -371,6 +371,10 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
+                    if distance_with_potential[0] == Weight::infinity() {
+                        continue;
+                    }
+
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
                     neighbor_label_set.retain(|&neighbor_label| {
@@ -495,6 +499,9 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
+                    if distance_with_potential[0] == Weight::infinity() {
+                        continue;
+                    }
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
                     neighbor_label_set.retain(|&neighbor_label| {
@@ -646,6 +653,10 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                         for current_new_dist in new_dist {
                             let pot = state.potential.potential(neighbor_node);
                             let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
+
+                            if distance_with_potential[0] == Weight::infinity() {
+                                continue;
+                            }
                             let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                             let mut dominated = false;
                             neighbor_label_set.retain(|&neighbor_label| {
@@ -762,6 +773,9 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
+                    if distance_with_potential[0] == Weight::infinity() {
+                        continue;
+                    }
                     // pruning with bw lower bound
                     let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
                     if let Some(Reverse(Label {
@@ -908,6 +922,9 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
+                    if distance_with_potential[0] == Weight::infinity() {
+                        continue;
+                    }
                     // pruning with bw lower bound
                     if is_core.get(neighbor_node as usize).unwrap() {
                         let best_label = bw_state.get_settled_labels_at(neighbor_node).max();

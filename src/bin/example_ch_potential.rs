@@ -33,6 +33,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
+    let s = 5411152;
+    let t = 12290136;
 
     // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
     // path with distance 20517304
