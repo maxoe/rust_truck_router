@@ -350,7 +350,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("\rProgress {}/{}", n, n);
 
-    let file = File::create("thesis_avg_mid-csp-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
+    let file = File::create("thesis_avg_all-csp-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;
     let mut file = LineWriter::new(file);
     writeln!(file, "{}", LocalMeasurementResult::get_header())?;
     for r in stat_logs {

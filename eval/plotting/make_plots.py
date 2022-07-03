@@ -61,6 +61,7 @@ GRAPH_PATH = os.path.normpath(
 
 RUN_ALL_MEASUREMENTS = False
 PROHIBIT_MEASUREMENTS = False
+VERBOSE = False
 
 
 def is_bin(fpath):
@@ -118,11 +119,19 @@ def is_hash_up_to_date(bin):
 
 def run_bin(bin, args=[]):
     start = time.time()
-    popen = subprocess.Popen(
-        ["cargo", "run", "--release", "--bin", bin] + args,
-        stdout=subprocess.PIPE,
-        cwd=DATA_PATH,
-    )
+
+    if VERBOSE:
+        popen = subprocess.Popen(
+            ["cargo", "run", "--release", "--bin", bin] + args,
+            cwd=DATA_PATH,
+        )
+    else:
+        popen = subprocess.Popen(
+            ["cargo", "run", "--release", "--bin", bin] + args,
+            stdout=subprocess.PIPE,
+            cwd=DATA_PATH,
+        )
+
     popen.communicate()
     print('"' + bin + '" ran in {:.2f}'.format(time.time() - start))
 
@@ -282,11 +291,11 @@ def plot_rank_times_perf_profile(problem, graph):
     linespecs = ["r-", "b-"]  # , "g-"]
 
     run_measurement_conditionally(
-        "measure_all_" + problem + "_1000_queries_rank_times", g
+        "measure_all_" + problem + "_1000_queries_rank_times", graph
     )
 
     algo_results = read_measurement(
-        "measure_all_" + problem + "_1000_queries_rank_times-" + g,
+        "measure_all_" + problem + "_1000_queries_rank_times-" + graph,
     )
 
     algo_results = algo_results.loc[algo_results["dijkstra_rank_exponent"] >= 10]
@@ -299,7 +308,9 @@ def plot_rank_times_perf_profile(problem, graph):
 
     algo_times = np.asarray(algo_times).T
     perfprof(algo_times, linespecs=linespecs, legendnames=algos)
-    write_plt("measure_all_" + problem + "_1000_queries_rank_times-perfprofile.png", g)
+    write_plt(
+        "measure_all_" + problem + "_1000_queries_rank_times-perfprofile.png", graph
+    )
 
 
 def plot_core_size_experiments(problem, graph):
@@ -360,6 +371,11 @@ def run_avg_opt(problem, graph):
     run_measurement_conditionally(name, graph)
 
 
+def run_rank_times(problem, graph):
+    name = "thesis_rank_times_all-" + problem
+    run_measurement_conditionally(name, graph)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument(
@@ -382,10 +398,17 @@ if __name__ == "__main__":
         action="store_true",
         help="prohibit rerun of any measurement",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="print the output of binaries",
+    )
     args = parser.parse_args()
 
     RUN_ALL_MEASUREMENTS = args.force
     PROHIBIT_MEASUREMENTS = args.plot
+    VERBOSE = args.verbose
 
     if RUN_ALL_MEASUREMENTS and PROHIBIT_MEASUREMENTS:
         print("Cannot force and prohibit measurements and the same time")
@@ -404,3 +427,6 @@ if __name__ == "__main__":
 
     run_avg_opt("csp", "parking_europe_hgv")
     run_avg_opt("csp_2", "parking_europe_hgv")
+
+    run_rank_times("csp", "parking_europe_hgv")
+    run_rank_times("csp_2", "parking_europe_hgv")

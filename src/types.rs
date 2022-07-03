@@ -15,7 +15,7 @@ pub type Weight2 = [Weight; 2];
 pub type Weight3 = [Weight; 3];
 
 pub const EU_SHORT_PAUSE_TIME: Weight = 2_700_000; // 45 minutes
-pub const EU_LONG_PAUSE_TIME: Weight = 32_400_000; // 9 hours
+pub const EU_LONG_PAUSE_TIME: Weight = 39_600_000; // 11 hours
 pub const EU_SHORT_DRIVING_TIME: Weight = 16_200_000; // 4.5 hours
 pub const EU_LONG_DRIVING_TIME: Weight = 32_400_000; // 9 hours
 
@@ -313,6 +313,14 @@ where
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
+pub struct Label2<T> {
+    pub distance_with_potential: Weight,
+    pub distance: T,
+    pub prev_node: NodeId,
+    pub prev_label: Option<usize>,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Ord, PartialOrd)]
 pub struct Label<T> {
     pub distance_with_potential: T,
     pub distance: T,
@@ -321,9 +329,18 @@ pub struct Label<T> {
 }
 
 pub type MCDHeap<L> = AutoIndexedHeap<Reverse<Label<L>>>;
+pub type MCDHeap2<L> = AutoIndexedHeap<Reverse<Label2<L>>>;
 
 impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap<L> {
     const DEFAULT: MCDHeap<L> = MCDHeap::<L>::new();
+
+    fn reset(&mut self) {
+        self.reset();
+    }
+}
+
+impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap2<L> {
+    const DEFAULT: MCDHeap2<L> = MCDHeap2::<L>::new();
 
     fn reset(&mut self) {
         self.reset();

@@ -776,18 +776,21 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     if distance_with_potential[0] == Weight::infinity() {
                         continue;
                     }
+
                     // pruning with bw lower bound
                     let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
                     if let Some(Reverse(Label {
                         distance: best_label_distance, ..
                     })) = best_label
                     {
+                        println!("prune label exists");
                         // best settled label as lower bound for D(neighbor_node,t)
                         if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
                             continue;
                         }
                     } else if bw_state.queue.contains_index(neighbor_node as usize) {
-                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                        println!("prune in queue");
+                        // bw_min_key - bw_pot(best label at neighbor_node) as lower bound for D(neighbor_node,t)
                         let bw_pot_at_neighbor =
                             bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
                         let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
@@ -795,6 +798,17 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                             continue;
                         }
                     }
+                    // else {
+                    //     // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                    //     println!("prune not in queue");
+                    //     let v_t_dist = bw_state.potential.potential(neighbor_node);
+                    //     let bw_pot_at_neighbor =
+                    //         bw_state.estimated_dist_with_restriction([0, 0, 0], v_t_dist)[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
+                    //     let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                    //     if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
+                    //         continue;
+                    //     }
+                    // }
 
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;

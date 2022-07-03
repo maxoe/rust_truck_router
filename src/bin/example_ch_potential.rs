@@ -33,13 +33,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
-    let s = 5411152;
-    let t = 12290136;
-
-    // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
-    // path with distance 20517304
-    // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
-    // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
+    let s = 70764962; //2568299; //70764962; //30266271; //70764962;
+                      // let t = 30990782;
+    let t = 30990782; // 2568299; //30990782; // 70764962; //30266271;
+                      // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
+                      // path with distance 20517304
+                      // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
+                      // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
 
     // let max_driving_time_short = 4_000_000;
     // let pause_time_short = 100_000;
@@ -50,11 +50,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     ch.check();
 
     let mut csp2_astar_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
-    csp2_astar_state.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    csp2_astar_state.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     // csp2_astar_state.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
     let mut csp2_bidir_astar_query = CSP2BidirAstarCHPotQuery::new(graph.borrow(), bw_graph.borrow(), &is_parking_node, ch.borrow());
-    csp2_bidir_astar_query.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    csp2_bidir_astar_query.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     // csp2_core_ch_chpot_query.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
 
     csp2_astar_state.init_new_s(s);
