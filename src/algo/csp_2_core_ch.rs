@@ -233,7 +233,7 @@ impl<'a> CSP2CoreCHQuery<'a> {
 
                     // fw search found t -> done here
                     if node == self.t {
-                        tentative_distance = dist_from_queue_at_v[0];
+                        tentative_distance = dist_from_queue_at_v;
                         self.fw_finished = true;
                         // self.bw_finished = true;
 
@@ -278,7 +278,7 @@ impl<'a> CSP2CoreCHQuery<'a> {
 
                 // bw search found s -> done here
                 if node == self.s {
-                    tentative_distance = dist_from_queue_at_v[0];
+                    tentative_distance = dist_from_queue_at_v;
 
                     // self.fw_finished = true;
                     self.bw_finished = true;

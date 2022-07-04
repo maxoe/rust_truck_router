@@ -1,4 +1,4 @@
-use std::{cmp::Reverse, rc::Rc, thread::current};
+use std::rc::Rc;
 
 use super::{
     astar::Potential,
@@ -157,16 +157,11 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
         fw_label_dist: &Weight2,
         bw_state: &mut OneRestrictionDijkstraData<CHPotential>,
     ) -> Weight {
-        // if node == 81502861 {
-        // if node == 81498908 {
-        //     dbg!(bw_state.per_node_labels.get(node as usize).iter().map(|r| r.0).collect::<Vec<Label<Weight2>>>());
-        // }
-
         let v_to_t = bw_state.get_settled_labels_at(node);
+
         let mut current_bw = v_to_t.rev().map(|r| r.0);
 
         let mut best_distance = Weight::infinity();
-
         while let Some(bw_label) = current_bw.next() {
             let total_dist = fw_label_dist.add(bw_label.distance);
 
@@ -327,53 +322,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
             return None;
         }
 
-        // let (fw_nodes, fw_dists) = self.fw_state.current_best_path_to(_middle_node, true).unwrap();
-        // let (bw_nodes, bw_dists) = self.bw_state.current_best_path_to(_middle_node, true).unwrap();
-
-        // dbg!(_middle_node);
-
-        // let mut last = 0;
-        // let mut acc = 0;
-        // for (node, dist) in fw_nodes.into_iter().zip(fw_dists) {
-        //     let length = dist[0] - last;
-        //     acc += length;
-
-        //     last = dist[0];
-
-        //     if self.core_ch.is_core().get(node as usize).unwrap() {
-        //         if acc - self.restriction.pause_time > self.restriction.max_driving_time {
-        //             panic!();
-        //         }
-
-        //         acc = 0;
-        //     } else {
-        //         if dist[1] > self.restriction.max_driving_time {
-        //             panic!();
-        //         }
-        //     }
-        // }
-
-        // let mut last = 0;
-        // let mut acc = 0;
-        // for (node, dist) in bw_nodes.into_iter().zip(bw_dists) {
-        //     let length = dist[0] - last;
-        //     acc += length;
-
-        //     last = dist[0];
-
-        //     if self.core_ch.is_core().get(node as usize).unwrap() {
-        //         // if acc - self.restriction.pause_time > self.restriction.max_driving_time {
-        //         //     panic!();
-        //         // }
-        //         acc = 0;
-        //     } else {
-        //         if dist[1] > self.restriction.max_driving_time {
-        //             panic!();
-        //         }
-        //     }
-        // }
-
-        // self.last_dist = Some(tentative_distance);
+        self.last_dist = Some(tentative_distance);
         self.last_dist
     }
 }

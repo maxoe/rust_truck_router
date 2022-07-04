@@ -423,7 +423,7 @@ if __name__ == "__main__":
     run_avg_all_times("csp", "parking_ger_hgv")
     run_avg_all_times("csp_2", "parking_ger_hgv")
     run_avg_mid_times("csp", "parking_europe_hgv")
-    run_avg_fast_times("csp_2", "parking_europe_hgv")
+    run_avg_mid_times("csp_2", "parking_europe_hgv")
 
     run_avg_opt("csp", "parking_europe_hgv")
     run_avg_opt("csp_2", "parking_europe_hgv")

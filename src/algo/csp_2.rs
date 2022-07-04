@@ -16,7 +16,7 @@ pub struct TwoRestrictionDijkstraData<P = NoPotential>
 where
     P: Potential,
 {
-    pub queue: IndexdMinHeap<State<Weight3>>,
+    pub queue: IndexdMinHeap<State<Weight>>,
     pub per_node_labels: TimestampedVector<MCDHeap<Weight3>, u16>,
     invalid_node_id: NodeId,
     s: NodeId,
@@ -125,7 +125,7 @@ where
     }
 
     pub fn min_key(&self) -> Option<Weight> {
-        self.queue.peek().map(|s| s.distance[0])
+        self.queue.peek().map(|s| s.distance)
     }
 
     pub fn current_best_path_to(&self, t: NodeId, with_distances: bool) -> Option<(Vec<NodeId>, Vec<Weight3>)> {
@@ -251,7 +251,7 @@ where
         self.get_best_label_at(node).map_or(Weight3::infinity(), |l| l.distance)
     }
 
-    pub fn peek_queue(&self) -> Option<&State<Weight3>> {
+    pub fn peek_queue(&self) -> Option<&State<Weight>> {
         self.queue.peek()
     }
 
@@ -270,27 +270,23 @@ where
             .count()
     }
 
-    fn estimated_dist_with_restriction(&self, distance_at_node: [Weight; 3], potential_to_target: Weight) -> [Weight; 3] {
+    fn estimated_dist_with_restriction(&self, distance_at_node: [Weight; 3], potential_to_target: Weight) -> Weight {
         if potential_to_target == Weight::infinity() {
-            Weight3::infinity()
+            Weight::infinity()
         } else {
             let estimated = distance_at_node.link(potential_to_target);
 
             if self.restriction_short.max_driving_time == Weight::infinity() {
-                estimated
+                estimated[0]
             } else {
                 let amount_long_breaks = estimated[2] / self.restriction_long.max_driving_time;
                 let amount_short_breaks = (estimated[1] / self.restriction_short.max_driving_time)
                     .checked_sub(amount_long_breaks)
                     .unwrap_or(0);
 
-                [
-                    estimated[0]
-                        .link(amount_short_breaks * self.restriction_short.pause_time)
-                        .link(amount_long_breaks * self.restriction_long.pause_time),
-                    estimated[1],
-                    estimated[2],
-                ]
+                estimated[0]
+                    .link(amount_short_breaks * self.restriction_short.pause_time)
+                    .link(amount_long_breaks * self.restriction_long.pause_time)
             }
         }
     }
@@ -306,7 +302,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
         Self { graph, reset_flags }
     }
 
-    pub fn settle_next_label<P: Potential>(&self, state: &mut TwoRestrictionDijkstraData<P>, t: NodeId) -> Option<State<Weight3>> {
+    pub fn settle_next_label<P: Potential>(&self, state: &mut TwoRestrictionDijkstraData<P>, t: NodeId) -> Option<State<Weight>> {
         let next = state.queue.pop();
 
         if let Some(State {
@@ -371,7 +367,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
-                    if distance_with_potential[0] == Weight::infinity() {
+                    if distance_with_potential == Weight::infinity() {
                         continue;
                     }
 
@@ -426,7 +422,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
         is_core: &BitVec,
         non_core_count: &mut u32,
         t: NodeId,
-    ) -> Option<State<Weight3>> {
+    ) -> Option<State<Weight>> {
         let next = state.queue.pop();
 
         if let Some(State {
@@ -499,7 +495,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
-                    if distance_with_potential[0] == Weight::infinity() {
+                    if distance_with_potential == Weight::infinity() {
                         continue;
                     }
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
@@ -608,7 +604,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
         None
     }
 
-    pub fn settle_next_label_propagate_all<P: Potential>(&self, state: &mut TwoRestrictionDijkstraData<P>, t: NodeId) -> Option<State<Weight3>> {
+    pub fn settle_next_label_propagate_all<P: Potential>(&self, state: &mut TwoRestrictionDijkstraData<P>, t: NodeId) -> Option<State<Weight>> {
         let next = state.queue.pop();
 
         if let Some(State {
@@ -654,7 +650,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                             let pot = state.potential.potential(neighbor_node);
                             let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
-                            if distance_with_potential[0] == Weight::infinity() {
+                            if distance_with_potential == Weight::infinity() {
                                 continue;
                             }
                             let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
@@ -708,7 +704,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
         bw_state: &mut TwoRestrictionDijkstraData<P>,
         tentative_distance: Weight,
         t: NodeId,
-    ) -> Option<State<Weight3>> {
+    ) -> Option<State<Weight>> {
         let next = state.queue.pop();
 
         if let Some(State {
@@ -773,42 +769,28 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
-                    if distance_with_potential[0] == Weight::infinity() {
+                    if distance_with_potential == Weight::infinity() {
                         continue;
                     }
-
                     // pruning with bw lower bound
                     let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
                     if let Some(Reverse(Label {
                         distance: best_label_distance, ..
                     })) = best_label
                     {
-                        println!("prune label exists");
                         // best settled label as lower bound for D(neighbor_node,t)
                         if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
                             continue;
                         }
                     } else if bw_state.queue.contains_index(neighbor_node as usize) {
-                        println!("prune in queue");
-                        // bw_min_key - bw_pot(best label at neighbor_node) as lower bound for D(neighbor_node,t)
+                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
                         let bw_pot_at_neighbor =
-                            bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
+                            bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential - bw_state.get_tentative_dist_at(neighbor_node)[0];
                         let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                        if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
+                        if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
                             continue;
                         }
                     }
-                    // else {
-                    //     // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
-                    //     println!("prune not in queue");
-                    //     let v_t_dist = bw_state.potential.potential(neighbor_node);
-                    //     let bw_pot_at_neighbor =
-                    //         bw_state.estimated_dist_with_restriction([0, 0, 0], v_t_dist)[0] - bw_state.get_tentative_dist_at(neighbor_node)[0];
-                    //     let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                    //     if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
-                    //         continue;
-                    //     }
-                    // }
 
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
                     let mut dominated = false;
@@ -863,7 +845,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
         is_core: &BitVec,
         non_core_count: &mut u32,
         t: NodeId,
-    ) -> Option<State<Weight3>> {
+    ) -> Option<State<Weight>> {
         let next = state.queue.pop();
 
         if let Some(State {
@@ -936,7 +918,7 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                     let pot = state.potential.potential(neighbor_node);
                     let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
 
-                    if distance_with_potential[0] == Weight::infinity() {
+                    if distance_with_potential == Weight::infinity() {
                         continue;
                     }
                     // pruning with bw lower bound
@@ -952,10 +934,10 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                             }
                         } else if bw_state.queue.contains_index(neighbor_node as usize) {
                             // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
-                            let bw_pot_at_neighbor = bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential[0]
-                                - bw_state.get_tentative_dist_at(neighbor_node)[0];
+                            let bw_pot_at_neighbor =
+                                bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential - bw_state.get_tentative_dist_at(neighbor_node)[0];
                             let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                            if current_new_dist[0] + bw_min_key[0] - bw_pot_at_neighbor >= tentative_distance {
+                            if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
                                 continue;
                             }
                         }

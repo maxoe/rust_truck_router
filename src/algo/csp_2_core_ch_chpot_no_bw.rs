@@ -240,7 +240,7 @@ impl<'a> CSP2AstarCoreCHQueryNoBw<'a> {
                     // fw search found t -> done here
                     if node == self.t {
                         println!("Forward settled t");
-                        tentative_distance = dist_from_queue_at_v[0];
+                        tentative_distance = dist_from_queue_at_v;
                         self.fw_finished = true;
                         // self.bw_finished = true;
 
@@ -285,7 +285,7 @@ impl<'a> CSP2AstarCoreCHQueryNoBw<'a> {
 
                 // bw search found s -> done here
                 if node == self.s {
-                    tentative_distance = dist_from_queue_at_v[0];
+                    tentative_distance = dist_from_queue_at_v;
 
                     // self.fw_finished = true;
                     self.bw_finished = true;
