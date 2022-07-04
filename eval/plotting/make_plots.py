@@ -376,6 +376,11 @@ def run_rank_times(problem, graph):
     run_measurement_conditionally(name, graph)
 
 
+def run_constraint_experiments(graph):
+    run_measurement_conditionally("thesis_driving_times-csp", graph)
+    run_measurement_conditionally("thesis_break_times-csp", graph)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument(
@@ -430,3 +435,5 @@ if __name__ == "__main__":
 
     run_rank_times("csp", "parking_europe_hgv")
     run_rank_times("csp_2", "parking_europe_hgv")
+
+    run_constraint_experiments("parking_europe_hgv")

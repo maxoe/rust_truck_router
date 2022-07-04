@@ -790,6 +790,14 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                         if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
                             continue;
                         }
+                    } else {
+                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                        let v_t_dist = bw_state.potential.potential(neighbor_node);
+                        let bw_pot_at_neighbor = bw_state.estimated_dist_with_restriction([0, 0, 0], v_t_dist) + bw_state.restriction_long.pause_time;
+                        let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                        if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
+                            continue;
+                        }
                     }
 
                     let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
@@ -940,6 +948,14 @@ impl<'a> TwoRestrictionDijkstra<'a> {
                             if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
                                 continue;
                             }
+                        }
+                    } else {
+                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                        let v_t_dist = bw_state.potential.potential(neighbor_node);
+                        let bw_pot_at_neighbor = bw_state.estimated_dist_with_restriction([0, 0, 0], v_t_dist) + bw_state.restriction_long.pause_time;
+                        let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                        if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
+                            continue;
                         }
                     }
 

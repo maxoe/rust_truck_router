@@ -49,19 +49,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut stat_logs = Vec::with_capacity(n);
+    let total_n = range_step(driving_time_start, driving_time_limit, driving_time_step).count() * EXPERIMENTS_N;
+
+    let mut core_ch_chpot_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
+    let mut core_ch_query = CSPCoreCHQuery::new(core_ch.borrow());
 
     for (i, dt) in range_step(driving_time_start, driving_time_limit, driving_time_step).enumerate() {
-        let mut core_ch_query = CSPCoreCHQuery::new(core_ch.borrow());
         core_ch_query.set_restriction(dt, EU_SHORT_PAUSE_TIME);
-
-        let mut core_ch_chpot_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
         core_ch_chpot_query.set_restriction(dt, EU_SHORT_PAUSE_TIME);
 
         for j in 0..n {
             let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
             let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
-            print!("\rProgress {}/{} from {} to {} - Core CH        ", i * n * j, n, s, t);
+            print!("\rProgress {}/{} from {} to {} - Core CH        ", i * n + j, total_n, s, t);
             stdout().flush()?;
 
             let start = Instant::now();
@@ -70,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let _core_ch_dist = core_ch_query.run_query();
             let core_ch_time = start.elapsed();
 
-            print!("\rProgress {}/{} from {} to {} - A* Core CH\t\t\t\t\t\t\t", i * n * j, n, s, t);
+            print!("\rProgress {}/{} from {} to {} - A* Core CH\t\t\t\t\t\t\t", i * n + j, total_n, s, t);
             stdout().flush()?;
 
             let start = Instant::now();

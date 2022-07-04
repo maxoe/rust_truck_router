@@ -21,21 +21,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
 
-    let graph = OwnedGraph::load_from_routingkit_dir(path)?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
-
-    let mut query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
-    query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
-
-    let mut query_no_bw = CSPAstarCoreCHQueryNoBw::new(core_ch.borrow(), ch.borrow());
-    query_no_bw.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
-
-    let mut query_no_pr = CSPAstarCoreCHQueryNoPrune::new(core_ch.borrow(), ch.borrow());
-    query_no_pr.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
-
-    let mut query_no_bw_no_pr = CSPAstarCoreCHQueryNoBwNoPrune::new(core_ch.borrow(), ch.borrow());
-    query_no_bw_no_pr.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
     let n = EXPERIMENTS_N;
 
@@ -58,65 +45,98 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut stat_logs = Vec::with_capacity(n);
 
-    for _i in 0..n {
-        let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
-        let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
+    let mut queries = Vec::with_capacity(n);
 
-        print!("\rProgress {}/{} from {} to {} - A* Core CH FULL\t\t\t\t\t\t\t", _i, n, s, t);
-        stdout().flush()?;
+    for _ in 0..n {
+        let num_nodes = OwnedGraph::load_from_routingkit_dir(path)?.num_nodes();
+        queries.push((
+            rand::thread_rng().gen_range(0..num_nodes as NodeId),
+            rand::thread_rng().gen_range(0..num_nodes as NodeId),
+        ));
+    }
 
-        let start = Instant::now();
-        query.init_new_s(s);
-        query.init_new_t(t);
-        let _core_ch_chpot_dist = query.run_query();
-        let core_ch_chpot_time = start.elapsed();
+    {
+        let mut query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
+        query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-        print!("\rProgress {}/{} from {} to {} - A* Core CH NO BW NO PRUNE\t\t\t\t\t\t\t", _i, n, s, t);
-        stdout().flush()?;
+        for (i, &(s, t)) in queries.iter().enumerate() {
+            print!("\rProgress {}/{} from {} to {} - A* Core CH FULL\t\t\t\t\t\t\t", i, n, s, t);
+            stdout().flush()?;
 
-        let start = Instant::now();
-        query_no_bw_no_pr.init_new_s(s);
-        query_no_bw_no_pr.init_new_t(t);
-        let _no_bw_no_prune_dist = query_no_bw_no_pr.run_query();
-        let no_bw_no_prune_time = start.elapsed();
+            let start = Instant::now();
+            query.init_new_s(s);
+            query.init_new_t(t);
+            let _core_ch_chpot_dist = query.run_query();
+            let core_ch_chpot_time = start.elapsed();
 
-        print!("\rProgress {}/{} from {} to {} - A* Core CH NO BW\t\t\t\t\t\t\t", _i, n, s, t);
-        stdout().flush()?;
+            stat_logs.push(LocalMeasurementResult {
+                algo: String::from("core_ch_chpot"),
+                time: core_ch_chpot_time,
+            });
+        }
+    }
 
-        let start = Instant::now();
-        query_no_bw.init_new_s(s);
-        query_no_bw.init_new_t(t);
-        let _no_bw_dist = query_no_bw.run_query();
-        let no_bw_time = start.elapsed();
+    {
+        let mut query_no_bw_no_pr = CSPAstarCoreCHQueryNoBwNoPrune::new(core_ch.borrow(), ch.borrow());
+        query_no_bw_no_pr.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-        print!("\rProgress {}/{} from {} to {} - A* Core CH NO PRUNE\t\t\t\t\t\t\t", _i, n, s, t);
-        stdout().flush()?;
+        for (i, &(s, t)) in queries.iter().enumerate() {
+            print!("\rProgress {}/{} from {} to {} - A* Core CH NO BW NO PRUNE\t\t\t\t\t\t\t", i, n, s, t);
+            stdout().flush()?;
 
-        let start = Instant::now();
-        query_no_pr.init_new_s(s);
-        query_no_pr.init_new_t(t);
-        let _no_prune_dist = query_no_pr.run_query();
-        let no_prune_time = start.elapsed();
+            let start = Instant::now();
+            query_no_bw_no_pr.init_new_s(s);
+            query_no_bw_no_pr.init_new_t(t);
+            let _no_bw_no_prune_dist = query_no_bw_no_pr.run_query();
+            let no_bw_no_prune_time = start.elapsed();
 
-        stat_logs.push(LocalMeasurementResult {
-            algo: String::from("no_bw"),
-            time: no_bw_time,
-        });
+            stat_logs.push(LocalMeasurementResult {
+                algo: String::from("no_bw_no_prune"),
+                time: no_bw_no_prune_time,
+            });
+        }
+    }
 
-        stat_logs.push(LocalMeasurementResult {
-            algo: String::from("no_bw_no_prune"),
-            time: no_bw_no_prune_time,
-        });
+    {
+        let mut query_no_bw = CSPAstarCoreCHQueryNoBw::new(core_ch.borrow(), ch.borrow());
+        query_no_bw.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-        stat_logs.push(LocalMeasurementResult {
-            algo: String::from("no_prune"),
-            time: no_prune_time,
-        });
+        for (i, &(s, t)) in queries.iter().enumerate() {
+            print!("\rProgress {}/{} from {} to {} - A* Core CH NO BW\t\t\t\t\t\t\t", i, n, s, t);
+            stdout().flush()?;
 
-        stat_logs.push(LocalMeasurementResult {
-            algo: String::from("core_ch_chpot"),
-            time: core_ch_chpot_time,
-        });
+            let start = Instant::now();
+            query_no_bw.init_new_s(s);
+            query_no_bw.init_new_t(t);
+            let _no_bw_dist = query_no_bw.run_query();
+            let no_bw_time = start.elapsed();
+
+            stat_logs.push(LocalMeasurementResult {
+                algo: String::from("no_bw"),
+                time: no_bw_time,
+            });
+        }
+    }
+
+    {
+        let mut query_no_pr = CSPAstarCoreCHQueryNoPrune::new(core_ch.borrow(), ch.borrow());
+        query_no_pr.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+
+        for (i, &(s, t)) in queries.iter().enumerate() {
+            print!("\rProgress {}/{} from {} to {} - A* Core CH NO PRUNE\t\t\t\t\t\t\t", i, n, s, t);
+            stdout().flush()?;
+
+            let start = Instant::now();
+            query_no_pr.init_new_s(s);
+            query_no_pr.init_new_t(t);
+            let _no_prune_dist = query_no_pr.run_query();
+            let no_prune_time = start.elapsed();
+
+            stat_logs.push(LocalMeasurementResult {
+                algo: String::from("no_prune"),
+                time: no_prune_time,
+            });
+        }
     }
 
     println!("\rProgress {}/{}", n, n);
