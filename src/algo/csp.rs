@@ -757,7 +757,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                         let bw_pot_at_neighbor =
                             bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential - bw_state.get_tentative_dist_at(neighbor_node)[0];
                         let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                        if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
+                        if (current_new_dist[0] + bw_min_key).saturating_sub(bw_pot_at_neighbor) >= tentative_distance {
                             continue;
                         }
                     } else {
@@ -765,7 +765,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                         let v_t_dist = bw_state.potential.potential(neighbor_node);
                         let bw_pot_at_neighbor = bw_state.estimated_dist_with_restriction([0, 0], v_t_dist) + bw_state.restriction.pause_time;
                         let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                        if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
+                        if (current_new_dist[0] + bw_min_key).saturating_sub(bw_pot_at_neighbor) >= tentative_distance {
                             continue;
                         }
                     }
@@ -901,7 +901,9 @@ impl<'a> OneRestrictionDijkstra<'a> {
                         continue;
                     }
                     // pruning with bw lower bound
-                    if is_core.get(neighbor_node as usize).unwrap() {
+                    if is_core.get(neighbor_node as usize).unwrap()
+                    /* why is this necessary wtf */
+                    {
                         let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
                         if let Some(Reverse(Label {
                             distance: best_label_distance, ..
@@ -916,17 +918,17 @@ impl<'a> OneRestrictionDijkstra<'a> {
                             let bw_pot_at_neighbor =
                                 bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential - bw_state.get_tentative_dist_at(neighbor_node)[0];
                             let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                            if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
+                            if (current_new_dist[0] + bw_min_key).saturating_sub(bw_pot_at_neighbor) >= tentative_distance {
                                 continue;
                             }
-                        }
-                    } else {
-                        // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
-                        let v_t_dist = bw_state.potential.potential(neighbor_node);
-                        let bw_pot_at_neighbor = bw_state.estimated_dist_with_restriction([0, 0], v_t_dist) + bw_state.restriction.pause_time;
-                        let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                        if current_new_dist[0] + bw_min_key - bw_pot_at_neighbor >= tentative_distance {
-                            continue;
+                        } else {
+                            // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
+                            let v_s_dist = bw_state.potential.potential(neighbor_node);
+                            let bw_pot_at_neighbor = bw_state.estimated_dist_with_restriction([0, 0], v_s_dist) + bw_state.restriction.pause_time;
+                            let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
+                            if (current_new_dist[0] + bw_min_key).saturating_sub(bw_pot_at_neighbor) >= tentative_distance {
+                                continue;
+                            }
                         }
                     }
 

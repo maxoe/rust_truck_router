@@ -2,10 +2,9 @@ use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy,
         ch_potential::CHPotential,
-        core_ch::{self, CoreContractionHierarchy},
+        core_ch::CoreContractionHierarchy,
         csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
-        csp_core_ch_chpot_no_bw_no_prune::CSPAstarCoreCHQueryNoBwNoPrune,
     },
     io::*,
     types::*,
