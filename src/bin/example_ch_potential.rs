@@ -33,13 +33,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
-    let s = 70764962; //2568299; //70764962; //30266271; //70764962;
-                      // let t = 30990782;
-    let t = 30990782; // 2568299; //30990782; // 70764962; //30266271;
-                      // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
-                      // path with distance 20517304
-                      // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
-                      // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
+    // let s = 70764962; //2568299; //70764962; //30266271; //70764962;
+    // let t = 30990782;
+    // let t = 30990782; // 2568299; //30990782; // 70764962; //30266271;
+    // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
+    // path with distance 20517304
+    // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
+    // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
 
     // let max_driving_time_short = 4_000_000;
     // let pause_time_short = 100_000;

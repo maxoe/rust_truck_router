@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let driving_time_start = 1_500_000;
     let driving_time_limit = 40_000_000;
-    let driving_time_step = 10_000;
+    let driving_time_step = 100_000;
     let n = EXPERIMENTS_N;
 
     #[derive(Debug, Clone)]

@@ -372,7 +372,7 @@ def run_avg_opt(problem, graph):
 
 
 def run_rank_times(problem, graph):
-    name = "thesis_rank_times_all-" + problem
+    name = "thesis_rank_times-" + problem
     run_measurement_conditionally(name, graph)
 
 

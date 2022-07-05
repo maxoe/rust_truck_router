@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let break_time_start = 0;
     let break_time_limit = 40_000_000;
-    let break_time_step = 10_000;
+    let break_time_step = 100_000;
     let n = EXPERIMENTS_N;
 
     #[derive(Debug, Clone)]
