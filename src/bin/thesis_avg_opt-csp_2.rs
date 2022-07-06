@@ -12,7 +12,7 @@ use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_2_core_ch_chpot::CSP2AstarCoreCHQuery,
         csp_2_core_ch_chpot_no_bw::CSP2AstarCoreCHQueryNoBw, csp_2_core_ch_chpot_no_bw_no_prune::CSP2AstarCoreCHQueryNoBwNoPrune,
-        csp_2_core_ch_chpot_no_prune::CSP2AstarCoreCHQueryNoPrune,
+        csp_2_core_ch_chpot_no_prune::CSP2AstarCoreCHQueryAddPrune,
     },
     experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
     types::{Graph, NodeId, OwnedGraph, EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
@@ -113,18 +113,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             let no_bw_time = start.elapsed();
 
             stat_logs.push(LocalMeasurementResult {
-                algo: String::from("no_bw"),
+                algo: String::from("no_bw_add_prune"),
                 time: no_bw_time,
             });
         }
     }
 
     {
-        let mut query_no_pr = CSP2AstarCoreCHQueryNoPrune::new(core_ch.borrow(), ch.borrow());
+        let mut query_no_pr = CSP2AstarCoreCHQueryAddPrune::new(core_ch.borrow(), ch.borrow());
         query_no_pr.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
         for (i, &(s, t)) in queries.iter().enumerate() {
-            print!("\rProgress {}/{} from {} to {} - A* Core CH NO PRUNE\t\t\t\t\t\t\t", i, n, s, t);
+            print!("\rProgress {}/{} from {} to {} - A* Core CH ADD PRUNE\t\t\t\t\t\t\t", i, n, s, t);
             stdout().flush()?;
 
             let start = Instant::now();
@@ -134,7 +134,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let no_prune_time = start.elapsed();
 
             stat_logs.push(LocalMeasurementResult {
-                algo: String::from("no_prune"),
+                algo: String::from("add_bw_add_prune"),
                 time: no_prune_time,
             });
         }

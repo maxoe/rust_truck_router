@@ -15,7 +15,7 @@ pub mod csp_bidir;
 pub mod csp_bidir_chpot;
 pub mod csp_core_ch;
 pub mod csp_core_ch_chpot;
+pub mod csp_core_ch_chpot_add_prune;
 pub mod csp_core_ch_chpot_no_bw;
 pub mod csp_core_ch_chpot_no_bw_no_prune;
-pub mod csp_core_ch_chpot_no_prune;
 pub mod dijkstra;

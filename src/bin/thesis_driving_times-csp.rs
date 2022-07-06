@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use num::range_step;
+use num::range_step_inclusive;
 use rand::Rng;
 use rust_truck_router::{
     algo::{ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_core_ch::CSPCoreCHQuery, csp_core_ch_chpot::CSPAstarCoreCHQuery},
@@ -25,9 +25,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
 
-    let driving_time_start = 1_500_000;
-    let driving_time_limit = 40_000_000;
-    let driving_time_step = 100_000;
+    let driving_time_start = 0;
+    let driving_time_limit = 72_000_000;
+    let driving_time_step = 1_000_000;
     let n = EXPERIMENTS_N;
 
     #[derive(Debug, Clone)]
@@ -49,12 +49,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut stat_logs = Vec::with_capacity(n);
-    let total_n = range_step(driving_time_start, driving_time_limit, driving_time_step).count() * EXPERIMENTS_N;
+    let total_n = range_step_inclusive(driving_time_start, driving_time_limit, driving_time_step).count() * EXPERIMENTS_N;
 
     let mut core_ch_chpot_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     let mut core_ch_query = CSPCoreCHQuery::new(core_ch.borrow());
 
-    for (i, dt) in range_step(driving_time_start, driving_time_limit, driving_time_step).enumerate() {
+    for (i, dt) in range_step_inclusive(driving_time_start, driving_time_limit, driving_time_step).enumerate() {
         core_ch_query.set_restriction(dt, EU_SHORT_PAUSE_TIME);
         core_ch_chpot_query.set_restriction(dt, EU_SHORT_PAUSE_TIME);
 

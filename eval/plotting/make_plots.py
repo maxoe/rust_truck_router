@@ -425,13 +425,13 @@ if __name__ == "__main__":
     #         plot_rank_times_perf_profile(p, g)
     #         plot_core_size_experiments(p, g)
 
+    run_avg_opt("csp", "parking_europe_hgv")
+    run_avg_opt("csp_2", "parking_europe_hgv")
+
     run_avg_all_times("csp", "parking_ger_hgv")
     run_avg_all_times("csp_2", "parking_ger_hgv")
     run_avg_mid_times("csp", "parking_europe_hgv")
     run_avg_mid_times("csp_2", "parking_europe_hgv")
-
-    run_avg_opt("csp", "parking_europe_hgv")
-    run_avg_opt("csp_2", "parking_europe_hgv")
 
     run_rank_times("csp", "parking_europe_hgv")
     run_rank_times("csp_2", "parking_europe_hgv")
