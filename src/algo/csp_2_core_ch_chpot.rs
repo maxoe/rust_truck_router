@@ -12,8 +12,6 @@ use super::{
 
 pub struct CSP2AstarCoreCHQuery<'a> {
     core_ch: BorrowedCoreContractionHierarchy<'a>,
-    pub is_reachable_from_core_in_fw: BitVec,
-    pub is_reachable_from_core_in_bw: BitVec,
     pub fw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
     pub bw_state: TwoRestrictionDijkstraData<CHPotential<'a>>,
     fw_finished: bool,
@@ -30,25 +28,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
     pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>, ch: BorrowedContractionHierarchy<'a>) -> Self {
         let node_count = core_ch.rank().len();
 
-        let mut is_reachable_from_core_in_bw = BitVec::from_elem(node_count, false);
-        let mut is_reachable_from_core_in_fw = BitVec::from_elem(node_count, false);
-
-        let mut core_node_count = 0;
-        for n in core_ch.is_core().iter().enumerate().filter(|(_, b)| *b).map(|(i, _)| i) {
-            core_node_count += 1;
-
-            for i in core_ch.forward().first_out()[n as usize]..core_ch.forward().first_out()[n as usize + 1] {
-                if !core_ch.is_core().get(core_ch.forward().head()[i as usize] as usize).unwrap() {
-                    is_reachable_from_core_in_fw.set(core_ch.forward().head()[i as usize] as usize, true);
-                }
-            }
-
-            for i in core_ch.backward().first_out()[n as usize]..core_ch.backward().first_out()[n as usize + 1] {
-                if !core_ch.is_core().get(core_ch.backward().head()[i as usize] as usize).unwrap() {
-                    is_reachable_from_core_in_bw.set(core_ch.backward().head()[i as usize] as usize, true);
-                }
-            }
-        }
+        let core_node_count = core_ch.is_core().iter().enumerate().filter(|(_, b)| *b).map(|(i, _)| i).count();
 
         println!(
             "Core node count: {} ({:.2}%)",
@@ -61,8 +41,6 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
 
         CSP2AstarCoreCHQuery {
             core_ch,
-            is_reachable_from_core_in_fw,
-            is_reachable_from_core_in_bw,
             fw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_with_node_mapping(ch, node_mapping.clone())),
             bw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_with_node_mapping_backwards(ch, node_mapping)),
             fw_finished: false,
@@ -213,6 +191,11 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
 
         let fw_search = TwoRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
         let bw_search = TwoRestrictionDijkstra::new(self.core_ch.backward(), self.is_reset_node.as_ref());
+
+        if self.fw_state.potential.potential(self.s) == Weight::infinity() {
+            self.fw_finished = true;
+            self.bw_finished = true;
+        }
 
         while !self.fw_finished || !self.bw_finished {
             if !self.fw_finished && (self.bw_finished || fw_next) {
