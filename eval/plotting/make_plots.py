@@ -381,6 +381,11 @@ def run_constraint_experiments(graph):
     run_measurement_conditionally("thesis_break_times-csp", graph)
 
 
+def run_core_sizes_experiment(problem, graph):
+    name = "thesis_core_sizes-" + problem
+    run_measurement_conditionally(name, graph)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument(
@@ -437,3 +442,6 @@ if __name__ == "__main__":
     run_rank_times("csp_2", "parking_europe_hgv")
 
     run_constraint_experiments("parking_europe_hgv")
+
+    run_core_sizes_experiment("parking_europe_hgv", "csp")
+    run_core_sizes_experiment("parking_europe_hgv", "csp_2")
