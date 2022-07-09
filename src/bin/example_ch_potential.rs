@@ -27,25 +27,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
-    // let graph_mcd = OwnedOneRestrictionGraph::new(first_out, head, travel_time);
     let graph = OwnedGraph::new(first_out, head, travel_time);
     let bw_graph = OwnedGraph::reverse(graph.borrow());
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
-    // let s = 70764962; //2568299; //70764962; //30266271; //70764962;
-    // let t = 30990782;
-    // let t = 30990782; // 2568299; //30990782; // 70764962; //30266271;
-    // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
-    // path with distance 20517304
-    // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
-    // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
-
-    // let max_driving_time_short = 4_000_000;
-    // let pause_time_short = 100_000;
-    // let max_driving_time_long = 6_000_000;
-    // let pause_time_long = 500_000;
-
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     ch.check();
 
@@ -74,17 +60,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(unidir_dist, bidir_dist);
 
-    // instance_mcd_acc.reset();
-    // instance_mcd_acc.dist_query_propagate_all_labels(t);
-    // print!("{}", instance_mcd_acc.info());
-
     let latitude = Vec::<f32>::load_from(path.join("latitude"))?;
     let longitude = Vec::<f32>::load_from(path.join("longitude"))?;
     let osm_node_id = Vec::<u64>::load_from(path.join("osm_node_id"))?;
     assert_eq!(latitude.len(), longitude.len());
     assert_eq!(latitude.len(), graph.num_nodes());
 
-    if let Some((p, _d)) = csp2_astar_state.current_best_path_to(t, true) {
+    if let Some((p, d)) = csp2_astar_state.current_best_path_to(t, true) {
         let file = File::create("path_acc.csv")?;
         let mut file = LineWriter::new(file);
         writeln!(file, "latitude,longitude")?;
@@ -93,37 +75,38 @@ fn main() -> Result<(), Box<dyn Error>> {
             writeln!(file, "{},{}", latitude[node_id as usize], longitude[node_id as usize])?;
         }
 
-        let file = File::create("path_flagged_acc.csv")?;
-        let mut file = LineWriter::new(file);
-        writeln!(file, "latitude,longitude,osm_id,is_parking_used")?;
-        let used_p = csp2_astar.reset_nodes_on_path(&(p, _d));
-        for &node_id in used_p.0.iter() {
-            writeln!(
-                file,
-                "{},{},{},{}",
-                latitude[node_id as usize],
-                longitude[node_id as usize],
-                osm_node_id[node_id as usize],
-                used_p.0.contains(&node_id)
-            )?;
-        }
-
-        // let (reset_p_short, reset_p_long) = instance_mcd_acc.reset_nodes_on_path(&(p, d));
         // let file = File::create("path_flagged_acc.csv")?;
         // let mut file = LineWriter::new(file);
-        // writeln!(file, "latitude,longitude,osm_id,is_parking_short_break,is_parking_long_break")?;
+        // writeln!(file, "latitude,longitude,osm_id,is_parking_used")?;
+        // // let used_p = csp_astar.reset_nodes_on_path(&(p, d));
 
-        // for node_id in flagged_p {
+        // for &node_id in used_p.iter() {
         //     writeln!(
         //         file,
-        //         "{},{},{},{},{}",
+        //         "{},{},{},{}",
         //         latitude[node_id as usize],
         //         longitude[node_id as usize],
         //         osm_node_id[node_id as usize],
-        //         reset_p_short.contains(&node_id),
-        //         reset_p_long.contains(&node_id)
+        //         used_p.0.contains(&node_id)
         //     )?;
         // }
+
+        let (reset_p_short, reset_p_long) = csp2_astar.reset_nodes_on_path(&(p, d));
+        let file = File::create("path_flagged_acc.csv")?;
+        let mut file = LineWriter::new(file);
+        writeln!(file, "latitude,longitude,osm_id,is_parking_short_break,is_parking_long_break")?;
+
+        for &node_id in reset_p_short.iter().chain(reset_p_long.iter()) {
+            writeln!(
+                file,
+                "{},{},{},{},{}",
+                latitude[node_id as usize],
+                longitude[node_id as usize],
+                osm_node_id[node_id as usize],
+                reset_p_short.contains(&node_id),
+                reset_p_long.contains(&node_id)
+            )?;
+        }
     }
 
     let file = File::create("labels_acc.csv")?;

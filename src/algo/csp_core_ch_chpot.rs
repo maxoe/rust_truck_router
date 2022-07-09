@@ -26,14 +26,6 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
     pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>, ch: BorrowedContractionHierarchy<'a>) -> Self {
         let node_count = core_ch.rank().len();
 
-        let core_node_count = core_ch.is_core().iter().enumerate().filter(|(_, b)| *b).map(|(i, _)| i).count();
-
-        println!(
-            "Core node count: {} ({:.2}%)",
-            core_node_count,
-            core_node_count as f32 * 100.0 / node_count as f32
-        );
-
         let node_mapping = core_ch.order().to_owned();
         let is_reset_node = core_ch.is_core().clone();
         CSPAstarCoreCHQuery {

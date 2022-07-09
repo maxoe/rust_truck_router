@@ -11,7 +11,7 @@ use rand::Rng;
 use rust_truck_router::{
     algo::{ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_2_core_ch::CSP2CoreCHQuery, csp_2_core_ch_chpot::CSP2AstarCoreCHQuery},
     experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
-    types::{Graph, NodeId, OwnedGraph, EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
+    types::{Graph, NodeId, OwnedGraph, Weight, EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -36,16 +36,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     struct LocalMeasurementResult {
         pub algo: String,
         pub time: Duration,
+        pub path_distance: Option<Weight>,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
-        const OWN_HEADER: &'static str = "algo,time_ms";
+        const OWN_HEADER: &'static str = "algo,time_ms,path_distance";
 
         fn get_header() -> String {
             format!("{}", Self::OWN_HEADER)
         }
         fn as_csv(&self) -> String {
-            format!("{},{}", self.algo, self.time.as_secs_f64() * 1000.0)
+            format!(
+                "{},{},{}",
+                self.algo,
+                self.time.as_secs_f64() * 1000.0,
+                self.path_distance.map_or("NaN".to_owned(), |v| v.to_string())
+            )
         }
     }
 
@@ -61,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let start = Instant::now();
         core_ch_query.init_new_s(s);
         core_ch_query.init_new_t(t);
-        let _core_ch_dist = core_ch_query.run_query();
+        let core_ch_dist = core_ch_query.run_query();
         let core_ch_time = start.elapsed();
 
         print!("\rProgress {}/{} from {} to {} - A* Core CH\t\t\t\t\t\t\t", _i, n, s, t);
@@ -70,17 +76,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         let start = Instant::now();
         core_ch_chpot_query.init_new_s(s);
         core_ch_chpot_query.init_new_t(t);
-        let _core_ch_chpot_dist = core_ch_chpot_query.run_query();
+        let core_ch_chpot_dist = core_ch_chpot_query.run_query();
         let core_ch_chpot_time = start.elapsed();
 
         stat_logs.push(LocalMeasurementResult {
             algo: String::from("core_ch"),
             time: core_ch_time,
+            path_distance: core_ch_dist,
         });
 
         stat_logs.push(LocalMeasurementResult {
             algo: String::from("core_ch_chpot"),
             time: core_ch_chpot_time,
+            path_distance: core_ch_chpot_dist,
         });
     }
 

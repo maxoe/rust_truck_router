@@ -11,7 +11,6 @@ use rand::Rng;
 use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_core_ch_chpot::CSPAstarCoreCHQuery,
-        csp_core_ch_chpot_add_prune::CSPAstarCoreCHQueryAddPrune, csp_core_ch_chpot_no_bw::CSPAstarCoreCHQueryNoBw,
         csp_core_ch_chpot_no_bw_no_prune::CSPAstarCoreCHQueryNoBwNoPrune,
     },
     experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
@@ -98,47 +97,47 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    {
-        let mut query_no_bw = CSPAstarCoreCHQueryNoBw::new(core_ch.borrow(), ch.borrow());
-        query_no_bw.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    // // {
+    // //     let mut query_no_bw = CSPAstarCoreCHQueryNoBw::new(core_ch.borrow(), ch.borrow());
+    // //     query_no_bw.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-        for (i, &(s, t)) in queries.iter().enumerate() {
-            print!("\rProgress {}/{} from {} to {} - A* Core CH NO BW\t\t\t\t\t\t\t", i, n, s, t);
-            stdout().flush()?;
+    // //     for (i, &(s, t)) in queries.iter().enumerate() {
+    // //         print!("\rProgress {}/{} from {} to {} - A* Core CH NO BW\t\t\t\t\t\t\t", i, n, s, t);
+    // //         stdout().flush()?;
 
-            let start = Instant::now();
-            query_no_bw.init_new_s(s);
-            query_no_bw.init_new_t(t);
-            let _no_bw_dist = query_no_bw.run_query();
-            let no_bw_time = start.elapsed();
+    // //         let start = Instant::now();
+    // //         query_no_bw.init_new_s(s);
+    // //         query_no_bw.init_new_t(t);
+    // //         let _no_bw_dist = query_no_bw.run_query();
+    // //         let no_bw_time = start.elapsed();
 
-            stat_logs.push(LocalMeasurementResult {
-                algo: String::from("no_bw_add_prune"),
-                time: no_bw_time,
-            });
-        }
-    }
+    // //         stat_logs.push(LocalMeasurementResult {
+    // //             algo: String::from("no_bw_add_prune"),
+    // //             time: no_bw_time,
+    // //         });
+    // //     }
+    // // }
 
-    {
-        let mut query_no_pr = CSPAstarCoreCHQueryAddPrune::new(core_ch.borrow(), ch.borrow());
-        query_no_pr.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    // {
+    //     let mut query_no_pr = CSPAstarCoreCHQueryAddPrune::new(core_ch.borrow(), ch.borrow());
+    //     query_no_pr.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
-        for (i, &(s, t)) in queries.iter().enumerate() {
-            print!("\rProgress {}/{} from {} to {} - A* Core CH ADD PRUNE\t\t\t\t\t\t\t", i, n, s, t);
-            stdout().flush()?;
+    //     for (i, &(s, t)) in queries.iter().enumerate() {
+    //         print!("\rProgress {}/{} from {} to {} - A* Core CH ADD PRUNE\t\t\t\t\t\t\t", i, n, s, t);
+    //         stdout().flush()?;
 
-            let start = Instant::now();
-            query_no_pr.init_new_s(s);
-            query_no_pr.init_new_t(t);
-            let _no_prune_dist = query_no_pr.run_query();
-            let no_prune_time = start.elapsed();
+    //         let start = Instant::now();
+    //         query_no_pr.init_new_s(s);
+    //         query_no_pr.init_new_t(t);
+    //         let _no_prune_dist = query_no_pr.run_query();
+    //         let no_prune_time = start.elapsed();
 
-            stat_logs.push(LocalMeasurementResult {
-                algo: String::from("add_bw_add_prune"),
-                time: no_prune_time,
-            });
-        }
-    }
+    //         stat_logs.push(LocalMeasurementResult {
+    //             algo: String::from("add_bw_add_prune"),
+    //             time: no_prune_time,
+    //         });
+    //     }
+    // }
 
     println!("\rProgress {}/{}", n, n);
 

@@ -25,14 +25,6 @@ pub struct CSP2CoreCHQuery<'a> {
 impl<'a> CSP2CoreCHQuery<'a> {
     pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>) -> Self {
         let node_count = core_ch.rank().len();
-        let core_node_count = core_ch.is_core().iter().enumerate().filter(|(_, b)| *b).map(|(i, _)| i).count();
-
-        println!(
-            "Core node count: {} ({:.2}%)",
-            core_node_count,
-            core_node_count as f32 * 100.0 / node_count as f32
-        );
-
         let is_reset_node = core_ch.is_core().clone();
 
         CSP2CoreCHQuery {

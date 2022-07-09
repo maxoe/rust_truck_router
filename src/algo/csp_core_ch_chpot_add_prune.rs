@@ -31,10 +31,7 @@ impl<'a> CSPAstarCoreCHQueryAddPrune<'a> {
         let mut is_reachable_from_core_in_bw = BitVec::from_elem(node_count, false);
         let mut is_reachable_from_core_in_fw = BitVec::from_elem(node_count, false);
 
-        let mut core_node_count = 0;
         for n in core_ch.is_core().iter().enumerate().filter(|(_, b)| *b).map(|(i, _)| i) {
-            core_node_count += 1;
-
             for i in core_ch.forward().first_out()[n as usize]..core_ch.forward().first_out()[n as usize + 1] {
                 if !core_ch.is_core().get(core_ch.forward().head()[i as usize] as usize).unwrap() {
                     is_reachable_from_core_in_fw.set(core_ch.forward().head()[i as usize] as usize, true);
@@ -47,12 +44,6 @@ impl<'a> CSPAstarCoreCHQueryAddPrune<'a> {
                 }
             }
         }
-
-        println!(
-            "Core node count: {} ({:.2}%)",
-            core_node_count,
-            core_node_count as f32 * 100.0 / node_count as f32
-        );
 
         let node_mapping = core_ch.order().to_owned();
         let is_reset_node = core_ch.is_core().clone();

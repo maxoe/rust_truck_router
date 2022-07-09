@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             });
         }
 
-        print!("Progress {}/{} - Core Size {}%\r", n, n, rel_core_size * 100.0);
+        println!("Progress {}/{} - Core Size {}%\r", n, n, rel_core_size * 100.0);
     }
 
     let file = File::create("thesis_core_sizes-csp_2-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt")?;

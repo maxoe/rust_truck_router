@@ -35,13 +35,6 @@ where
             is_core.set(rank.as_ref()[n as usize] as usize, true);
         }
 
-        let core_node_count = core.as_ref().len();
-        println!(
-            "Core node count: {} ({:.2}%)",
-            core_node_count,
-            core_node_count as f32 * 100.0 / rank.as_ref().len() as f32
-        );
-
         CoreContractionHierarchy {
             rank,
             order,

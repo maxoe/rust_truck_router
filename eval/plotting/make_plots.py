@@ -60,7 +60,6 @@ GRAPH_PATH = os.path.normpath(
 )
 
 RUN_ALL_MEASUREMENTS = False
-PROHIBIT_MEASUREMENTS = False
 VERBOSE = False
 
 
@@ -161,7 +160,7 @@ def run_measurement_conditionally(bin, graph):
         is_hash_up_to_date(bin)
         and exists_measurement(bin, graph)
         and not RUN_ALL_MEASUREMENTS
-    ) or PROHIBIT_MEASUREMENTS
+    )
 
     if not build_successful or should_skip:
         print('Skipping measurement of "' + bin + '" with "' + graph + '"')
@@ -386,6 +385,11 @@ def run_core_sizes_experiment(problem, graph):
     run_measurement_conditionally(name, graph)
 
 
+def run_speed_cap_experiment(problem, graph):
+    name = "thesis_speed_cap-" + problem
+    run_measurement_conditionally(name, graph)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument(
@@ -402,46 +406,36 @@ if __name__ == "__main__":
         action="store_true",
         help="force rerun of all measurements",
     )
-    parser.add_argument(
-        "-p",
-        "--plot",
-        action="store_true",
-        help="prohibit rerun of any measurement",
-    )
+
     parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
         help="print the output of binaries",
     )
+
     args = parser.parse_args()
 
     RUN_ALL_MEASUREMENTS = args.force
-    PROHIBIT_MEASUREMENTS = args.plot
     VERBOSE = args.verbose
-
-    if RUN_ALL_MEASUREMENTS and PROHIBIT_MEASUREMENTS:
-        print("Cannot force and prohibit measurements and the same time")
-        exit(0)
-
-    # for g in args.graph:
-    #     for p in ["csp", "csp_2"]:
-    #         plot_all_rank_times(p, g)
-    #         plot_rank_times_perf_profile(p, g)
-    #         plot_core_size_experiments(p, g)
 
     run_avg_opt("csp", "parking_europe_hgv")
     run_avg_opt("csp_2", "parking_europe_hgv")
 
-    run_avg_all_times("csp", "parking_ger_hgv")
-    run_avg_all_times("csp_2", "parking_ger_hgv")
-    run_avg_mid_times("csp", "parking_europe_hgv")
-    run_avg_mid_times("csp_2", "parking_europe_hgv")
+    run_speed_cap_experiment("csp", "parking_europe_hgv_sc")
+    run_speed_cap_experiment("csp_2", "parking_europe_hgv_sc")
 
-    run_rank_times("csp", "parking_europe_hgv")
-    run_rank_times("csp_2", "parking_europe_hgv")
+    run_avg_mid_times("csp", "parking_europe_hgv")
+    # run_avg_mid_times("csp_2", "parking_europe_hgv") # out of memory
+    run_avg_fast_times("csp_2", "parking_europe_hgv")
 
     run_constraint_experiments("parking_europe_hgv")
 
-    run_core_sizes_experiment("parking_europe_hgv", "csp")
-    run_core_sizes_experiment("parking_europe_hgv", "csp_2")
+    run_core_sizes_experiment("csp", "parking_europe_hgv")
+    run_core_sizes_experiment("csp_2", "parking_europe_hgv")
+
+    run_avg_all_times("csp", "parking_ger_hgv")
+    run_avg_all_times("csp_2", "parking_ger_hgv")
+
+    run_rank_times("csp", "parking_europe_hgv")
+    run_rank_times("csp_2", "parking_europe_hgv")
