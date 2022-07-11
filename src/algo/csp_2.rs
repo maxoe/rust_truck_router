@@ -199,6 +199,7 @@ where
     ) -> &mut Self {
         assert!(max_driving_time_long >= max_driving_time_short);
         assert!(pause_time_long >= pause_time_short);
+
         self.restriction_short = DrivingTimeRestriction {
             pause_time: pause_time_short,
             max_driving_time: max_driving_time_short,

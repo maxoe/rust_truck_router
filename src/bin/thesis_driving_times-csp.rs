@@ -25,8 +25,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
 
-    let driving_time_start = 1;
-    let driving_time_limit = 72_000_001;
+    let driving_time_start = 0;
+    let driving_time_limit = 72_000_000;
     let driving_time_step = 1_000_000;
     let n = EXPERIMENTS_BASE_N;
 

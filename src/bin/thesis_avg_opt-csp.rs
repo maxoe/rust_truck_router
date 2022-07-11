@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
 
-    let n = EXPERIMENTS_BASE_N;
+    let n = EXPERIMENTS_BASE_N * 10;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {

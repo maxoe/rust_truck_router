@@ -183,7 +183,6 @@ where
     }
 
     pub fn set_restriction(&mut self, max_driving_time: Weight, pause_time: Weight) -> &mut Self {
-        assert!(max_driving_time > 0);
         self.restriction = DrivingTimeRestriction { pause_time, max_driving_time };
         self.reset();
         self
