@@ -19,7 +19,7 @@ use rust_truck_router::{
         csp_2_core_ch::CSP2CoreCHQuery,
         csp_2_core_ch_chpot::CSP2AstarCoreCHQuery,
     },
-    experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult, EXPERIMENTS_N},
+    experiments::measurement::{CSP2MeasurementResult, CSPMeasurementResult, MeasurementResult, EXPERIMENTS_BASE_N},
     io::load_routingkit_bitvector,
     types::{Graph, NodeId, OwnedGraph, EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
 };
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //         "core_ch_chpot".to_owned(),
     //     ];
     // }
-    let n = EXPERIMENTS_N;
+    let n = EXPERIMENTS_BASE_N;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {

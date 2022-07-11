@@ -11,7 +11,7 @@ use num::range_step_inclusive;
 use rand::Rng;
 use rust_truck_router::{
     algo::{ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_core_ch::CSPCoreCHQuery, csp_core_ch_chpot::CSPAstarCoreCHQuery},
-    experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
+    experiments::measurement::{MeasurementResult, EXPERIMENTS_BASE_N},
     types::{Graph, NodeId, OwnedGraph, EU_SHORT_DRIVING_TIME},
 };
 
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let break_time_start = 1;
     let break_time_limit = 72_000_001;
     let break_time_step = 1_000_000;
-    let n = EXPERIMENTS_N;
+    let n = EXPERIMENTS_BASE_N;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {
@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut stat_logs = Vec::with_capacity(n);
-    let total_n = range_step_inclusive(break_time_start, break_time_limit, break_time_step).count() * EXPERIMENTS_N;
+    let total_n = range_step_inclusive(break_time_start, break_time_limit, break_time_step).count() * EXPERIMENTS_BASE_N;
 
     let mut core_ch_chpot_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     let mut core_ch_query = CSPCoreCHQuery::new(core_ch.borrow());

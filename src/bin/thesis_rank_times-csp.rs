@@ -18,7 +18,7 @@ use rust_truck_router::{
         csp_core_ch_chpot::CSPAstarCoreCHQuery,
         dijkstra::{Dijkstra, DijkstraData},
     },
-    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult, EXPERIMENTS_N},
+    experiments::measurement::{CSP1MeasurementResult, CSPMeasurementResult, MeasurementResult, EXPERIMENTS_BASE_N},
     io::load_routingkit_bitvector,
     types::{Graph, NodeId, OwnedGraph, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
 };
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
 
-    let n = EXPERIMENTS_N;
+    let n = EXPERIMENTS_BASE_N;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {

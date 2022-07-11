@@ -1,7 +1,7 @@
 use rand::Rng;
 use rust_truck_router::{
     algo::{ch::*, core_ch::CoreContractionHierarchy, csp_2_core_ch_chpot::CSP2AstarCoreCHQuery},
-    experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
+    experiments::measurement::{MeasurementResult, EXPERIMENTS_BASE_N},
     io::*,
     types::*,
 };
@@ -15,7 +15,7 @@ use std::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let n = EXPERIMENTS_N;
+    let n = EXPERIMENTS_BASE_N * 10;
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let parent_dir_path = Path::new(arg);
 
@@ -23,16 +23,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     struct LocalMeasurementResult {
         pub speed_cap_kmh: Weight,
         pub time_ms: Duration,
+        pub path_distance: Option<Weight>,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
-        const OWN_HEADER: &'static str = "speed_cap_kmh,time_ms";
+        const OWN_HEADER: &'static str = "speed_cap_kmh,time_ms,path_distance";
 
         fn get_header() -> String {
             format!("{}", Self::OWN_HEADER)
         }
         fn as_csv(&self) -> String {
-            format!("{},{}", self.speed_cap_kmh, self.time_ms.as_secs_f64() * 1000.0)
+            format!(
+                "{},{},{}",
+                self.speed_cap_kmh,
+                self.time_ms.as_secs_f64() * 1000.0,
+                self.path_distance.map_or("NaN".to_owned(), |v| v.to_string())
+            )
         }
     }
 
@@ -73,11 +79,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             let start = Instant::now();
             core_ch_chpot_query.init_new_s(s);
             core_ch_chpot_query.init_new_t(t);
-            let _core_ch_chpot_dist = core_ch_chpot_query.run_query();
+            let core_ch_chpot_dist = core_ch_chpot_query.run_query();
             let core_ch_chpot_time = start.elapsed();
+
             stat_logs.push(LocalMeasurementResult {
                 speed_cap_kmh,
                 time_ms: core_ch_chpot_time,
+                path_distance: core_ch_chpot_dist,
             });
         }
 

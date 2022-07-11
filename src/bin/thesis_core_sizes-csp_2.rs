@@ -1,7 +1,7 @@
 use rand::Rng;
 use rust_truck_router::{
     algo::{ch::*, core_ch::CoreContractionHierarchy, csp_2_core_ch_chpot::CSP2AstarCoreCHQuery},
-    experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
+    experiments::measurement::{MeasurementResult, EXPERIMENTS_BASE_N},
     io::*,
     types::*,
 };
@@ -16,7 +16,7 @@ use std::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let n = EXPERIMENTS_N;
+    let n = EXPERIMENTS_BASE_N;
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
     let first_out = Vec::<EdgeId>::load_from(path.join("first_out"))?;

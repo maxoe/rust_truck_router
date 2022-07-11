@@ -1,7 +1,7 @@
 use rand::Rng;
 use rust_truck_router::{
     algo::{ch::*, core_ch::CoreContractionHierarchy, csp_core_ch_chpot::CSPAstarCoreCHQuery},
-    experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
+    experiments::measurement::{MeasurementResult, EXPERIMENTS_BASE_N},
     io::*,
     types::*,
 };
@@ -15,7 +15,7 @@ use std::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let n = EXPERIMENTS_N;
+    let n = EXPERIMENTS_BASE_N * 10;
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let parent_dir_path = Path::new(arg);
 

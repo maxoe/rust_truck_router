@@ -13,7 +13,7 @@ use rust_truck_router::{
         ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_core_ch_chpot::CSPAstarCoreCHQuery,
         csp_core_ch_chpot_no_bw_no_prune::CSPAstarCoreCHQueryNoBwNoPrune,
     },
-    experiments::measurement::{MeasurementResult, EXPERIMENTS_N},
+    experiments::measurement::{MeasurementResult, EXPERIMENTS_BASE_N},
     types::{Graph, NodeId, OwnedGraph, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},
 };
 
@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
 
-    let n = EXPERIMENTS_N;
+    let n = EXPERIMENTS_BASE_N;
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {

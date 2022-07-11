@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::types::Weight;
 
 pub static LONG_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5);
-pub static EXPERIMENTS_N: usize = 1000;
+pub static EXPERIMENTS_BASE_N: usize = 1000;
 
 #[derive(Debug, Clone, Copy)]
 pub struct CSPMeasurementResult {
