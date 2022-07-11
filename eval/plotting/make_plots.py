@@ -390,6 +390,11 @@ def run_speed_cap_experiment(problem, graph):
     run_measurement_conditionally(name, graph)
 
 
+def run_parking_set_experiment(problem, graph):
+    name = "thesis_parking_set-" + problem
+    run_measurement_conditionally(name, graph)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument(
@@ -424,6 +429,9 @@ if __name__ == "__main__":
 
     run_speed_cap_experiment("csp", "parking_europe_hgv_sc")
     run_speed_cap_experiment("csp_2", "parking_europe_hgv_sc")
+
+    run_parking_set_experiment("csp", "parking_europe_hgvev_exp")
+    run_parking_set_experiment("csp_2", "parking_europe_hgvev_exp")
 
     run_avg_mid_times("csp", "parking_europe_hgv")
     # run_avg_mid_times("csp_2", "parking_europe_hgv") # out of memory
