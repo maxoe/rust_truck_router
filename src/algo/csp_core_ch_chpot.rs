@@ -156,7 +156,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
 
         let mut settled_fw = BitVec::from_elem(self.core_ch.forward().num_nodes(), false);
         let mut settled_bw = BitVec::from_elem(self.core_ch.backward().num_nodes(), false);
-        let mut _middle_node = self.core_ch.forward().num_nodes() as NodeId;
+        let mut _middle_node = self.core_ch.rank().len() as NodeId;
         let mut fw_next = true;
 
         let fw_search = OneRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
@@ -183,9 +183,6 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                     if node == self.t {
                         tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
-                        // self.bw_finished = true;
-
-                        // break;
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
@@ -221,11 +218,7 @@ impl<'a> CSPAstarCoreCHQuery<'a> {
                 // bw search found s -> done here
                 if node == self.s {
                     tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
-
-                    // self.fw_finished = true;
                     self.bw_finished = true;
-
-                    // break;
                 }
 
                 if settled_fw.get(node as usize).unwrap() {

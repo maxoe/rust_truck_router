@@ -28,6 +28,14 @@ where
         forward: FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>,
         backward: FirstOutGraph<FirstOutContainer, HeadContainer, WeightsContainer>,
     ) -> Self {
+        assert_eq!(rank.as_ref().len(), order.as_ref().len());
+
+        // for &node in core.as_ref() {
+        // assert_eq!(rank.as_ref()[node as usize], node);
+        //     assert_eq!(order.as_ref()[node as usize], node);
+        // }
+
+        println!("Core size: {}", core.as_ref().len());
         let node_count = forward.num_nodes();
 
         let mut is_core = BitVec::from_elem(node_count, false);

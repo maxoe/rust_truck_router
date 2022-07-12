@@ -312,6 +312,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
             // with hopping reduction
             // for (current_label_index, current_tent_dist_without_pot) in dist_list {
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
+                //println!("relaxing edge {} -> {}", node_id, neighbor_node);
                 // [new_dist without, new_dist with parking]
                 let mut new_dist = Vec::with_capacity(2);
                 // new_dist.push(current_tent_dist_without_pot.link(edge_weight));
@@ -716,6 +717,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
             // for (current_label_index, current_tent_dist_without_pot) in dist_list {
             // with hopping reduction
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
+                //println!("(prune bw) relaxing edge {} -> {}", node_id, neighbor_node);
                 // [new_dist without, new_dist with parking]
                 let mut new_dist = Vec::with_capacity(2);
                 new_dist.push(tentative_dist_without_pot.link(edge_weight));

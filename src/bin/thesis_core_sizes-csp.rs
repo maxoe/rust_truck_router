@@ -16,7 +16,7 @@ use std::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let n = EXPERIMENTS_BASE_N * 10;
+    let n = EXPERIMENTS_BASE_N;
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
     let first_out = Vec::<EdgeId>::load_from(path.join("first_out"))?;
@@ -29,45 +29,49 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
 
     let rk_logfile = std::fs::read_to_string(path.join("core_experiment.log"))?;
+    std::fs::copy(
+        path.join(path.join("core_experiment.log")),
+        "thesis_core_sizes-construction-".to_owned() + path.file_name().unwrap().to_str().unwrap() + ".txt",
+    )?;
     let mut run_list = Vec::new();
 
     for line in rk_logfile.lines().skip(1) {
         let values: Vec<_> = line.split(',').collect();
-        run_list.push((
+        let new_tuple = (
             values[0].parse::<f64>().unwrap(),
             values[1].parse::<usize>().unwrap(),
-            values[2].parse::<f64>().unwrap(),
             path.join(values[3].to_owned()),
-        ));
+        );
+
+        if !run_list.contains(&new_tuple) {
+            run_list.push((
+                values[0].parse::<f64>().unwrap(),
+                values[1].parse::<usize>().unwrap(),
+                path.join(values[3].to_owned()),
+            ));
+        }
     }
 
     #[derive(Debug, Clone)]
     struct LocalMeasurementResult {
         pub rel_core_size: f64,
         pub abs_core_size: usize,
-        pub construction_time_ms: f64,
         pub time_ms: Duration,
     }
 
     impl MeasurementResult for LocalMeasurementResult {
-        const OWN_HEADER: &'static str = "rel_core_size,abs_core_size,construction_time_ms,time_ms";
+        const OWN_HEADER: &'static str = "rel_core_size,abs_core_size,time_ms";
 
         fn get_header() -> String {
             format!("{}", Self::OWN_HEADER)
         }
         fn as_csv(&self) -> String {
-            format!(
-                "{},{},{},{}",
-                self.rel_core_size,
-                self.abs_core_size,
-                self.construction_time_ms,
-                self.time_ms.as_secs_f64() * 1000.0
-            )
+            format!("{},{},{}", self.rel_core_size, self.abs_core_size, self.time_ms.as_secs_f64() * 1000.0)
         }
     }
     let mut stat_logs = Vec::with_capacity(n);
 
-    for (rel_core_size, abs_core_size, construction_time_ms, core_ch_dir) in run_list {
+    for (rel_core_size, abs_core_size, core_ch_dir) in run_list {
         let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(core_ch_dir)?;
         ch.check();
         core_ch.check();
@@ -91,7 +95,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             stat_logs.push(LocalMeasurementResult {
                 rel_core_size,
                 abs_core_size,
-                construction_time_ms,
                 time_ms: core_ch_chpot_time,
             });
         }

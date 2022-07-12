@@ -16,6 +16,7 @@ use std::{
     error::Error,
     io::{stdout, Write},
     path::Path,
+    rc::Rc,
     time::Instant,
 };
 
@@ -26,15 +27,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let head = Vec::<NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
+    let parking_rc = Rc::new(is_parking_node.clone());
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
+
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let mut core_ch_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
-    core_ch_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    core_ch_query.set_custom_reset_nodes(parking_rc.clone());
+    // core_ch_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
     // let mut core_ch_query = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     // core_ch_query.set_restriction(32_400_000, 32_400_000, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
