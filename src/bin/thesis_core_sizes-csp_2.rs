@@ -16,7 +16,7 @@ use std::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let n = EXPERIMENTS_BASE_N;
+    let n = EXPERIMENTS_BASE_N * 10;
     let arg = &env::args().skip(1).next().expect("No directory arg given");
     let path = Path::new(arg);
     let first_out = Vec::<EdgeId>::load_from(path.join("first_out"))?;
