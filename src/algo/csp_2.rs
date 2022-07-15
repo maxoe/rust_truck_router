@@ -272,7 +272,7 @@ where
     }
 
     fn estimated_dist_with_restriction(&self, distance_at_node: [Weight; 3], potential_to_target: Weight) -> Weight {
-        if potential_to_target == Weight::infinity() {
+        if potential_to_target == Weight::infinity() || self.restriction_long.max_driving_time == 0 || self.restriction_short.max_driving_time == 0 {
             Weight::infinity()
         } else {
             let estimated = distance_at_node.link(potential_to_target);
