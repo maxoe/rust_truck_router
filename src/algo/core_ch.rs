@@ -36,7 +36,7 @@ where
         // }
 
         println!("Core size: {}", core.as_ref().len());
-        let node_count = forward.num_nodes();
+        let node_count = rank.as_ref().len();
 
         let mut is_core = BitVec::from_elem(node_count, false);
         for &n in core.as_ref().iter() {

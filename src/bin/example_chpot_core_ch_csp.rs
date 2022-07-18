@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
     let mut core_ch_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch_query.set_custom_reset_nodes(parking_rc.clone());
-    // core_ch_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    core_ch_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
 
     // let mut core_ch_query = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     // core_ch_query.set_restriction(32_400_000, 32_400_000, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);

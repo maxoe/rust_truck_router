@@ -51,8 +51,15 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         }
     }
 
-    pub fn set_custom_reset_nodes(&mut self, is_reset_node: Rc<BitVec>) {
-        self.is_reset_node = is_reset_node;
+    pub fn set_custom_reset_nodes(&mut self, ext_is_reset_node: Rc<BitVec>) {
+        let mut new_is_reset_node = BitVec::from_elem(self.is_reset_node.len(), false);
+
+        for (ext_i, b) in ext_is_reset_node.iter().enumerate().filter(|(_, b)| *b) {
+            let i = self.core_ch.rank()[ext_i];
+            new_is_reset_node.set(i as usize, b);
+        }
+
+        self.is_reset_node = Rc::new(new_is_reset_node);
     }
 
     pub fn clear_custom_reset_nodes(&mut self) {
