@@ -286,20 +286,6 @@ impl<'a> OneRestrictionDijkstra<'a> {
             let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
             let tentative_dist_without_pot = label.0.distance;
 
-            // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
-
-            // // add all labels with equal dist[0] to list since those may be in invalid order
-            // while let (Some(next_best_label_index), Some(next_best_label)) = (
-            //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
-            //     state.per_node_labels.get_mut(node_id as usize).pop(),
-            // ) {
-            //     if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
-            //         dist_list.push((next_best_label_index, next_best_label.0.distance));
-            //     } else {
-            //         break;
-            //     }
-            // }
-
             // check if next unsettled lable exists for node and push to queue
             if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
                 let pot = state.potential.potential(node_id);
@@ -310,12 +296,10 @@ impl<'a> OneRestrictionDijkstra<'a> {
             }
 
             // with hopping reduction
-            // for (current_label_index, current_tent_dist_without_pot) in dist_list {
+
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
-                //println!("relaxing edge {} -> {}", node_id, neighbor_node);
                 // [new_dist without, new_dist with parking]
                 let mut new_dist = Vec::with_capacity(2);
-                // new_dist.push(current_tent_dist_without_pot.link(edge_weight));
                 new_dist.push(tentative_dist_without_pot.link(edge_weight));
 
                 // constraint and target pruning
@@ -351,7 +335,6 @@ impl<'a> OneRestrictionDijkstra<'a> {
                             distance_with_potential,
                             distance: current_new_dist,
                             prev_node: node_id,
-                            // prev_label: Some(current_label_index),
                             prev_label: Some(label_index),
                         }));
 
@@ -375,140 +358,6 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     }
                 }
             }
-            // }
-        } else {
-            state.last_distance = None;
-        }
-
-        next
-    }
-
-    pub fn settle_next_label_report_pushed_non_core_nodes<P: Potential>(
-        &self,
-        state: &mut OneRestrictionDijkstraData<P>,
-        is_core: &BitVec,
-        non_core_count: &mut u32,
-        t: NodeId,
-    ) -> Option<State<Weight>> {
-        let next = state.queue.pop();
-
-        if let Some(State {
-            distance: _tentative_distance_from_queue,
-            node: node_id,
-        }) = next
-        {
-            state.num_settled += 1;
-
-            if !is_core.get(node_id as usize).unwrap() {
-                *non_core_count -= 1;
-            }
-
-            if node_id == t {
-                state.last_distance = state.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
-            }
-
-            let label_index = state.per_node_labels.get_mut(node_id as usize).peek_index().unwrap();
-            let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
-            let tentative_dist_without_pot = label.0.distance;
-
-            // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
-
-            // // add all labels with equal dist[0] to list since those may be in invalid order
-            // while let (Some(next_best_label_index), Some(next_best_label)) = (
-            //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
-            //     state.per_node_labels.get_mut(node_id as usize).pop(),
-            // ) {
-            //     if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
-            //         dist_list.push((next_best_label_index, next_best_label.0.distance));
-            //     } else {
-            //         break;
-            //     }
-            // }
-
-            // check if next unsettled lable exists for node and push to queue
-            if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
-                let pot = state.potential.potential(node_id);
-                state.queue.push(State {
-                    distance: state.estimated_dist_with_restriction(next_best_label.0.distance, pot),
-                    node: node_id,
-                });
-
-                if !is_core.get(node_id as usize).unwrap() {
-                    *non_core_count += 1;
-                }
-            }
-
-            // with hopping reduction
-            // for (current_label_index, current_tent_dist_without_pot) in dist_list {
-            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
-                // [new_dist without, new_dist with parking]
-                let mut new_dist = Vec::with_capacity(2);
-                // new_dist.push(current_tent_dist_without_pot.link(edge_weight));
-                new_dist.push(tentative_dist_without_pot.link(edge_weight));
-
-                // constraint and target pruning
-                if new_dist[0][1] >= state.restriction.max_driving_time
-                    || state.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
-                {
-                    continue;
-                }
-
-                if self.reset_flags.get(neighbor_node as usize).unwrap() {
-                    new_dist.push(new_dist[0]);
-                    new_dist[1].reset_distance(1, state.restriction.pause_time);
-                    state.num_labels_reset += 1;
-                }
-
-                for current_new_dist in new_dist {
-                    let pot = state.potential.potential(neighbor_node);
-                    let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
-
-                    if distance_with_potential == Weight::infinity() {
-                        continue;
-                    }
-                    state.per_node_labels.get_mut(neighbor_node as usize);
-                    let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
-                    let mut dominated = false;
-                    neighbor_label_set.retain(|&neighbor_label| {
-                        dominated |= neighbor_label.0.distance.dominates(&current_new_dist);
-                        dominated || !current_new_dist.dominates(&neighbor_label.0.distance)
-                    });
-
-                    if !dominated {
-                        state.num_labels_propagated += 1;
-                        neighbor_label_set.push(Reverse(Label {
-                            distance_with_potential,
-                            distance: current_new_dist,
-                            prev_node: node_id,
-                            // prev_label: Some(current_label_index),
-                            prev_label: Some(label_index),
-                        }));
-
-                        let pot = state.potential.potential(neighbor_node);
-                        let dist_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
-                        if state.queue.contains_index(neighbor_node as usize) {
-                            // decrease key seems to increase key if given a larger key than existing
-                            if state.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {
-                                state.queue.decrease_key(State {
-                                    distance: dist_with_potential,
-                                    node: neighbor_node,
-                                });
-                            }
-                        } else {
-                            state.num_queue_pushes += 1;
-                            state.queue.push(State {
-                                distance: dist_with_potential,
-                                node: neighbor_node,
-                            });
-
-                            if !is_core.get(neighbor_node as usize).unwrap() {
-                                *non_core_count += 1;
-                            }
-                        }
-                    }
-                }
-            }
-            // }
         } else {
             state.last_distance = None;
         }
@@ -691,20 +540,6 @@ impl<'a> OneRestrictionDijkstra<'a> {
             let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
             let tentative_dist_without_pot = label.0.distance;
 
-            // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
-
-            // // add all labels with equal dist[0] to list since those may be in invalid order
-            // while let (Some(next_best_label_index), Some(next_best_label)) = (
-            //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
-            //     state.per_node_labels.get_mut(node_id as usize).pop(),
-            // ) {
-            //     if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
-            //         dist_list.push((next_best_label_index, next_best_label.0.distance));
-            //     } else {
-            //         break;
-            //     }
-            // }
-
             // check if next unsettled lable exists for node and push to queue
             if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
                 let pot = state.potential.potential(node_id);
@@ -714,14 +549,11 @@ impl<'a> OneRestrictionDijkstra<'a> {
                 });
             }
 
-            // for (current_label_index, current_tent_dist_without_pot) in dist_list {
             // with hopping reduction
             for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
-                //println!("(prune bw) relaxing edge {} -> {}", node_id, neighbor_node);
                 // [new_dist without, new_dist with parking]
                 let mut new_dist = Vec::with_capacity(2);
                 new_dist.push(tentative_dist_without_pot.link(edge_weight));
-                // new_dist.push((current_tent_dist_without_pot).link(edge_weight));
 
                 // constraint and target pruning
                 if new_dist[0][1] >= state.restriction.max_driving_time
@@ -745,16 +577,7 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     }
                     // pruning with bw lower bound
                     if self.reset_flags.get(neighbor_node as usize).unwrap() {
-                        let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
-                        if let Some(Reverse(Label {
-                            distance: best_label_distance, ..
-                        })) = best_label
-                        {
-                            // best settled label as lower bound for D(neighbor_node,t)
-                            if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
-                                continue;
-                            }
-                        } else if bw_state.queue.contains_index(neighbor_node as usize) {
+                        if bw_state.queue.contains_index(neighbor_node as usize) {
                             // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
                             let bw_pot_at_neighbor =
                                 bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential - bw_state.get_tentative_dist_at(neighbor_node)[0];
@@ -787,7 +610,6 @@ impl<'a> OneRestrictionDijkstra<'a> {
                             distance: current_new_dist,
                             prev_node: node_id,
                             prev_label: Some(label_index),
-                            // prev_label: Some(current_label_index),
                         }));
 
                         let pot = state.potential.potential(neighbor_node);
@@ -810,173 +632,6 @@ impl<'a> OneRestrictionDijkstra<'a> {
                     }
                 }
             }
-            // }
-        } else {
-            state.last_distance = None;
-        }
-
-        next
-    }
-
-    pub fn settle_next_label_prune_bw_lower_bound_report_pushed_non_core_nodes<P: Potential>(
-        &self,
-        state: &mut OneRestrictionDijkstraData<P>,
-        bw_state: &mut OneRestrictionDijkstraData<P>,
-        tentative_distance: Weight,
-        is_core: &BitVec,
-        non_core_count: &mut u32,
-        t: NodeId,
-    ) -> Option<State<Weight>> {
-        let next = state.queue.pop();
-
-        if let Some(State {
-            distance: _tentative_distance_from_queue,
-            node: node_id,
-        }) = next
-        {
-            state.num_settled += 1;
-
-            if !is_core.get(node_id as usize).unwrap() {
-                *non_core_count -= 1;
-            }
-
-            if node_id == t {
-                state.last_distance = state.per_node_labels.get(node_id as usize).peek().map(|label| label.0.distance[0]);
-            }
-
-            let label_index = state.per_node_labels.get_mut(node_id as usize).peek_index().unwrap();
-            let label = state.per_node_labels.get_mut(node_id as usize).pop().unwrap();
-            let tentative_dist_without_pot = label.0.distance;
-
-            // let mut dist_list = vec![(label_index, tentative_dist_without_pot)];
-
-            // // add all labels with equal dist[0] to list since those may be in invalid order
-            // while let (Some(next_best_label_index), Some(next_best_label)) = (
-            //     state.per_node_labels.get_mut(node_id as usize).peek_index(),
-            //     state.per_node_labels.get_mut(node_id as usize).pop(),
-            // ) {
-            //     if next_best_label.0.distance[0] == tentative_dist_without_pot[0] {
-            //         dist_list.push((next_best_label_index, next_best_label.0.distance));
-            //     } else {
-            //         break;
-            //     }
-            // }
-
-            // check if next unsettled lable exists for node and push to queue
-            if let Some(next_best_label) = state.per_node_labels.get(node_id as usize).peek() {
-                let pot = state.potential.potential(node_id);
-                state.queue.push(State {
-                    distance: state.estimated_dist_with_restriction(next_best_label.0.distance, pot),
-                    node: node_id,
-                });
-
-                if !is_core.get(node_id as usize).unwrap() {
-                    *non_core_count += 1;
-                }
-            }
-
-            // for (current_label_index, current_tent_dist_without_pot) in dist_list {
-            // with hopping reduction
-            for (&edge_weight, &neighbor_node) in self.graph.outgoing_edge_iter(node_id).filter(|&s| *(s.1) != node_id) {
-                // [new_dist without, new_dist with parking]
-                let mut new_dist = Vec::with_capacity(2);
-                new_dist.push(tentative_dist_without_pot.link(edge_weight));
-                // new_dist.push(current_tent_dist_without_pot.link(edge_weight));
-
-                // constraint and target pruning
-                if new_dist[0][1] >= state.restriction.max_driving_time
-                    || state.per_node_labels.get(t as usize).iter().any(|&s| s.0.distance.dominates(&new_dist[0]))
-                {
-                    continue;
-                }
-
-                if self.reset_flags.get(neighbor_node as usize).unwrap() {
-                    new_dist.push(new_dist[0]);
-                    new_dist[1].reset_distance(1, state.restriction.pause_time);
-                    state.num_labels_reset += 1;
-                }
-
-                for current_new_dist in new_dist {
-                    let pot = state.potential.potential(neighbor_node);
-                    let distance_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
-
-                    if distance_with_potential == Weight::infinity() {
-                        continue;
-                    }
-                    // pruning with bw lower bound
-                    if is_core.get(neighbor_node as usize).unwrap()
-                    /* why is this necessary wtf */
-                    {
-                        let best_label = bw_state.get_settled_labels_at(neighbor_node).max();
-                        if let Some(Reverse(Label {
-                            distance: best_label_distance, ..
-                        })) = best_label
-                        {
-                            // best settled label as lower bound for D(neighbor_node,t)
-                            if current_new_dist[0] + best_label_distance[0] >= tentative_distance {
-                                continue;
-                            }
-                        } else if bw_state.queue.contains_index(neighbor_node as usize) {
-                            // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
-                            let bw_pot_at_neighbor =
-                                bw_state.get_best_label_at(neighbor_node).unwrap().distance_with_potential - bw_state.get_tentative_dist_at(neighbor_node)[0];
-                            let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                            if (current_new_dist[0] + bw_min_key).saturating_sub(bw_pot_at_neighbor) >= tentative_distance {
-                                continue;
-                            }
-                        } else {
-                            // bw_min_key - bw_pot(neighbor_node) as lower bound for D(neighbor_node,t)
-                            let v_s_dist = bw_state.potential.potential(neighbor_node);
-                            let bw_pot_at_neighbor = bw_state.estimated_dist_with_restriction([0, 0], v_s_dist) + bw_state.restriction.pause_time;
-                            let bw_min_key = bw_state.peek_queue().map(|s| s.distance).unwrap();
-                            if (current_new_dist[0] + bw_min_key).saturating_sub(bw_pot_at_neighbor) >= tentative_distance {
-                                continue;
-                            }
-                        }
-                    }
-
-                    let neighbor_label_set = state.per_node_labels.get_mut(neighbor_node as usize);
-                    let mut dominated = false;
-                    neighbor_label_set.retain(|&neighbor_label| {
-                        dominated |= neighbor_label.0.distance.dominates(&current_new_dist);
-                        dominated || !current_new_dist.dominates(&neighbor_label.0.distance)
-                    });
-
-                    if !dominated {
-                        state.num_labels_propagated += 1;
-                        neighbor_label_set.push(Reverse(Label {
-                            distance_with_potential,
-                            distance: current_new_dist,
-                            prev_node: node_id,
-                            // prev_label: Some(current_label_index),
-                            prev_label: Some(label_index),
-                        }));
-
-                        let pot = state.potential.potential(neighbor_node);
-                        let dist_with_potential = state.estimated_dist_with_restriction(current_new_dist, pot);
-                        if state.queue.contains_index(neighbor_node as usize) {
-                            // decrease key seems to increase key if given a larger key than existing
-                            if state.queue.get_key_by_index(neighbor_node as usize).unwrap().distance > dist_with_potential {
-                                state.queue.decrease_key(State {
-                                    distance: dist_with_potential,
-                                    node: neighbor_node,
-                                });
-                            }
-                        } else {
-                            state.num_queue_pushes += 1;
-                            state.queue.push(State {
-                                distance: dist_with_potential,
-                                node: neighbor_node,
-                            });
-
-                            if !is_core.get(neighbor_node as usize).unwrap() {
-                                *non_core_count += 1;
-                            }
-                        }
-                    }
-                }
-            }
-            // }
         } else {
             state.last_distance = None;
         }
@@ -1117,30 +772,3 @@ impl<'a> OneRestrictionDijkstra<'a> {
         s
     }
 }
-
-pub trait OneRestrictionDijkstraQuery<'a, P> {
-    fn one_restriction_dijkstra_query(q: STQuery, graph: BorrowedGraph<'a>, reset_flags: &'a BitVec, p: P) -> Option<NodeId>;
-}
-
-impl<'a, P: Potential> OneRestrictionDijkstraQuery<'a, P> for OneRestrictionDijkstra<'a> {
-    fn one_restriction_dijkstra_query(q: STQuery, graph: BorrowedGraph<'a>, reset_flags: &'a BitVec, p: P) -> Option<NodeId> {
-        let mut state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), p);
-        state.init_new_s(q.s);
-        let restriction_dijkstra = Self::new(graph, reset_flags);
-        restriction_dijkstra.dist_query(&mut state, q.t)
-    }
-}
-
-// impl<'a> DijkstraQuery<'a> for OneRestrictionDijkstra<'_> {
-//     fn dijkstra_query<'b>(q: STQuery, graph: BorrowedGraph<'b>) -> Option<NodeId> {
-//         let mut state = OneRestrictionDijkstraData::new(graph.num_nodes());
-//         state.init_new_s(q.s);
-
-//         let reset_flags = BitVec::from_elem(graph.num_nodes(), false);
-//         let mut restriction_dijkstra = Some(Self::new(graph, &reset_flags));
-//         let res = restriction_dijkstra.unwrap().dist_query(&mut state, q.t);
-//         restriction_dijkstra = None;
-
-//         res
-//     }
-// }

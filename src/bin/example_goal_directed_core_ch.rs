@@ -3,15 +3,22 @@ use rust_truck_router::{
         ch::ContractionHierarchy,
         ch_potential::CHPotential,
         core_ch::CoreContractionHierarchy,
-        csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
-        csp_2_core_ch::CSP2CoreCHQuery,
+        csp::{OneRestrictionDijkstra, OneRestrictionDijkstraData},
+        csp_core_ch_chpot::CSPAstarCoreCHQuery,
     },
     io::*,
     types::*,
 };
 
 use rand::Rng;
-use std::{env, error::Error, path::Path, time::Instant};
+use std::{
+    env,
+    error::Error,
+    io::{stdout, Write},
+    path::Path,
+    rc::Rc,
+    time::Instant,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arg = &env::args().skip(1).next().expect("No directory arg given");
@@ -20,22 +27,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let head = Vec::<NodeId>::load_from(path.join("head"))?;
     let travel_time = Vec::<Weight>::load_from(path.join("travel_time"))?;
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
+    let parking_rc = Rc::new(is_parking_node.clone());
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
 
-    // let is_routing_node = load_routingkit_bitvector(path.join("is_routing_node"))?;
-    // path with distance 20517304
-    // let s = is_routing_node.to_local(80232745).unwrap(); // osm_id
-    // let t = is_routing_node.to_local(824176810).unwrap(); // osm_id
-
     let core_ch = CoreContractionHierarchy::load_from_routingkit_dir(path.join("core_ch"))?;
-    // let mut core_ch_query = CSPCoreCHQuery::new(core_ch.borrow());
-    // core_ch_query.set_restriction(16_200_000, 2_700_000);
-    let mut core_ch_query = CSP2CoreCHQuery::new(core_ch.borrow());
-    core_ch_query.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000);
+    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
+    // let mut core_ch_query = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
+    let mut core_ch_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
+    core_ch_query.set_custom_reset_nodes(parking_rc.clone());
+    // core_ch_query.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_DRIVING_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    core_ch_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     core_ch_query.check();
 
     core_ch_query.init_new_s(s);
@@ -52,20 +57,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     print!("Validating result using constrained dijkstra");
-    let ch = ContractionHierarchy::load_from_routingkit_dir(path.join("ch"))?;
-    ch.check();
-    let mut csp_pot_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
-    let csp_pot = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
+    stdout().flush()?;
+
+    // let mut csp_pot_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    // let csp_pot = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
+    let mut csp_pot_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
+    let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     csp_pot_state.init_new_s(s);
-    csp_pot_state.set_restriction(32_400_000, 32_400_000, 16_200_000, 2_700_000); //.set_restriction(16_200_000, 2_700_000);
+    // csp_pot_state.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_DRIVING_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    csp_pot_state.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
-    let csp_pot_num_breaks = csp_pot_state
-        .current_best_path_to(t, true)
-        .map(|path| csp_pot.reset_nodes_on_path(&path).0.len());
-
     assert_eq!(dist, csp_pot_dist);
-    assert!(dist == csp_pot_dist || (csp_pot_num_breaks.is_some() && csp_pot_num_breaks.unwrap() > 1));
     assert_eq!(dist, core_ch_query.last_dist);
 
     println!(" - Done");

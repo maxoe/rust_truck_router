@@ -11,7 +11,7 @@ use rand::Rng;
 use rust_truck_router::{
     algo::{
         ch::ContractionHierarchy, core_ch::CoreContractionHierarchy, csp_2_core_ch_chpot::CSP2AstarCoreCHQuery,
-        csp_2_core_ch_chpot_no_bw_no_prune::CSP2AstarCoreCHQueryNoBwNoPrune,
+        csp_2_core_ch_chpot_no_bw::CSP2AstarCoreCHQueryNoBwNoPrune,
     },
     experiments::measurement::{MeasurementResult, EXPERIMENTS_BASE_N},
     types::{Graph, NodeId, OwnedGraph, EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME},

@@ -1,9 +1,5 @@
 use crate::{algo::astar::*, index_heap::*, timestamped_vector::TimestampedVector, types::*};
 
-pub trait DijkstraQuery<'a> {
-    fn dijkstra_query(q: STQuery, graph: BorrowedGraph<'a>) -> Option<Weight>;
-}
-
 #[derive(Debug, Clone)]
 pub struct DijkstraData<P = NoPotential> {
     pub queue: IndexdMinHeap<State<Weight>>,
@@ -253,14 +249,5 @@ impl<'a> Dijkstra<'a> {
         state.reset();
 
         while self.settle_next_node(state).is_some() {}
-    }
-}
-
-impl<'a> DijkstraQuery<'a> for Dijkstra<'a> {
-    fn dijkstra_query(q: STQuery, graph: BorrowedGraph<'a>) -> Option<NodeId> {
-        let mut state = DijkstraData::new(graph.num_nodes());
-        state.init_new_s(q.s);
-        let dijkstra = Self::new(graph);
-        dijkstra.dist_query(&mut state, q.t)
     }
 }

@@ -331,10 +331,6 @@ impl<L: Ord + Clone + Copy> DefaultReset for MCDHeap<L> {
     }
 }
 
-pub struct STQuery {
-    pub s: NodeId,
-    pub t: NodeId,
-}
 
 #[derive(Debug, Clone)]
 pub struct QueryTimeoutError;

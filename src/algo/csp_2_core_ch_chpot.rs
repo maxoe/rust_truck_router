@@ -27,9 +27,9 @@ pub struct CSP2AstarCoreCHQuery<'a> {
 impl<'a> CSP2AstarCoreCHQuery<'a> {
     pub fn new(core_ch: BorrowedCoreContractionHierarchy<'a>, ch: BorrowedContractionHierarchy<'a>) -> Self {
         let node_count = core_ch.rank().len();
+
         let node_mapping = core_ch.order().to_owned();
         let is_reset_node = core_ch.is_core().clone();
-
         CSP2AstarCoreCHQuery {
             core_ch,
             fw_state: TwoRestrictionDijkstraData::new_with_potential(node_count, CHPotential::from_ch_with_node_mapping(ch, node_mapping.clone())),
@@ -139,7 +139,6 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
 
         self.fw_finished = false;
         self.bw_finished = false;
-        self.last_dist = None;
     }
 
     pub fn clean(&mut self) {
@@ -184,7 +183,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
 
         let mut settled_fw = BitVec::from_elem(self.core_ch.forward().num_nodes(), false);
         let mut settled_bw = BitVec::from_elem(self.core_ch.backward().num_nodes(), false);
-        let mut _middle_node = self.core_ch.forward().num_nodes() as NodeId;
+        let mut _middle_node = self.core_ch.rank().len() as NodeId;
         let mut fw_next = true;
 
         let fw_search = TwoRestrictionDijkstra::new(self.core_ch.forward(), self.is_reset_node.as_ref());
@@ -198,7 +197,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
         while !self.fw_finished || !self.bw_finished {
             if !self.fw_finished && (self.bw_finished || fw_next) {
                 if let Some(State {
-                    distance: dist_from_queue_at_v,
+                    distance: _dist_from_queue_at_v,
                     node,
                 }) = if tentative_distance < Weight::infinity() && self.bw_state.min_key().is_some() {
                     fw_search.settle_next_label_prune_bw_lower_bound(&mut self.fw_state, &mut self.bw_state, tentative_distance, self.t)
@@ -209,12 +208,8 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
 
                     // fw search found t -> done here
                     if node == self.t {
-                        println!("Forward settled t");
-                        tentative_distance = dist_from_queue_at_v;
+                        tentative_distance = self.fw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                         self.fw_finished = true;
-                        // self.bw_finished = true;
-
-                        // break;
                     }
 
                     if settled_bw.get(node as usize).unwrap() {
@@ -239,7 +234,7 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
                     fw_next = false;
                 }
             } else if let Some(State {
-                distance: dist_from_queue_at_v,
+                distance: _dist_from_queue_at_v,
                 node,
             }) = if tentative_distance < Weight::infinity() && self.fw_state.min_key().is_some() {
                 bw_search.settle_next_label_prune_bw_lower_bound(&mut self.bw_state, &mut self.fw_state, tentative_distance, self.s)
@@ -250,12 +245,8 @@ impl<'a> CSP2AstarCoreCHQuery<'a> {
 
                 // bw search found s -> done here
                 if node == self.s {
-                    tentative_distance = dist_from_queue_at_v;
-
-                    // self.fw_finished = true;
+                    tentative_distance = self.bw_state.get_settled_labels_at(node).last().unwrap().0.distance[0]; // dist_from_queue_at_v[0];
                     self.bw_finished = true;
-
-                    // break;
                 }
 
                 if settled_fw.get(node as usize).unwrap() {
