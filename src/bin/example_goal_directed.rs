@@ -3,7 +3,6 @@ use rust_truck_router::{
         ch::*,
         ch_potential::CHPotential,
         csp_2::{TwoRestrictionDijkstra, TwoRestrictionDijkstraData},
-        csp_2_bidir_chpot::CSP2BidirAstarCHPotQuery,
     },
     io::*,
     types::*,
@@ -28,7 +27,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let is_parking_node = load_routingkit_bitvector(path.join("routing_parking_flags"))?;
 
     let graph = OwnedGraph::new(first_out, head, travel_time);
-    let bw_graph = OwnedGraph::reverse(graph.borrow());
 
     let s = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
     let t = rand::thread_rng().gen_range(0..graph.num_nodes() as NodeId);
@@ -37,28 +35,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut csp2_astar_state = TwoRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     csp2_astar_state.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
-    // csp2_astar_state.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
-
-    let mut csp2_bidir_astar_query = CSP2BidirAstarCHPotQuery::new(graph.borrow(), bw_graph.borrow(), &is_parking_node, ch.borrow());
-    csp2_bidir_astar_query.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
-    // csp2_core_ch_chpot_query.set_restriction(max_driving_time_long, pause_time_long, max_driving_time_short, pause_time_short);
-
     csp2_astar_state.init_new_s(s);
-    csp2_bidir_astar_query.init_new_s(s);
-    csp2_bidir_astar_query.init_new_t(t);
 
     let csp2_astar = TwoRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     let timer = Instant::now();
-    let unidir_dist = csp2_astar.dist_query(&mut csp2_astar_state, t);
+    let _dist = csp2_astar.dist_query(&mut csp2_astar_state, t);
     println!("Elapsed: {}ms", timer.elapsed().as_secs_f64() * 1000.0);
     print!("{}", csp2_astar.summary(&csp2_astar_state));
-
-    let timer = Instant::now();
-    let bidir_dist = csp2_bidir_astar_query.run_query();
-    println!("Elapsed bidirectional: {}ms", timer.elapsed().as_secs_f64() * 1000.0);
-    print!("{}", csp2_bidir_astar_query.summary());
-
-    assert_eq!(unidir_dist, bidir_dist);
 
     let latitude = Vec::<f32>::load_from(path.join("latitude"))?;
     let longitude = Vec::<f32>::load_from(path.join("longitude"))?;
