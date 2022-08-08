@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let mut core_ch_query = CSP2AstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     let mut core_ch_query = CSPAstarCoreCHQuery::new(core_ch.borrow(), ch.borrow());
     core_ch_query.set_custom_reset_nodes(parking_rc.clone());
-    // core_ch_query.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_DRIVING_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    // core_ch_query.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     core_ch_query.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     core_ch_query.check();
 
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut csp_pot_state = OneRestrictionDijkstraData::new_with_potential(graph.num_nodes(), CHPotential::from_ch(ch.borrow()));
     let csp_pot = OneRestrictionDijkstra::new(graph.borrow(), &is_parking_node);
     csp_pot_state.init_new_s(s);
-    // csp_pot_state.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_DRIVING_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
+    // csp_pot_state.set_restriction(EU_LONG_DRIVING_TIME, EU_LONG_PAUSE_TIME, EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     csp_pot_state.set_restriction(EU_SHORT_DRIVING_TIME, EU_SHORT_PAUSE_TIME);
     let csp_pot_dist = csp_pot.dist_query(&mut csp_pot_state, t);
 
